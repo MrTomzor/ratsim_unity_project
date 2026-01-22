@@ -8,6 +8,8 @@ using System.Threading;
 using UnityEngine;
 using UnityEngine.XR;
 using Newtonsoft.Json; // Add Newtonsoft.Json via Unity Package Manager or .dll
+using UnityEngine.SceneManagement;
+using System.Linq;
 
 
 
@@ -21,6 +23,48 @@ public class RoslikeTCPServer : MonoBehaviour
     public static RoslikeTCPServer GetInstance()
     {
         return instance;
+    }
+
+    // SCENE HANDLING
+
+    private string currentLoadedScene = null;
+
+    void OnSceneSelectReceived(StringMessage msg)
+    {
+        string sceneName = msg.data;
+        
+        if (verbose)
+        {
+            Debug.Log($"Received scene load request: {sceneName}");
+        }
+
+        
+        if (Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            // Unload previous scene if exists
+            /*if (currentLoadedScene != null && SceneManager.GetSceneByName(currentLoadedScene).isLoaded)
+            {
+                SceneManager.UnloadSceneAsync(currentLoadedScene);
+                Debug.Log($"Unloading previous scene: {currentLoadedScene}");
+            }*/
+            
+            // Load new scene
+            SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+            currentLoadedScene = sceneName;
+            
+            Debug.Log($"Loading scene: {sceneName}");
+
+        }
+        else
+        {
+            Debug.LogWarning($"Scene '{sceneName}' not found in build settings!");
+        }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        CleanupDestroyedTimersAndSubscribers();
+        Debug.Log($"Scene loaded: {scene.name}, cleaned up timers/subscribers");
     }
 
     private TcpListener listener;
@@ -83,6 +127,59 @@ public class RoslikeTCPServer : MonoBehaviour
             {
                 action(msg);
             }
+        }
+    }
+
+    public void CleanupDestroyedTimersAndSubscribers()
+    {
+        var numTimersBefore = timers.Count;
+        var numSubscribersBefore = subscribersByTopic.Values.Sum(list => list.Count);
+
+        // ---- Clean timers ----
+        timers.RemoveAll(timer =>
+        {
+            if (timer.callback == null) return true; // safety
+            if (timer.callback.Target is UnityEngine.Object unityObj)
+            {
+                return unityObj == null; // destroyed
+            }
+            return false; // keep non-Unity objects
+        });
+
+        var numTimersAfter = timers.Count;
+
+        // ---- Clean subscribers ----
+        foreach (var topic in subscribersByTopic.Keys.ToList()) // ToList to avoid modifying collection while iterating
+        {
+            var subs = subscribersByTopic[topic];
+            subs.RemoveAll(sub =>
+            {
+                if (sub == null) return true; // safety
+                if (sub.Target is UnityEngine.Object unityObj)
+                {
+                    return unityObj == null; // destroyed
+                }
+                return false; // keep non-Unity objects
+            });
+
+            // Optional: remove the topic entry if no subscribers remain
+            if (subs.Count == 0)
+            {
+                subscribersByTopic.Remove(topic);
+            }
+        }
+        var numSubscribersAfter = subscribersByTopic.Values.Sum(list => list.Count);
+
+        
+        Debug.Log($"Cleanup complete. Remaining timers: {timers.Count} (removed {numTimersBefore - numTimersAfter}), remaining topics: {subscribersByTopic.Count} (removed {numSubscribersBefore - numSubscribersAfter})");
+        // print their names
+        
+
+
+        Debug.Log("Remaining subscribers by topic:");
+        foreach (var topic in subscribersByTopic.Keys)
+        {
+            Debug.Log($"Topic: {topic}, Subscribers: {subscribersByTopic[topic].Count}");
         }
     }
 
@@ -170,11 +267,25 @@ public class RoslikeTCPServer : MonoBehaviour
             return;
         }
         instance = this;
-        
-        
 
+        // Track current scene
+        currentLoadedScene = SceneManager.GetActiveScene().name;
+        // This keeps it alive across scene loads
+        DontDestroyOnLoad(gameObject);
+
+        // This removes destroyed timers and subscribers on scene load
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        
+        
         Physics.simulationMode = SimulationMode.Script;
         Application.targetFrameRate = 10000;
+
+        // Subscribe to scene select topic
+        Subscribe<StringMessage>("/sim_control/scene_select", OnSceneSelectReceived);
+
+        // Setup core subscribers
+        Subscribe<StepRequestMessage>("/sim_control/do_step", StepRequestCallback);
+
         serverThread = new Thread(MainLoop);
         serverThread.IsBackground = true;
         serverThread.Start();
@@ -214,31 +325,23 @@ public class RoslikeTCPServer : MonoBehaviour
         }
     }
 
-    void MainLoop()
+
+    void HandleClient(TcpClient client)
     {
-        listener = new TcpListener(IPAddress.Any, 9000);
-        listener.Start();
-        Debug.Log("TCP server started on port 9000");
-
-        var client = listener.AcceptTcpClient();
-        client.NoDelay = true;
-        Debug.Log("Client connected");
-
+        // ASSUME 1 CLIENT AT A TIME ALWAYS
         var stream = client.GetStream();
         var reader = new StreamReader(stream, Encoding.UTF8);
         writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = false };
 
-        // Setup core subscribers
-        Subscribe<StepRequestMessage>("/sim_control/do_step", StepRequestCallback);
-
-        while (client.Connected)
-        { 
+        //try
+        {
+            while (client.Connected)
             {
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 //var mainloopstart = Time.realtimeSinceStartup;
                 // Read incoming messages
                 var line = reader.ReadLine();
-                if (line == null) continue;
+                if (line == null) break; // Client disconnected
                 var readingDoneTime = stopwatch.Elapsed.TotalSeconds;
 
                 //Debug.Log("Received data len: " + line.Length);
@@ -304,20 +407,36 @@ public class RoslikeTCPServer : MonoBehaviour
                     Debug.Log($"[Timing] Sending time: {(sendingDoneTime - updateDoneTime):F4} seconds");
                 }
             }
-
-          
-
-            
-
-            /*catch (Exception e)
-            {
-                Debug.LogError("Server loop error: " + e.Message);
-                break;
-            }*/
         }
+        /*catch (Exception e)
+        {
+            Debug.LogWarning("Client connection error: " + e.Message);
+        }
+        finally*/
+        {
+            client.Close();
+            Debug.Log("Client disconnected");
+        }
+    }
 
-        client.Close();
-        listener.Stop();
+
+    void MainLoop()
+    {
+        listener = new TcpListener(IPAddress.Any, 9000);
+        listener.Start();
+        Debug.Log("TCP server started on port 9000");
+
+        while (true)
+        {
+            Debug.Log("Waiting for client...");
+            TcpClient client = listener.AcceptTcpClient();
+            client.NoDelay = true;
+            Debug.Log("Client connected");
+
+            Thread clientThread = new Thread(() => HandleClient(client));
+            clientThread.IsBackground = true;
+            clientThread.Start();
+        }
     }
     
     void OnApplicationQuit()
