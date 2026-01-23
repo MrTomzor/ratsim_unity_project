@@ -72,7 +72,7 @@ public class RoslikeTCPServer : MonoBehaviour
     private StreamWriter writer;
 
     // Change the subscribers dictionary to support different message types per topic
-    private Dictionary<string, List<Action<Message>>> subscribersByTopic = new();
+    private Dictionary<string, List<RoslikeSubscriber>> subscribersByTopic = new();
     private List<RoslikeTimer> timers = new List<RoslikeTimer>();
 
     private List<Tuple<string, Message>> receivedMessages = new List<Tuple<string, Message>>();
@@ -121,12 +121,16 @@ public class RoslikeTCPServer : MonoBehaviour
         //Debug.Log("Message type: " + msg.GetType().Name);
         //Debug.Log("Message data: " + JsonConvert.SerializeObject(msg));
 
+        if(!subscribersByTopic.ContainsKey(topic))
+        {
+            // No subscribers for this topic
+            Debug.LogWarning($"No subscribers for topic receiving msg: {topic}");
+            return;
+        }
+
         foreach (var subscriber in subscribersByTopic[topic])
         {
-            if (subscriber is Action<Message> action)
-            {
-                action(msg);
-            }
+            subscriber.callback(msg);
         }
     }
 
@@ -155,7 +159,7 @@ public class RoslikeTCPServer : MonoBehaviour
             subs.RemoveAll(sub =>
             {
                 if (sub == null) return true; // safety
-                if (sub.Target is UnityEngine.Object unityObj)
+                if (sub.owner is UnityEngine.Object unityObj)
                 {
                     return unityObj == null; // destroyed
                 }
@@ -205,20 +209,22 @@ public class RoslikeTCPServer : MonoBehaviour
 
     public void Subscribe<T>(string topic, Action<T> callback) where T : Message
     {
-
-        if (subscribersByTopic.TryGetValue(topic, out var subscribersOfThisTopic) == false)
+        if (!subscribersByTopic.TryGetValue(topic, out var list))
         {
-            subscribersOfThisTopic = new List<Action<Message>>();
-            subscribersByTopic[topic] = subscribersOfThisTopic;
+            list = new List<RoslikeSubscriber>();
+            subscribersByTopic[topic] = list;
         }
-        subscribersOfThisTopic.Add((Message msg) =>
+
+        UnityEngine.Object owner = callback.Target as UnityEngine.Object;
+
+        list.Add(new RoslikeSubscriber
         {
-            if (msg is not T)
+            owner = owner,
+            callback = (Message msg) =>
             {
-                Debug.LogWarning($"Received message of type {msg.GetType().Name} but expected {typeof(T).Name}");
-                return;
+                if (msg is T typed)
+                    callback(typed);
             }
-            callback((T)msg);
         });
     }
 
