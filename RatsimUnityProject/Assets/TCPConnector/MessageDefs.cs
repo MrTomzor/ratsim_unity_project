@@ -97,3 +97,29 @@ public class MapGenTemplate2D : Message
     public int[] forbiddenMask{ get; set; }
     public int[] growableMask{ get; set; }
 }
+
+public class WildfireWorldGenMessage : Message
+{
+    // Seed for generating
+    public int seed{ get; set; }
+    public int numAgents{ get; set; }
+    public float startAndGoalClearingDistance{ get; set; }
+    public int arenaWidth{ get; set; }
+    public int arenaHeight{ get; set; }
+    public float treeDensity{ get; set; }
+    public string topology{ get; set; }
+    public float treesSwayingFactor{ get; set; }
+    public float debrisTriggerzoneSpawnFrequency{ get; set; }
+    public float debrisGroupSizeModifier{ get; set; }
+    public float carRoadSpawnFrequency{ get; set; }
+    public float carVelocityMin{ get; set; }
+    public float carVelocityMax{ get; set; }
+    public float fireSpawnFrequency{ get; set; }
+    public float fireGlobalSpreadModifier{ get; set; }
+    public float fireSmokeGenerationModifier{ get; set; }
+    public bool fireSpreadsAcrossGround{ get; set; }
+    public float staticWindXVel{ get; set; }
+    public float staticWindYVel{ get; set; }
+    public float windFluctuationModifier{ get; set; }
+
+}

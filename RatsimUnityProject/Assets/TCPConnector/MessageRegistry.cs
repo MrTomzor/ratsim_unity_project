@@ -33,6 +33,7 @@ public class MessageRegistry
         { "VisualPointTrackerMessage", typeof(VisualPointTrackerMessage) },
         { "RGBDMessage", typeof(RGBDMessage) },
         { "CameraIntrinsicsMessage", typeof(CameraIntrinsicsMessage) },
-        { "MapGenTemplate2D", typeof(MapGenTemplate2D)}
+        { "MapGenTemplate2D", typeof(MapGenTemplate2D)},
+        { "WildfireWorldGenMessage", typeof (WildfireWorldGenMessage)}
     };
 }
