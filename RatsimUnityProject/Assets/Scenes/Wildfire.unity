@@ -303,6 +303,13 @@ MonoBehaviour:
   trees: []
   agents:
   - {fileID: 1741282481}
+  roadClearingWidth: 20
+  roadStartGoalMargin: 20
+  numCarsToSpawn: 15
+  carSpawnerPrefab: {fileID: 1086114779671310507, guid: 264d13968d27375dba66166ca493f0e7, type: 3}
+  roadPrefab: {fileID: 2839297427355278621, guid: 7e8c7f4b59ff23873ad56fd9ba864851, type: 3}
+  carSpawners: []
+  roads: []
   treePrefab: {fileID: 2462568519800153458, guid: 013d944ba76dc920d83d83b920691f1f, type: 3}
   agentPrefab: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
 --- !u!4 &425708173

@@ -18,6 +18,17 @@ public class WildfireWorldManager : MonoBehaviour
     public List<GameObject> trees;
     public List<GameObject> agents;
 
+    // CARS
+    public float roadClearingWidth = 1.5f;
+    public float roadStartGoalMargin = 20;
+    public int numCarsToSpawn = 15;
+
+
+    public GameObject carSpawnerPrefab;
+    public GameObject roadPrefab;
+    public List<GameObject> carSpawners;
+    public List<GameObject> roads;
+
     // PREFABS
     public GameObject treePrefab;
     public GameObject agentPrefab;
@@ -72,6 +83,9 @@ public class WildfireWorldManager : MonoBehaviour
         // Generate trees
         GenerateTrees();
 
+        // Generate roads
+        GenerateRoadsSimple();
+
         // Spawn or move agents to start position
         for (int i = 0; i < wildfireWorldGenMessage.numAgents; i++)
         {
@@ -115,6 +129,101 @@ public class WildfireWorldManager : MonoBehaviour
         goalMsg.left = -goalPosition.x;
         goalMsg.radiansCounterClockwise = 0.0f; // No orientation for goal
         conn.Publish(goalPosTopic, goalMsg);
+    }
+
+    void GenerateRoadsSimple()
+    {
+        // delete old
+        foreach (var road in roads)
+        {
+            Destroy(road);
+        }
+        roads.Clear();
+        foreach (var spawner in carSpawners)
+        {
+            spawner.GetComponent<CarSpawner>().spawningEnabled = false;
+            Destroy(spawner);
+        }
+        carSpawners.Clear();
+
+        // First determine number of roads
+        int numRoads = (int)wildfireWorldGenMessage.carRoadSpawnFrequency; // assume its just number of roads for now
+        Debug.Log($"Generating {numRoads} roads.");
+
+        // Then for each road, determine position along the axis from start to goal (assume in Z).
+        
+        for(int i = 0; i < numRoads; i++){
+            // Select along random pos between start and goal, with some margin from both positions
+            float roadZ = (float)(rng.NextDouble() * ((goalPosition.z - roadStartGoalMargin) - (startPosition.z + roadStartGoalMargin)) + (startPosition.z + roadStartGoalMargin));
+
+            // check if not too close to other roads, otherwise skip
+            bool tooClose = false;
+            foreach(var existingRoad in roads)
+            {
+                if(Mathf.Abs(existingRoad.transform.position.z - roadZ) < roadClearingWidth / 2)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if(tooClose)
+            {
+                Debug.Log($"Skipping road at Z={roadZ} due to proximity to existing road.");
+                continue;
+            }
+
+            // CLEAR ALL TREES IN THE ROAD AREA
+            List<GameObject> treesToRemove = new List<GameObject>();
+            foreach (var tree in trees)
+            {
+                if (Mathf.Abs(tree.transform.position.z - roadZ) < roadClearingWidth / 2)
+                {
+                    treesToRemove.Add(tree);
+                }
+            }
+            foreach (var tree in treesToRemove)
+            {
+                Destroy(tree);
+                trees.Remove(tree);
+            }
+            Debug.Log($"Cleared {treesToRemove.Count} trees for road at Z={roadZ}.");
+
+            // Spawn the road prefab (for visualization)
+            Vector3 roadPosition = new Vector3(wildfireWorldGenMessage.arenaWidth / 2, 0.1f, roadZ);
+
+            // Spawn road
+            GameObject road = Instantiate(roadPrefab, roadPosition, Quaternion.identity);
+            roads.Add(road);
+
+            // Determine car direction (left or right), determines spawn
+            bool directionLeftToRight = (rng.NextDouble() > 0.5);
+            
+            // Spawn car spawner at one end of the road 
+            float spawnerX = directionLeftToRight ? 0f : wildfireWorldGenMessage.arenaWidth;
+            float spawnerZ = roadZ;
+            Vector3 spawnerPosition = new Vector3(spawnerX, defaultHeight, spawnerZ);
+            Quaternion spawnerRotation = directionLeftToRight ? Quaternion.Euler(0, 90, 0) : Quaternion.Euler(0, -90, 0);
+            GameObject carSpawner = Instantiate(carSpawnerPrefab, spawnerPosition, spawnerRotation);
+            carSpawners.Add(carSpawner);   
+
+            // Generate sequence of spawn times for the car spawner (using the given seed for the world to be deterministic)
+            CarSpawner spawnerScript = carSpawner.GetComponent<CarSpawner>();
+            spawnerScript.spawnTimes.Clear();
+            
+            float minSpawnInterval = spawnerScript.minSpawnInterval;
+            float maxSpawnInterval = spawnerScript.maxSpawnInterval;
+            spawnerScript.roadLength = wildfireWorldGenMessage.arenaWidth;
+            float currentTime = 0f;
+            for (int j = 0; j < numCarsToSpawn; j++)
+            {
+                float interval = (float)(rng.NextDouble() * (maxSpawnInterval - minSpawnInterval) + minSpawnInterval);
+                currentTime += interval;
+                spawnerScript.spawnTimes.Add(currentTime);
+            }
+                     
+        }
+
+        
     }
 
     void GenerateTrees()

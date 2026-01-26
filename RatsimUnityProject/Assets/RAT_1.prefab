@@ -103,6 +103,7 @@ GameObject:
   - component: {fileID: 8404249312285438026}
   - component: {fileID: 9209674583849767778}
   - component: {fileID: 749717876643433552}
+  - component: {fileID: 8223704123116478089}
   m_Layer: 0
   m_Name: RAT_1
   m_TagString: Untagged
@@ -168,6 +169,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxLinearVelocity: 5
   maxAngularVelocity: 2.5
+  topic_in: /cmd_vel
 --- !u!114 &7081735771137792426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -263,6 +265,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   topic: /rat1_odom
   verbose: 1
+--- !u!114 &8223704123116478089
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e59a3a5d76d6b4735a1055981e47c485, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hasCollided: 0
+  collisionVel: 0
+  outTopic: /collisions
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0
