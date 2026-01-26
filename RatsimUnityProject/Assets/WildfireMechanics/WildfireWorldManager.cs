@@ -21,6 +21,8 @@ public class WildfireWorldManager : MonoBehaviour
     // PREFABS
     public GameObject treePrefab;
     public GameObject agentPrefab;
+
+    RoslikeTCPServer conn;
     
 
 
@@ -30,14 +32,14 @@ public class WildfireWorldManager : MonoBehaviour
     {
         defaultHeight = this.transform.position.y;
 
-        var conn = RoslikeTCPServer.GetInstance();
+        conn = RoslikeTCPServer.GetInstance();
         conn.Subscribe<WildfireWorldGenMessage>(mapGenMsgTopic, GenerateMsgCallback);
         conn.RegisterTimerDiscrete(MainLoop, 1);
     }
 
     public void MainLoop(TimerEvent ev)
     {
-        
+        PublishGoalPosition();
     }
 
     public void GenerateMsgCallback(WildfireWorldGenMessage msg)
@@ -101,10 +103,17 @@ public class WildfireWorldManager : MonoBehaviour
 
 
         // Send data to python
+        PublishGoalPosition();
+        
+    }
+
+    void PublishGoalPosition()
+    {
         // Publish goal position
-        var conn = RoslikeTCPServer.GetInstance();
-        Float32Message goalMsg = new Float32Message();
-        goalMsg.data = goalPosition.z; // Assuming forward is along the z-axis
+        Twist2DMessage goalMsg = new Twist2DMessage();
+        goalMsg.forward = goalPosition.z;
+        goalMsg.left = -goalPosition.x;
+        goalMsg.radiansCounterClockwise = 0.0f; // No orientation for goal
         conn.Publish(goalPosTopic, goalMsg);
     }
 

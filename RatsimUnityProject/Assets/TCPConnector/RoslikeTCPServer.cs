@@ -102,14 +102,21 @@ public class RoslikeTCPServer : MonoBehaviour
                 {
                     Debug.Log($"Deserializing message: {fullJson}");
                 }
+                try{
+                    var msg = (Message)JsonConvert.DeserializeObject(dataJson, msgType);
+                    messages.Add(new Tuple<string, Message>(topic, msg));
+                }
+                catch(Exception e)
+                {
+                    Debug.LogError($"Failed to deserialize message of type {typeName} on topic {topic}: {e.Message}");
+                }
+                //var msg = (Message)JsonConvert.DeserializeObject(dataJson, msgType);
 
-                var msg = (Message)JsonConvert.DeserializeObject(dataJson, msgType);
-
-                messages.Add(new Tuple<string, Message>(topic, msg));
+                //messages.Add(new Tuple<string, Message>(topic, msg));
             }
             else
             {
-                Debug.LogWarning($"Unknown message type: {typeName}");
+                Debug.LogError($"Unknown message type: {typeName}");
             }
         }
         return messages;

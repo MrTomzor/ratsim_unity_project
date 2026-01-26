@@ -6,12 +6,14 @@ public class Twist2DActuator : MonoBehaviour
     public float maxLinearVelocity = 10f;
     public float maxAngularVelocity = 5f;
 
+    public string topic_in = "/cmd_vel";
+
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         conn = RoslikeTCPServer.GetInstance();
-        conn.Subscribe<Twist2DMessage>("/cmd_vel", OnTwist2DMessage);
+        conn.Subscribe<Twist2DMessage>(topic_in, OnTwist2DMessage);
 
     }
 
