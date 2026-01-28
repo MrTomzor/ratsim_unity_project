@@ -9,7 +9,7 @@ public class WildfireWorldManager : MonoBehaviour
 
     float defaultHeight;
 
-     System.Random rng;
+    System.Random rng;
 
     public Vector3 startPosition;
     public Vector3 goalPosition;
@@ -30,8 +30,11 @@ public class WildfireWorldManager : MonoBehaviour
     public List<GameObject> roads;
 
     // PREFABS
+    public bool randomizeAgentDirection = true;
     public GameObject treePrefab;
     public GameObject agentPrefab;
+    public GameObject goalMarkerPrefab;
+    public List<GameObject> activeMarkers;
 
     RoslikeTCPServer conn;
     
@@ -86,6 +89,9 @@ public class WildfireWorldManager : MonoBehaviour
         // Generate roads
         GenerateRoadsSimple();
 
+        // Generate markers
+        GenerateMarkers();
+
         // Spawn or move agents to start position
         for (int i = 0; i < wildfireWorldGenMessage.numAgents; i++)
         {
@@ -105,6 +111,8 @@ public class WildfireWorldManager : MonoBehaviour
                 agent = agents[i];
                 agent.transform.position = spawnpos;
                 agent.transform.rotation = spawnrot;
+
+                
                 
             }
             else
@@ -113,12 +121,34 @@ public class WildfireWorldManager : MonoBehaviour
                 agents.Add(agent);
                 // TODO later -- set agent's topic prefix according to its index
             }
+
+            if(randomizeAgentDirection)
+            {
+                // Randomize initial rotation a bit
+                float randomYaw = (float)(rng.NextDouble() * 360.0);
+                agent.transform.Rotate(0, randomYaw, 0);
+            }
         }
 
 
         // Send data to python
         PublishGoalPosition();
+    }
         
+        
+
+    public void GenerateMarkers()
+    {
+        // Clear existing markers
+        foreach (var marker in activeMarkers)
+        {
+            Destroy(marker);
+        }
+        activeMarkers.Clear();
+
+        // Create new goal marker
+        GameObject goalMarker = Instantiate(goalMarkerPrefab, goalPosition, Quaternion.identity);
+        activeMarkers.Add(goalMarker);
     }
 
     void PublishGoalPosition()
