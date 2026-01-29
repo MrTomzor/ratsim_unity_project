@@ -169,7 +169,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxLinearVelocity: 5
   maxAngularVelocity: 2.5
-  topic_in: /cmd_vel
+  maxLinearAcceleration: 5
+  maxAngularAcceleration: 2
+  velCmdTopic: /cmd_vel
+  accelCmdTopic: /cmd_accel
+  accelModeLinearDrag: 0.3
+  accelModeAngularDrag: 0.8
 --- !u!114 &7081735771137792426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -182,8 +187,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05267ae5d39a2f06cb04bb9c3ac108e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  angleStartDeg: -90
-  angleEndDeg: 90
+  angleStartDeg: -120
+  angleEndDeg: 120
   angleIncrementDeg: 10
   maxRange: 60
   descriptorDimension: 3
@@ -550,6 +555,7 @@ GameObject:
   - component: {fileID: 8316416262114376727}
   - component: {fileID: 6186023179724351064}
   - component: {fileID: 5898013457848217193}
+  - component: {fileID: 5862725220624195196}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -645,6 +651,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   componentToToggle: {fileID: 8316416262114376727}
   enableKey: 99
+--- !u!114 &5862725220624195196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4354631481880064101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c529b7e641c637e2193f7f37de137cee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  target: {fileID: 1675505943394758802}
+  height: 50
+  lockRotation: 1
+  rotationAngle: 0
 --- !u!1 &5278955909795711973
 GameObject:
   m_ObjectHideFlags: 0

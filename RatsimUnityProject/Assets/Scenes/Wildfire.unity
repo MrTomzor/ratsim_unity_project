@@ -330,27 +330,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &458552173 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 4354631481880064101, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-  m_PrefabInstance: {fileID: 973860714}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &458552178
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 458552173}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c529b7e641c637e2193f7f37de137cee, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  target: {fileID: 1741282481}
-  height: 50
-  lockRotation: 1
-  rotationAngle: 0
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -500,25 +479,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: angleEndDeg
-      value: 120
-      objectReference: {fileID: 0}
-    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: angleStartDeg
-      value: -120
-      objectReference: {fileID: 0}
-    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: angleIncrementDeg
-      value: 10
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 4354631481880064101, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 458552178}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
 --- !u!1 &991619180
 GameObject:

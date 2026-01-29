@@ -52,7 +52,7 @@ public class HumanControlManager : MonoBehaviour
         //msg.left = Input.GetAxis("Horizontal");
         msg.radiansCounterClockwise = - Input.GetAxis("Horizontal") * velocityController.maxAngularVelocity;
 
-        velocityController.OnTwist2DMessage(msg);
+        velocityController.OnVelTwist2DMessage(msg);
         //msg.radiansCounterClockwise = Input.GetAxis("Mouse X") * 0.1f;
     }
 }
