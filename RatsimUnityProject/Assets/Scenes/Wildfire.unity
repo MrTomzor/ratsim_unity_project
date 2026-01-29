@@ -303,6 +303,14 @@ MonoBehaviour:
   trees: []
   agents:
   - {fileID: 1741282481}
+  treeOscillationEnabled: 1
+  treeOscillationDirection: {x: 1, y: 0}
+  treeOriginalPositions: []
+  treeOscillationPhases: []
+  treeOscillationMagnitude: 1.5
+  treeOscillationFrequency: 1
+  treeOscillationTime: 0
+  aroundAgentDynamicsBoxSize: 120
   roadClearingWidth: 20
   roadStartGoalMargin: 20
   numCarsToSpawn: 15
@@ -435,9 +443,41 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1129026885181769916, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
     - target: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_Name
       value: RAT_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 1815150826476604271, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 2986656227358772888, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 3681299339813415260, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 4354631481880064101, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5278955909795711973, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5334983029809024186, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -478,6 +518,14 @@ PrefabInstance:
     - target: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6607694363763748135, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 7986998840026720300, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

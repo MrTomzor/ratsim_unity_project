@@ -17,6 +17,15 @@ public class WildfireWorldManager : MonoBehaviour
     // TREES
     public List<GameObject> trees;
     public List<GameObject> agents;
+    public bool treeOscillationEnabled = false;
+    public Vector2 treeOscillationDirection = new Vector2(1, 0);
+    public List<Vector3> treeOriginalPositions;
+    public List<float> treeOscillationPhases;
+    public float treeOscillationMagnitude = 0.5f;
+    public float treeOscillationFrequency = 1.0f;
+    public float treeOscillationTime = 0;
+    public float aroundAgentDynamicsBoxSize = 120f;
+
 
     // CARS
     public float roadClearingWidth = 1.5f;
@@ -54,6 +63,8 @@ public class WildfireWorldManager : MonoBehaviour
     public void MainLoop(TimerEvent ev)
     {
         PublishGoalPosition();
+        if(treeOscillationEnabled)
+            HandleTreeOscillation();
     }
 
     public void GenerateMsgCallback(WildfireWorldGenMessage msg)
@@ -128,6 +139,10 @@ public class WildfireWorldManager : MonoBehaviour
                 float randomYaw = (float)(rng.NextDouble() * 360.0);
                 agent.transform.Rotate(0, randomYaw, 0);
             }
+        }
+
+        if(treeOscillationEnabled){
+            InitializeTreeDynamics();
         }
 
 
@@ -256,6 +271,25 @@ public class WildfireWorldManager : MonoBehaviour
         
     }
 
+    void InitializeTreeDynamics()
+    {
+
+        treeOriginalPositions = new List<Vector3>();
+        treeOscillationPhases = new List<float>();
+        treeOscillationTime = 0;
+    
+
+        for(int i = 0; i < trees.Count; i++)
+        {
+            Vector3 position = trees[i].transform.position;
+                
+            treeOriginalPositions.Add(position);
+            treeOscillationPhases.Add((float)(rng.NextDouble() * 2 * Mathf.PI));
+        }
+
+            
+    }
+
     void GenerateTrees()
     {
         // Clear existing trees
@@ -264,6 +298,8 @@ public class WildfireWorldManager : MonoBehaviour
             Destroy(tree);
         }
         trees.Clear();
+        
+
 
         // Instantiate new trees based on wildfireWorldGenMessage and its seed
         float mapArea = wildfireWorldGenMessage.arenaWidth * wildfireWorldGenMessage.arenaHeight;
@@ -285,10 +321,38 @@ public class WildfireWorldManager : MonoBehaviour
 
             GameObject tree = Instantiate(treePrefab, position, Quaternion.identity);
             trees.Add(tree);
+            
         }
 
         Debug.Log($"Total trees generated: {trees.Count}");
-        
-        
+    }
+
+    void HandleTreeOscillation()
+    {
+        treeOscillationTime += conn.physicsStepTime * treeOscillationFrequency;
+
+        float agentX = agents[0].transform.position.x;
+        float agentZ = agents[0].transform.position.z;
+
+        float time = treeOscillationTime;
+        for (int i = 0; i < trees.Count; i++)
+        {
+            // do not oscillate if outside of aroundAgentDynamicsBoxSize
+            Vector3 treePos = trees[i].transform.position;
+            if (Mathf.Abs(treePos.x - agentX) > aroundAgentDynamicsBoxSize / 2 ||
+                Mathf.Abs(treePos.z - agentZ) > aroundAgentDynamicsBoxSize / 2)
+            {
+                continue;
+            }
+            
+            Vector3 originalPos = treeOriginalPositions[i];
+            GameObject tree = trees[i];
+            float phase = treeOscillationPhases[i];
+
+            float oscillation = Mathf.Sin(time + phase) * treeOscillationMagnitude;
+            Vector3 offset = new Vector3(treeOscillationDirection.x, 0, treeOscillationDirection.y).normalized * oscillation;
+
+            tree.transform.position = originalPos + offset;
+        }
     }
 }
