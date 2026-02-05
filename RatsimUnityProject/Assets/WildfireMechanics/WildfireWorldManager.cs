@@ -1,18 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public class WildfireWorldManager : MonoBehaviour
 {
-    public WildfireWorldGenMessage wildfireWorldGenMessage = null;
-    public string mapGenMsgTopic = "/wildfire_worldgen_input";
     public string goalPosTopic = "/wildfire_goal_position";
 
     float defaultHeight;
+
+    // WORLD PARAMETERS SETTABLE THRU MSGS
+    public float arenaWidth = 100f;
+    public float arenaHeight = 100f;
+    public float treeDensity = 0.01f; // trees per square unit
+    public int seed = 42;
+    public int numAgents = 1;
+    public float startAndGoalClearingDistance = 10f;
+    public float carRoadSpawnFrequency = 3; // number of roads to spawn
 
     System.Random rng;
 
     public Vector3 startPosition;
     public Vector3 goalPosition;
+
+    // BELOW ARE INTERNAL VARIABLES (not communicated via msgs)
 
     // TREES
     public List<GameObject> trees;
@@ -46,6 +56,9 @@ public class WildfireWorldManager : MonoBehaviour
     public List<GameObject> activeMarkers;
 
     RoslikeTCPServer conn;
+
+    // FLAGS
+    public bool worldgenRequested = false;
     
 
 
@@ -56,41 +69,57 @@ public class WildfireWorldManager : MonoBehaviour
         defaultHeight = this.transform.position.y;
 
         conn = RoslikeTCPServer.GetInstance();
-        conn.Subscribe<WildfireWorldGenMessage>(mapGenMsgTopic, GenerateMsgCallback);
+        //conn.Subscribe<WildfireWorldGenMessage>(mapGenMsgTopic, GenerateMsgCallback);
         conn.RegisterTimerDiscrete(MainLoop, 1);
+
+        conn.Subscribe<BoolMessage>("/worldgen/requested", (msg) => {
+            worldgenRequested = msg.data;
+            Debug.Log($"Worldgen requested: {worldgenRequested}");
+        });
+
+        conn.Subscribe<Int32Message>("/worldgen/seed", (msg) => {
+            seed = msg.data;
+            Debug.Log($"Worldgen seed set to: {seed}");
+        });
+
+       // w and h
+        conn.Subscribe<Float32Message>("/worldgen/arenaWidth", (msg) => {
+            arenaWidth = msg.data;
+            Debug.Log($"Worldgen arena width set to: {arenaWidth}");
+        });
+        conn.Subscribe<Float32Message>("/worldgen/arenaHeight", (msg) => {
+            arenaHeight = msg.data;
+            Debug.Log($"Worldgen arena height set to: {arenaHeight}");
+        });
+
+        // trees
+        conn.Subscribe<Float32Message>("/worldgen/treeDensity", (msg) => {
+            treeDensity = msg.data;
+            Debug.Log($"Worldgen tree density set to: {treeDensity}");
+        });
     }
 
     public void MainLoop(TimerEvent ev)
     {
+        if(worldgenRequested)
+        {
+            worldgenRequested = false;
+            GenerateWorld();
+        }
+
         PublishGoalPosition();
         if(treeOscillationEnabled)
             HandleTreeOscillation();
     }
 
-    public void GenerateMsgCallback(WildfireWorldGenMessage msg)
-    {
-        Debug.Log("Received WildfireWorldGenMessage, generating world.");
-        wildfireWorldGenMessage = msg;
-
-        GenerateWorld();
-    }
-
     public void GenerateWorld()
     {
-        if (wildfireWorldGenMessage == null)
-        {
-            Debug.LogError("WildfireWorldGenMessage is null, cannot generate world.");
-            return;
-        }
-        
-        float arenaWidth = wildfireWorldGenMessage.arenaWidth;
-        float arenaHeight = wildfireWorldGenMessage.arenaHeight;
 
         // apply seed
-        rng = new System.Random(wildfireWorldGenMessage.seed);
+        rng = new System.Random(seed);
 
         // Generate start and goal positions
-        float clearingDist = wildfireWorldGenMessage.startAndGoalClearingDistance;
+        float clearingDist = startAndGoalClearingDistance;
         startPosition = new Vector3(arenaWidth / 2, defaultHeight, arenaHeight * 0.2f);
         goalPosition = new Vector3(arenaWidth / 2, defaultHeight, arenaHeight * 0.8f);
 
@@ -104,7 +133,7 @@ public class WildfireWorldManager : MonoBehaviour
         GenerateMarkers();
 
         // Spawn or move agents to start position
-        for (int i = 0; i < wildfireWorldGenMessage.numAgents; i++)
+        for (int i = 0; i < numAgents; i++)
         {
             GameObject agent;
 
@@ -192,7 +221,7 @@ public class WildfireWorldManager : MonoBehaviour
         carSpawners.Clear();
 
         // First determine number of roads
-        int numRoads = (int)wildfireWorldGenMessage.carRoadSpawnFrequency; // assume its just number of roads for now
+        int numRoads = (int)carRoadSpawnFrequency; // assume its just number of roads for now
         Debug.Log($"Generating {numRoads} roads.");
 
         // Then for each road, determine position along the axis from start to goal (assume in Z).
@@ -234,7 +263,7 @@ public class WildfireWorldManager : MonoBehaviour
             Debug.Log($"Cleared {treesToRemove.Count} trees for road at Z={roadZ}.");
 
             // Spawn the road prefab (for visualization)
-            Vector3 roadPosition = new Vector3(wildfireWorldGenMessage.arenaWidth / 2, 0.1f, roadZ);
+            Vector3 roadPosition = new Vector3(arenaWidth / 2, 0.1f, roadZ);
 
             // Spawn road
             GameObject road = Instantiate(roadPrefab, roadPosition, Quaternion.identity);
@@ -244,7 +273,7 @@ public class WildfireWorldManager : MonoBehaviour
             bool directionLeftToRight = (rng.NextDouble() > 0.5);
             
             // Spawn car spawner at one end of the road 
-            float spawnerX = directionLeftToRight ? 0f : wildfireWorldGenMessage.arenaWidth;
+            float spawnerX = directionLeftToRight ? 0f : arenaWidth;
             float spawnerZ = roadZ;
             Vector3 spawnerPosition = new Vector3(spawnerX, defaultHeight, spawnerZ);
             Quaternion spawnerRotation = directionLeftToRight ? Quaternion.Euler(0, 90, 0) : Quaternion.Euler(0, -90, 0);
@@ -257,7 +286,7 @@ public class WildfireWorldManager : MonoBehaviour
             
             float minSpawnInterval = spawnerScript.minSpawnInterval;
             float maxSpawnInterval = spawnerScript.maxSpawnInterval;
-            spawnerScript.roadLength = wildfireWorldGenMessage.arenaWidth;
+            spawnerScript.roadLength = arenaWidth;
             float currentTime = 0f;
             for (int j = 0; j < numCarsToSpawn; j++)
             {
@@ -302,18 +331,18 @@ public class WildfireWorldManager : MonoBehaviour
 
 
         // Instantiate new trees based on wildfireWorldGenMessage and its seed
-        float mapArea = wildfireWorldGenMessage.arenaWidth * wildfireWorldGenMessage.arenaHeight;
-        int numTrees = (int)(wildfireWorldGenMessage.treeDensity * mapArea); 
+        float mapArea = arenaWidth * arenaHeight;
+        int numTrees = (int)(treeDensity * mapArea); 
         Debug.Log($"Generating {numTrees} trees.");
 
         for (int i = 0; i < numTrees; i++)
         {
-            float x = (float)(rng.NextDouble() * wildfireWorldGenMessage.arenaWidth);
-            float z = (float)(rng.NextDouble() * wildfireWorldGenMessage.arenaHeight);
+            float x = (float)(rng.NextDouble() * arenaWidth);
+            float z = (float)(rng.NextDouble() * arenaHeight);
             Vector3 position = new Vector3(x, defaultHeight, z);
 
-            if(Vector3.Distance(position, startPosition) < wildfireWorldGenMessage.startAndGoalClearingDistance ||
-               Vector3.Distance(position, goalPosition) < wildfireWorldGenMessage.startAndGoalClearingDistance)
+            if(Vector3.Distance(position, startPosition) < startAndGoalClearingDistance ||
+               Vector3.Distance(position, goalPosition) < startAndGoalClearingDistance)
             {
                 // Skip tree placement if too close to start or goal
                 continue;
