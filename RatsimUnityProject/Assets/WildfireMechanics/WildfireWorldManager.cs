@@ -9,6 +9,7 @@ public class WildfireWorldManager : MonoBehaviour
     float defaultHeight;
 
     // WORLD PARAMETERS SETTABLE THRU MSGS
+    public string mainLayout = "forest_frogger";
     public float arenaWidth = 100f;
     public float arenaHeight = 100f;
     public float treeDensity = 0.01f; // trees per square unit
@@ -77,12 +78,20 @@ public class WildfireWorldManager : MonoBehaviour
             Debug.Log($"Worldgen requested: {worldgenRequested}");
         });
 
+        InitParamSubscribers();
+        
+    }
+
+    void InitParamSubscribers()
+    {
         conn.Subscribe<Int32Message>("/worldgen/seed", (msg) => {
             seed = msg.data;
             Debug.Log($"Worldgen seed set to: {seed}");
         });
 
-       // w and h
+        // layout
+
+        // w and h
         conn.Subscribe<Float32Message>("/worldgen/arenaWidth", (msg) => {
             arenaWidth = msg.data;
             Debug.Log($"Worldgen arena width set to: {arenaWidth}");
@@ -97,6 +106,11 @@ public class WildfireWorldManager : MonoBehaviour
             treeDensity = msg.data;
             Debug.Log($"Worldgen tree density set to: {treeDensity}");
         });
+
+        conn.Subscribe<BoolMessage>("/worldgen/treeOscillationEnabled", (msg) => {
+            treeOscillationEnabled = msg.data;
+            Debug.Log($"Tree oscillation enabled set to: {treeOscillationEnabled}");
+        });
     }
 
     public void MainLoop(TimerEvent ev)
@@ -108,23 +122,22 @@ public class WildfireWorldManager : MonoBehaviour
         }
 
         PublishGoalPosition();
-        if(treeOscillationEnabled)
+        if(treeOscillationEnabled){
             HandleTreeOscillation();
+        }
     }
 
-    public void GenerateWorld()
+    // WORLD GENERATION CORE
+
+    void GenerateFroggerWorld()
     {
-
-        // apply seed
-        rng = new System.Random(seed);
-
         // Generate start and goal positions
         float clearingDist = startAndGoalClearingDistance;
-        startPosition = new Vector3(arenaWidth / 2, defaultHeight, arenaHeight * 0.2f);
-        goalPosition = new Vector3(arenaWidth / 2, defaultHeight, arenaHeight * 0.8f);
+        startPosition = new Vector3(0, defaultHeight, arenaHeight * 0.2f - arenaHeight/2);
+        goalPosition = new Vector3(0, defaultHeight, arenaHeight * 0.8f - arenaHeight/2);
 
         // Generate trees
-        GenerateTrees();
+        GenerateTreesUniform();
 
         // Generate roads
         GenerateRoadsSimple();
@@ -177,11 +190,44 @@ public class WildfireWorldManager : MonoBehaviour
 
         // Send data to python
         PublishGoalPosition();
+        // TODO implement later
+    }
+
+    void GenerateSuburbWorld()
+    {
+        GenerateTreesUniform();
+
+        // Generate houses 
+    }
+
+    void GenerateWorld()
+    {
+        // apply seed
+        rng = new System.Random(seed);
+
+        if(mainLayout == "forest_frogger")
+        {
+            GenerateFroggerWorld();
+            return;
+        }
+        if(mainLayout == "suburb")
+        {
+            GenerateSuburbWorld();
+            return;
+        }
+
+        Debug.LogError($"Unknown mainLayout for worldgen: {mainLayout}");
+        
     }
         
-        
+    // WORLD GENERATION HELPERS
 
-    public void GenerateMarkers()
+    void GenerateHouse(GameObject housePrefab, Vector3 position, Quaternion rotation, bool removeTreesInHouseAreas = true)
+    {
+        // TODO implement later
+    }
+
+    void GenerateMarkers()
     {
         // Clear existing markers
         foreach (var marker in activeMarkers)
@@ -194,17 +240,7 @@ public class WildfireWorldManager : MonoBehaviour
         GameObject goalMarker = Instantiate(goalMarkerPrefab, goalPosition, Quaternion.identity);
         activeMarkers.Add(goalMarker);
     }
-
-    void PublishGoalPosition()
-    {
-        // Publish goal position
-        Twist2DMessage goalMsg = new Twist2DMessage();
-        goalMsg.forward = goalPosition.z;
-        goalMsg.left = -goalPosition.x;
-        goalMsg.radiansCounterClockwise = 0.0f; // No orientation for goal
-        conn.Publish(goalPosTopic, goalMsg);
-    }
-
+   
     void GenerateRoadsSimple()
     {
         // delete old
@@ -263,7 +299,7 @@ public class WildfireWorldManager : MonoBehaviour
             Debug.Log($"Cleared {treesToRemove.Count} trees for road at Z={roadZ}.");
 
             // Spawn the road prefab (for visualization)
-            Vector3 roadPosition = new Vector3(arenaWidth / 2, 0.1f, roadZ);
+            Vector3 roadPosition = new Vector3(0, 0.1f, roadZ);
 
             // Spawn road
             GameObject road = Instantiate(roadPrefab, roadPosition, Quaternion.identity);
@@ -273,7 +309,7 @@ public class WildfireWorldManager : MonoBehaviour
             bool directionLeftToRight = (rng.NextDouble() > 0.5);
             
             // Spawn car spawner at one end of the road 
-            float spawnerX = directionLeftToRight ? 0f : arenaWidth;
+            float spawnerX = directionLeftToRight ? -arenaWidth / 2 : arenaWidth / 2;
             float spawnerZ = roadZ;
             Vector3 spawnerPosition = new Vector3(spawnerX, defaultHeight, spawnerZ);
             Quaternion spawnerRotation = directionLeftToRight ? Quaternion.Euler(0, 90, 0) : Quaternion.Euler(0, -90, 0);
@@ -319,7 +355,7 @@ public class WildfireWorldManager : MonoBehaviour
             
     }
 
-    void GenerateTrees()
+    void GenerateTreesUniform()
     {
         // Clear existing trees
         foreach (var tree in trees)
@@ -337,8 +373,8 @@ public class WildfireWorldManager : MonoBehaviour
 
         for (int i = 0; i < numTrees; i++)
         {
-            float x = (float)(rng.NextDouble() * arenaWidth);
-            float z = (float)(rng.NextDouble() * arenaHeight);
+            float x = (float)(rng.NextDouble() * arenaWidth) - arenaWidth / 2;
+            float z = (float)(rng.NextDouble() * arenaHeight) - arenaHeight / 2;
             Vector3 position = new Vector3(x, defaultHeight, z);
 
             if(Vector3.Distance(position, startPosition) < startAndGoalClearingDistance ||
@@ -356,6 +392,7 @@ public class WildfireWorldManager : MonoBehaviour
         Debug.Log($"Total trees generated: {trees.Count}");
     }
 
+    // RUNTIME FUNCTIONALITY
     void HandleTreeOscillation()
     {
         treeOscillationTime += conn.physicsStepTime * treeOscillationFrequency;
@@ -384,4 +421,15 @@ public class WildfireWorldManager : MonoBehaviour
             tree.transform.position = originalPos + offset;
         }
     }
+    void PublishGoalPosition()
+    {
+        // Publish goal position
+        Twist2DMessage goalMsg = new Twist2DMessage();
+        goalMsg.forward = goalPosition.z;
+        goalMsg.left = -goalPosition.x;
+        goalMsg.radiansCounterClockwise = 0.0f; // No orientation for goal
+        conn.Publish(goalPosTopic, goalMsg);
+    }
+
+
 }
