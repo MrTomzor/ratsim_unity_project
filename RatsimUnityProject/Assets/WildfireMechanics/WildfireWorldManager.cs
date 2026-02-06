@@ -18,6 +18,11 @@ public class WildfireWorldManager : MonoBehaviour
     public float startAndGoalClearingDistance = 10f;
     public float carRoadSpawnFrequency = 3; // number of roads to spawn
 
+    public float houseNumerosity = 0;
+    public string houseDoorDefaultType;
+    public float rewardNumerosity = 0;
+    public string rewardDistribution;
+
     System.Random rng;
 
     public Vector3 startPosition;
@@ -37,11 +42,17 @@ public class WildfireWorldManager : MonoBehaviour
     public float treeOscillationTime = 0;
     public float aroundAgentDynamicsBoxSize = 120f;
 
+    // HOUSES
+    public List<GameObject> houses;
+
 
     // CARS
     public float roadClearingWidth = 1.5f;
     public float roadStartGoalMargin = 20;
     public int numCarsToSpawn = 15;
+
+    // REWARDS
+    public List<GameObject> rewardObjects;
 
 
     public GameObject carSpawnerPrefab;
@@ -55,6 +66,8 @@ public class WildfireWorldManager : MonoBehaviour
     public GameObject agentPrefab;
     public GameObject goalMarkerPrefab;
     public List<GameObject> activeMarkers;
+    public GameObject houseDefaultPrefab;
+    public GameObject rewardPickupPrefab;
 
     RoslikeTCPServer conn;
 
@@ -90,6 +103,10 @@ public class WildfireWorldManager : MonoBehaviour
         });
 
         // layout
+        conn.Subscribe<StringMessage>("/worldgen/mainLayout", (msg) => {
+            mainLayout = msg.data;
+            Debug.Log($"Worldgen main layout set to: {mainLayout}");
+        });
 
         // w and h
         conn.Subscribe<Float32Message>("/worldgen/arenaWidth", (msg) => {
@@ -111,6 +128,37 @@ public class WildfireWorldManager : MonoBehaviour
             treeOscillationEnabled = msg.data;
             Debug.Log($"Tree oscillation enabled set to: {treeOscillationEnabled}");
         });
+
+                /*"houseNumerosity" : 5.0,
+        "houseDoorDefaultType" : "none",
+        # "rewardDistribution" : "houses",
+        "rewardDistribution" : "everywhere",*/
+
+
+        // houses
+        conn.Subscribe<Float32Message>("/worldgen/houseNumerosity", (msg) => {
+            houseNumerosity = msg.data;
+            Debug.Log($"Worldgen house numerosity set to: {houseNumerosity}");
+        });
+        conn.Subscribe<StringMessage>("/worldgen/houseDoorDefaultType", (msg) => {
+            houseDoorDefaultType = msg.data;
+            Debug.Log($"Worldgen house door default type set to: {houseDoorDefaultType}");
+        });
+        conn.Subscribe<StringMessage>("/worldgen/rewardDistribution", (msg) => {
+            rewardDistribution = msg.data;
+            Debug.Log($"Worldgen reward distribution set to: {rewardDistribution}");
+        });
+
+
+        // rewards
+        conn.Subscribe<Float32Message>("/worldgen/rewardNumerosity", (msg) => {
+            rewardNumerosity = msg.data;
+            Debug.Log($"Worldgen reward numerosity set to: {rewardNumerosity}");
+        });
+        conn.Subscribe<StringMessage>("/worldgen/rewardDistribution", (msg) => {
+            rewardDistribution = msg.data;
+            Debug.Log($"Worldgen reward distribution set to: {rewardDistribution}");
+        });
     }
 
     public void MainLoop(TimerEvent ev)
@@ -129,23 +177,8 @@ public class WildfireWorldManager : MonoBehaviour
 
     // WORLD GENERATION CORE
 
-    void GenerateFroggerWorld()
+    void RespawnAgents()
     {
-        // Generate start and goal positions
-        float clearingDist = startAndGoalClearingDistance;
-        startPosition = new Vector3(0, defaultHeight, arenaHeight * 0.2f - arenaHeight/2);
-        goalPosition = new Vector3(0, defaultHeight, arenaHeight * 0.8f - arenaHeight/2);
-
-        // Generate trees
-        GenerateTreesUniform();
-
-        // Generate roads
-        GenerateRoadsSimple();
-
-        // Generate markers
-        GenerateMarkers();
-
-        // Spawn or move agents to start position
         for (int i = 0; i < numAgents; i++)
         {
             GameObject agent;
@@ -182,6 +215,26 @@ public class WildfireWorldManager : MonoBehaviour
                 agent.transform.Rotate(0, randomYaw, 0);
             }
         }
+    }
+
+    void GenerateFroggerWorld()
+    {
+        // Generate start and goal positions
+        float clearingDist = startAndGoalClearingDistance;
+        startPosition = new Vector3(0, defaultHeight, arenaHeight * 0.2f - arenaHeight/2);
+        goalPosition = new Vector3(0, defaultHeight, arenaHeight * 0.8f - arenaHeight/2);
+
+        // Generate trees
+        GenerateTreesUniform();
+
+        // Generate roads
+        GenerateRoadsSimple();
+
+        // Generate markers
+        GenerateMarkers();
+
+        // Spawn or move agents to start position
+        RespawnAgents();
 
         if(treeOscillationEnabled){
             InitializeTreeDynamics();
@@ -195,15 +248,24 @@ public class WildfireWorldManager : MonoBehaviour
 
     void GenerateSuburbWorld()
     {
+
+        // tp agent to start
+        RespawnAgents();
+
         GenerateTreesUniform();
 
         // Generate houses 
+        GenerateHousesUniform();
+
+        GenerateRewards();
     }
 
     void GenerateWorld()
     {
         // apply seed
         rng = new System.Random(seed);
+
+
 
         if(mainLayout == "forest_frogger")
         {
@@ -221,10 +283,181 @@ public class WildfireWorldManager : MonoBehaviour
     }
         
     // WORLD GENERATION HELPERS
+    void GenerateRewards()
+    {
+        // remove all reward objects
+        foreach(var reward in rewardObjects)
+        {
+            Destroy(reward);
+        }
+        rewardObjects.Clear();
+
+        if(rewardDistribution == "none")
+        {
+            return;
+        }
+        else if (rewardDistribution == "everywhere")
+        {
+            // spawn rewards uniformly across the map
+            float mapArea = arenaWidth * arenaHeight;
+            int numRewards = (int)(rewardNumerosity * mapArea);
+            Debug.Log($"Generating {numRewards} rewards uniformly across the map.");
+            for (int i = 0; i < numRewards; i++)
+            {
+                float x = (float)(rng.NextDouble() * arenaWidth) - arenaWidth / 2;
+                float z = (float)(rng.NextDouble() * arenaHeight) - arenaHeight / 2;
+                Vector3 position = new Vector3(x, defaultHeight, z);
+
+                if(Vector3.Distance(position, startPosition) < startAndGoalClearingDistance ||
+                   Vector3.Distance(position, goalPosition) < startAndGoalClearingDistance)
+                {
+                    // Skip reward placement if too close to start or goal
+                    continue;
+                }
+
+                GameObject reward = Instantiate(rewardPickupPrefab, position, Quaternion.identity);
+                rewardObjects.Add(reward);
+            }
+
+        }
+        else if (rewardDistribution == "houses")
+        {
+            // spawn rewards in front of house doors
+            foreach(GameObject house in houses)
+            {
+                // here numerosity means chance of spawning a reward in front of a given house, rather than total number of rewards, to avoid overcrowding in front of houses when there are many houses
+                if(rng.NextDouble() > rewardNumerosity)
+                {
+                    continue;
+                }
+
+                House houseComponent = house.GetComponent<House>();
+                Vector3 rewardPosition = house.transform.position + Quaternion.Euler(0, house.transform.rotation.eulerAngles.y, 0) * houseComponent.clearingAreaCollider.center;
+
+                
+                GameObject reward = Instantiate(rewardPickupPrefab, rewardPosition, Quaternion.identity);
+                rewardObjects.Add(reward);
+            }
+        }
+        
+    }
 
     void GenerateHouse(GameObject housePrefab, Vector3 position, Quaternion rotation, bool removeTreesInHouseAreas = true)
     {
-        // TODO implement later
+        // Find trees that lie within the house's clearing area and remove them
+        if (removeTreesInHouseAreas)
+        {
+            House houseComponent = housePrefab.GetComponent<House>();
+            BoxCollider clearingBox = houseComponent.clearingAreaCollider;
+            Vector3 worldCenter = position + rotation * clearingBox.center;
+            Vector3 halfExtents = clearingBox.size * 0.5f;
+            List<GameObject> treesToRemove = new List<GameObject>();
+
+            // The trees have colliders, so we can use Physics.OverlapBox to find them
+            Collider[] colliders = Physics.OverlapBox(worldCenter, halfExtents, rotation, LayerMask.GetMask("DynaTrees"));
+            foreach (var collider in colliders)
+            {
+                treesToRemove.Add(collider.gameObject);
+                
+            }
+
+            foreach (var tree in treesToRemove)
+            {
+                Destroy(tree);
+            }
+        }
+
+        // Spawn the house prefab at the specified position and rotation
+        GameObject house = Instantiate(housePrefab, position, rotation);
+        houses.Add(house);
+    }
+
+    void GenerateHousesUniform()
+    {
+        // clear previous houses
+        foreach (var house in houses)
+        {
+            Destroy(house);
+        }
+        houses.Clear();
+
+        // get clearing box info from prefab
+        BoxCollider houseClearingBox = houseDefaultPrefab
+            .GetComponent<House>()
+            .clearingAreaCollider;
+
+        Vector3 clearingBoxSize = houseClearingBox.size;
+        Vector3 clearingBoxCenter = houseClearingBox.center;
+        var houseLayerMask = LayerMask.GetMask("House"); // make sure the house prefab is on the "House" layer and that layer is included in this mask
+
+        Debug.Log("trying to uniformly spawn houses with numerosity: " + houseNumerosity);
+
+        for (int i = 0; i < houseNumerosity; i++)
+        {
+            int maxAttempts = 10;
+            bool validPositionFound = false;
+            Vector3 position = Vector3.zero;
+            Quaternion rotation = Quaternion.identity;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                // random position
+                float x = (float)(rng.NextDouble() * arenaWidth) - arenaWidth / 2f;
+                float z = (float)(rng.NextDouble() * arenaHeight) - arenaHeight / 2f;
+                position = new Vector3(x, defaultHeight, z);
+
+                // random rotation
+                rotation = Quaternion.Euler(0f, (float)(rng.NextDouble() * 360.0), 0f);
+
+                // compute world-space clearing box
+                Vector3 worldCenter = position + rotation * clearingBoxCenter;
+                Vector3 halfExtents = clearingBoxSize * 0.5f;
+
+                // ---------- check distance from start & goal ----------
+                Vector2 houseXZ = new Vector2(worldCenter.x, worldCenter.z);
+                Vector2 startXZ = new Vector2(startPosition.x, startPosition.z);
+                //Vector2 goalXZ  = new Vector2(goalPosition.x, goalPosition.z);
+
+                float safeRadius = Mathf.Max(halfExtents.x, halfExtents.z) + startAndGoalClearingDistance;
+
+                if (Vector2.Distance(houseXZ, startXZ) < safeRadius)
+                    continue;
+
+                // if (Vector2.Distance(houseXZ, goalXZ) < safeRadius)
+                //     continue;
+
+                // ---------- check overlap with existing houses ----------
+                // This checks against existing houses' TRIGGER clearing colliders
+                bool overlapsExistingHouse = Physics.CheckBox(
+                    worldCenter,
+                    halfExtents,
+                    rotation,
+                    houseLayerMask,
+                    QueryTriggerInteraction.Collide // IMPORTANT: detect triggers
+                );
+
+                if (overlapsExistingHouse)
+                    continue;
+
+                validPositionFound = true;
+                break;
+            }
+
+            if (validPositionFound)
+            {
+                Debug.Log($"Spawning house {i} at position {position} with rotation {rotation.eulerAngles} after finding valid position in {maxAttempts} attempts.");
+                GenerateHouse(
+                    houseDefaultPrefab,
+                    position,
+                    rotation,
+                    removeTreesInHouseAreas: true
+                );
+            }
+            else
+            {
+                Debug.LogWarning($"Could not find valid position for house {i} after {maxAttempts} attempts.");
+            }
+        }
     }
 
     void GenerateMarkers()

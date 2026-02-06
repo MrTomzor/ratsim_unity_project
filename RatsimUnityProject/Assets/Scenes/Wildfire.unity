@@ -296,8 +296,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a0070b60507bf7d978fbc8a1927cf792, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mapGenMsgTopic: /wildfire_worldgen_input
   goalPosTopic: /wildfire_goal_position
+  mainLayout: forest_frogger
+  arenaWidth: 100
+  arenaHeight: 100
+  treeDensity: 0.01
+  seed: 42
+  numAgents: 1
+  startAndGoalClearingDistance: 10
+  carRoadSpawnFrequency: 3
+  houseNumerosity: 0
+  houseDoorDefaultType: 
+  rewardNumerosity: 0
+  rewardDistribution: 
   startPosition: {x: 0, y: 0, z: 0}
   goalPosition: {x: 0, y: 0, z: 0}
   trees: []
@@ -311,9 +322,11 @@ MonoBehaviour:
   treeOscillationFrequency: 1
   treeOscillationTime: 0
   aroundAgentDynamicsBoxSize: 120
+  houses: []
   roadClearingWidth: 20
   roadStartGoalMargin: 20
   numCarsToSpawn: 15
+  rewardObjects: []
   carSpawnerPrefab: {fileID: 1086114779671310507, guid: 264d13968d27375dba66166ca493f0e7, type: 3}
   roadPrefab: {fileID: 2839297427355278621, guid: 7e8c7f4b59ff23873ad56fd9ba864851, type: 3}
   carSpawners: []
@@ -323,6 +336,9 @@ MonoBehaviour:
   agentPrefab: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
   goalMarkerPrefab: {fileID: 3404270036332628800, guid: c0014123945c08df9a622b1f8d148f73, type: 3}
   activeMarkers: []
+  houseDefaultPrefab: {fileID: 7556120904209480306, guid: 81710b366b83ce10c8c6c18137695ff7, type: 3}
+  rewardPickupPrefab: {fileID: 7644313187523702680, guid: a6f19caa8a2903f0ea49a60d61fa4b06, type: 3}
+  worldgenRequested: 0
 --- !u!4 &425708173
 Transform:
   m_ObjectHideFlags: 0
@@ -443,45 +459,13 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 1129026885181769916, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
     - target: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_Name
       value: RAT_1
       objectReference: {fileID: 0}
-    - target: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 1815150826476604271, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 2986656227358772888, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 3681299339813415260, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 4354631481880064101, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 5278955909795711973, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 5334983029809024186, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
     - target: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.24
+      value: 2.56
       objectReference: {fileID: 0}
     - target: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_LocalPosition.y
@@ -489,7 +473,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.23
+      value: 1.49
       objectReference: {fileID: 0}
     - target: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
       propertyPath: m_LocalRotation.w
@@ -519,14 +503,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6607694363763748135, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
+    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: maxRange
+      value: 30
       objectReference: {fileID: 0}
-    - target: {fileID: 7986998840026720300, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
-      propertyPath: m_Layer
-      value: 7
+    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: angleEndDeg
+      value: 90
       objectReference: {fileID: 0}
+    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: angleStartDeg
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 7081735771137792426, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      propertyPath: activeSemanticSet
+      value: 
+      objectReference: {fileID: 11400000, guid: 129d887123c3c58369f3e0b00618fc5d, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

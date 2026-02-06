@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class CollisionSensor : MonoBehaviour
@@ -8,6 +9,8 @@ public class CollisionSensor : MonoBehaviour
     public bool hasCollided = false;
     public float collisionVel = 0;
     public string outTopic = "/collisions";
+
+    public List<string> ignoreTags = new List<string> { "reward" };
     
     void Start()
     {
@@ -35,6 +38,10 @@ public class CollisionSensor : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (ignoreTags.Contains(collision.gameObject.tag))
+        {
+            return;
+        }
         hasCollided = true;
         // save max magnitude incase of many cols
         collisionVel = Mathf.Max(collisionVel, collision.relativeVelocity.magnitude);

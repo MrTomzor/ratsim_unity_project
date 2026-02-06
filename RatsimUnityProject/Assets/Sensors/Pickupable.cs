@@ -15,4 +15,12 @@ public class Pickupable : MonoBehaviour
         conn.Publish(topicName, new Int32Message { data = publishedNumber });
         Destroy(gameObject);
     }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        Debug.Log("Pickupable collided with " + collision.gameObject.name);
+        RoslikeTCPServer conn = RoslikeTCPServer.GetInstance();
+        conn.Publish(topicName, new Int32Message { data = publishedNumber });
+        Destroy(gameObject);
+    }
 }

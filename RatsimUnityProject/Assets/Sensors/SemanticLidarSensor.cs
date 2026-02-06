@@ -1,15 +1,21 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class SemanticLidarSensor : MonoBehaviour
 {
+
+    public static Hashtable semanticNamesToIndices = null;
+    public SemanticSet activeSemanticSet;
+
+
     public int angleStartDeg = 45; // Start angle in degrees
     public int angleEndDeg = 45;
     public int angleIncrementDeg = 5;
     public float maxRange = 100f; // Maximum range of the lidar sensor
 
-    public uint descriptorDimension = 3;
+    public static uint descriptorDimension = 3;
 
     public string topicName = "/lidar2d";
 
@@ -19,9 +25,56 @@ public class SemanticLidarSensor : MonoBehaviour
     RoslikeTCPServer conn;
     public bool verbose = false;
 
+    public static float[] GetNamedSemanticObjectDescriptor(string semanticName)
+    {
+        // One hot encoding based on the semantic name
+        if (semanticNamesToIndices.ContainsKey(semanticName))
+        {
+            int index = (int)semanticNamesToIndices[semanticName];
+            float[] descriptor = new float[semanticNamesToIndices.Count];
+            descriptor[index] = 1.0f;
+            return descriptor;
+        }
+        else
+        {
+            return new float[semanticNamesToIndices.Count];
+        }
+    }
+
+    void InitializeSemanticSetData()
+    {
+        semanticNamesToIndices = new Hashtable();
+
+        foreach(GameObject obj in activeSemanticSet.prefabs)
+        {
+            NamedSemanticObject namedSemanticObject = obj.GetComponentInChildren<NamedSemanticObject>();
+            if (namedSemanticObject != null)
+            {
+                if (!semanticNamesToIndices.ContainsKey(namedSemanticObject.semanticName))
+                {
+                    semanticNamesToIndices[namedSemanticObject.semanticName] = semanticNamesToIndices.Count;
+                }
+            }
+        }
+
+        descriptorDimension = (uint)semanticNamesToIndices.Count;
+        Debug.Log("Initialized Semantic Set Hashtable with " + descriptorDimension + " semantic classes.");
+        Debug.Log("Semantic classes:");
+        foreach (DictionaryEntry entry in semanticNamesToIndices)
+        {
+            Debug.Log("  " + entry.Key + " -> " + entry.Value);
+        }
+    }
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        if(activeSemanticSet != null && semanticNamesToIndices == null)
+        {
+            Debug.Log("Initializing Semantic Set Data...");
+            InitializeSemanticSetData();
+        }
+
         numRays = 1 + (angleEndDeg - angleStartDeg) / angleIncrementDeg;
 
         conn = RoslikeTCPServer.GetInstance();
@@ -37,11 +90,12 @@ public class SemanticLidarSensor : MonoBehaviour
         foreach (var dir in worldDirections)
         {
             RaycastHit hit;
-            if (Physics.Raycast(start, dir, out hit, maxRange))
+            //if (Physics.Raycast(start, dir, out hit, maxRange))
+            if (Physics.Raycast(start, dir, out hit, maxRange, ~0, QueryTriggerInteraction.Ignore))
             {
                 float distance = hit.distance;
                 SemanticObject semanticObject = hit.collider.GetComponent<SemanticObject>();
-                float[] descriptor = semanticObject != null ? semanticObject.GetDescriptor(hit.point) : new float[3];
+                float[] descriptor = semanticObject != null ? semanticObject.GetDescriptor(hit.point) : new float[descriptorDimension];
 
                 res.Add(new Tuple<float, float[]>(distance, descriptor));
                 if (debugDrawRays)
@@ -51,7 +105,7 @@ public class SemanticLidarSensor : MonoBehaviour
             }
             else
             {
-                res.Add(new Tuple<float, float[]>(-1, new float[3]));
+                res.Add(new Tuple<float, float[]>(-1, new float[descriptorDimension]));
                 if (debugDrawRays)
                 {
                     Debug.DrawLine(start, start + dir * maxRange, Color.red, 0);
