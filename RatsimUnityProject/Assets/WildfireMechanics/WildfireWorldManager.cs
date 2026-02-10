@@ -54,6 +54,9 @@ public class WildfireWorldManager : MonoBehaviour
     // REWARDS
     public List<GameObject> rewardObjects;
 
+    // WALLS
+    public List<GameObject> arenaWalls;
+
 
     public GameObject carSpawnerPrefab;
     public GameObject roadPrefab;
@@ -68,6 +71,7 @@ public class WildfireWorldManager : MonoBehaviour
     public List<GameObject> activeMarkers;
     public GameObject houseDefaultPrefab;
     public GameObject rewardPickupPrefab;
+    public GameObject arenaWallPrefab;
 
     RoslikeTCPServer conn;
 
@@ -80,6 +84,8 @@ public class WildfireWorldManager : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+
+        
         defaultHeight = this.transform.position.y;
 
         conn = RoslikeTCPServer.GetInstance();
@@ -184,6 +190,10 @@ public class WildfireWorldManager : MonoBehaviour
             GameObject agent;
 
             Vector3 spawnpos = startPosition;
+            if(i < agents.Count && agents[i] != null)
+            {
+                spawnpos.y = agents[i].transform.position.y; // keep current height if agent already exists
+            }
             Quaternion spawnrot = Quaternion.identity;
             // make agent point towards goal at start
             Vector3 directionToGoal = (goalPosition - startPosition).normalized;
@@ -197,9 +207,6 @@ public class WildfireWorldManager : MonoBehaviour
                 agent = agents[i];
                 agent.transform.position = spawnpos;
                 agent.transform.rotation = spawnrot;
-
-                
-                
             }
             else
             {
@@ -213,6 +220,12 @@ public class WildfireWorldManager : MonoBehaviour
                 // Randomize initial rotation a bit
                 float randomYaw = (float)(rng.NextDouble() * 360.0);
                 agent.transform.Rotate(0, randomYaw, 0);
+            }
+
+            // Reset agents' relative pose trackers if they have them
+            if(agent.GetComponent<RelativePoseSensor>() != null)
+            {
+                agent.GetComponent<RelativePoseSensor>().ResetOrigin();
             }
         }
     }
@@ -252,6 +265,8 @@ public class WildfireWorldManager : MonoBehaviour
         // tp agent to start
         RespawnAgents();
 
+        GenerateArenaWalls();
+
         GenerateTreesUniform();
 
         // Generate houses 
@@ -262,8 +277,32 @@ public class WildfireWorldManager : MonoBehaviour
 
     void GenerateWorld()
     {
+        Debug.Log("*** Generating world with seed: " + seed + ", layout: " + mainLayout + ", arena size: " + arenaWidth + "x" + arenaHeight + ", tree density: " + treeDensity);
         // apply seed
         rng = new System.Random(seed);
+
+        // Clear all obstacles and rewards
+            foreach (var tree in trees)
+            {
+                DestroyImmediate(tree);
+            }
+            trees.Clear();
+                foreach (var house in houses)
+                {
+                    DestroyImmediate(house);
+                }
+                houses.Clear();
+                 foreach (var reward in rewardObjects)
+                {
+                    DestroyImmediate(reward);
+                }
+                rewardObjects.Clear();
+        
+        // 3. CRITICAL: Sync transforms to physics engine
+    Physics.SyncTransforms();
+    
+    // 4. CRITICAL: Simulate one tiny step to clear collision state
+    Physics.Simulate(0.001f);  // Tiny simulation to flush state
 
 
 
@@ -283,12 +322,48 @@ public class WildfireWorldManager : MonoBehaviour
     }
         
     // WORLD GENERATION HELPERS
+    void GenerateArenaWalls()
+    {
+        // Remove old
+        foreach(var wall in arenaWalls)
+        {
+            DestroyImmediate(wall);
+        }
+        arenaWalls.Clear();
+
+
+        // spawn 4 walls around the arena perimeter to prevent agents from leaving the area
+        // Assume the wall is a thin stretchable object in the X direction, and its pivot is in the center.
+        // The walls will have different lengths depending on whether they are vertical or horizontal, but the same thickness.
+        float wallThickness = 1f;
+        Vector3 wallScaleHorizontal = new Vector3(arenaWidth + wallThickness * 2, 5f, wallThickness);
+        Vector3 wallScaleVertical = new Vector3(wallThickness, 5f, arenaHeight + wallThickness * 2);
+
+        // bottom wall
+        GameObject bottomWall = Instantiate(arenaWallPrefab, new Vector3(0, defaultHeight, -arenaHeight / 2 - wallThickness / 2), Quaternion.identity);
+        bottomWall.transform.localScale = wallScaleHorizontal;
+        arenaWalls.Add(bottomWall);
+        // top wall
+        GameObject topWall = Instantiate(arenaWallPrefab, new Vector3(0, defaultHeight, arenaHeight / 2 + wallThickness / 2), Quaternion.identity);
+        topWall.transform.localScale = wallScaleHorizontal;
+        arenaWalls.Add(topWall);
+        // left wall
+        GameObject leftWall = Instantiate(arenaWallPrefab, new Vector3(-arenaWidth / 2 - wallThickness / 2, defaultHeight, 0), Quaternion.identity);
+        leftWall.transform.localScale = wallScaleVertical;
+        arenaWalls.Add(leftWall);
+        // right wall
+        GameObject rightWall = Instantiate(arenaWallPrefab, new Vector3(arenaWidth / 2 + wallThickness / 2, defaultHeight, 0), Quaternion.identity);
+        rightWall.transform.localScale = wallScaleVertical;
+        arenaWalls.Add(rightWall);
+
+    }
+
     void GenerateRewards()
     {
         // remove all reward objects
         foreach(var reward in rewardObjects)
         {
-            Destroy(reward);
+            DestroyImmediate(reward);
         }
         rewardObjects.Clear();
 
@@ -325,18 +400,21 @@ public class WildfireWorldManager : MonoBehaviour
             // spawn rewards in front of house doors
             foreach(GameObject house in houses)
             {
-                // here numerosity means chance of spawning a reward in front of a given house, rather than total number of rewards, to avoid overcrowding in front of houses when there are many houses
-                if(rng.NextDouble() > rewardNumerosity)
-                {
-                    continue;
-                }
+                
 
                 House houseComponent = house.GetComponent<House>();
-                Vector3 rewardPosition = house.transform.position + Quaternion.Euler(0, house.transform.rotation.eulerAngles.y, 0) * houseComponent.clearingAreaCollider.center;
+                foreach(var rewPos in houseComponent.rewardSpawnPoints){
+                    // here numerosity means chance of spawning a reward in front of a given house, rather than total number of rewards, to avoid overcrowding in front of houses when there are many houses
+                    if(rng.NextDouble() > rewardNumerosity)
+                    {
+                        continue;
+                    }
+                    Vector3 rewardPosition = rewPos.transform.position;
 
-                
-                GameObject reward = Instantiate(rewardPickupPrefab, rewardPosition, Quaternion.identity);
-                rewardObjects.Add(reward);
+                    
+                    GameObject reward = Instantiate(rewardPickupPrefab, rewardPosition, Quaternion.identity);
+                    rewardObjects.Add(reward);
+                }
             }
         }
         
@@ -363,7 +441,7 @@ public class WildfireWorldManager : MonoBehaviour
 
             foreach (var tree in treesToRemove)
             {
-                Destroy(tree);
+                DestroyImmediate(tree);
             }
         }
 
@@ -377,7 +455,7 @@ public class WildfireWorldManager : MonoBehaviour
         // clear previous houses
         foreach (var house in houses)
         {
-            Destroy(house);
+            DestroyImmediate(house);
         }
         houses.Clear();
 
@@ -401,9 +479,10 @@ public class WildfireWorldManager : MonoBehaviour
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
-                // random position
-                float x = (float)(rng.NextDouble() * arenaWidth) - arenaWidth / 2f;
-                float z = (float)(rng.NextDouble() * arenaHeight) - arenaHeight / 2f;
+                // random position, BUT take into account the size of the house's clearing box
+                float houseMaxMargin = Mathf.Max(clearingBoxSize.x, clearingBoxSize.z) / 2f;
+                float x = (float)(rng.NextDouble() * (arenaWidth - 2 * houseMaxMargin)) - (arenaWidth / 2f - houseMaxMargin);
+                float z = (float)(rng.NextDouble() * (arenaHeight - 2 * houseMaxMargin)) - (arenaHeight / 2f - houseMaxMargin);
                 position = new Vector3(x, defaultHeight, z);
 
                 // random rotation
@@ -465,7 +544,7 @@ public class WildfireWorldManager : MonoBehaviour
         // Clear existing markers
         foreach (var marker in activeMarkers)
         {
-            Destroy(marker);
+            DestroyImmediate(marker);
         }
         activeMarkers.Clear();
 
@@ -479,13 +558,13 @@ public class WildfireWorldManager : MonoBehaviour
         // delete old
         foreach (var road in roads)
         {
-            Destroy(road);
+            DestroyImmediate(road);
         }
         roads.Clear();
         foreach (var spawner in carSpawners)
         {
             spawner.GetComponent<CarSpawner>().spawningEnabled = false;
-            Destroy(spawner);
+            DestroyImmediate(spawner);
         }
         carSpawners.Clear();
 
@@ -526,7 +605,7 @@ public class WildfireWorldManager : MonoBehaviour
             }
             foreach (var tree in treesToRemove)
             {
-                Destroy(tree);
+                DestroyImmediate(tree);
                 trees.Remove(tree);
             }
             Debug.Log($"Cleared {treesToRemove.Count} trees for road at Z={roadZ}.");
@@ -593,7 +672,7 @@ public class WildfireWorldManager : MonoBehaviour
         // Clear existing trees
         foreach (var tree in trees)
         {
-            Destroy(tree);
+            DestroyImmediate(tree);
         }
         trees.Clear();
         

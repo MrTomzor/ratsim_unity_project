@@ -281,6 +281,11 @@ public class RoslikeTCPServer : MonoBehaviour
         }
         instance = this;
 
+        Physics.autoSyncTransforms = false;  // Add this - prevents auto syncing
+        // Force deterministic physics
+        Time.fixedDeltaTime = physicsStepTime;
+        Time.maximumDeltaTime = physicsStepTime;
+
         // Track current scene
         currentLoadedScene = SceneManager.GetActiveScene().name;
         // This keeps it alive across scene loads

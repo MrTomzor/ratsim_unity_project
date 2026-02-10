@@ -8,9 +8,14 @@ public class CollisionSensor : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public bool hasCollided = false;
     public float collisionVel = 0;
+    public string collidedObjectName = "";
     public string outTopic = "/collisions";
 
     public List<string> ignoreTags = new List<string> { "reward" };
+
+    public bool verbose = false;
+
+    int internalStep = 0;
     
     void Start()
     {
@@ -20,10 +25,16 @@ public class CollisionSensor : MonoBehaviour
 
     public void MainTimer(TimerEvent ev)
     {
+        internalStep++;
         if (hasCollided)
         {
+            if(verbose)
+            {
+                Debug.Log("!!!!!!!!!!!!!!!! COLLISION " + internalStep + " detected with velocity: " + collisionVel + " against object: " + collidedObjectName);
+            }
+
             Float32Message msg = new Float32Message();
-            msg.data = collisionVel;
+            msg.data = internalStep;;
             conn.Publish(outTopic, msg);
             hasCollided = false;
             collisionVel = 0;
@@ -42,6 +53,10 @@ public class CollisionSensor : MonoBehaviour
         {
             return;
         }
+
+        Debug.Log("COL step: " + internalStep);
+
+        collidedObjectName = collision.gameObject.name;
         hasCollided = true;
         // save max magnitude incase of many cols
         collisionVel = Mathf.Max(collisionVel, collision.relativeVelocity.magnitude);
