@@ -14,6 +14,7 @@ public class Twist2DActuator : MonoBehaviour
 
     public float accelModeLinearDrag = 0.2f;
     public float accelModeAngularDrag = 0.2f;
+    public bool verbose = false;
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -27,6 +28,8 @@ public class Twist2DActuator : MonoBehaviour
 
     public void OnVelTwist2DMessage(Twist2DMessage msg)
     {
+        if(verbose)            
+            Debug.Log($"Received Twist2DMessage: forward={msg.forward}, left={msg.left}, radiansCounterClockwise={msg.radiansCounterClockwise}");
         // Apply the twist to the GameObject
         Vector3 forward = transform.forward * msg.forward;
         Vector3 left = -transform.right * msg.left;
@@ -39,14 +42,14 @@ public class Twist2DActuator : MonoBehaviour
 
     public void OnAccelTwist2DMessage(Twist2DMessage msg)
     {
+        if(verbose)
+            Debug.Log($"Received AccelTwist2DMessage: forward={msg.forward}, left={msg.left}, radiansCounterClockwise={msg.radiansCounterClockwise}");
         // Apply the twist to the GameObject
         Vector3 forward = transform.forward * msg.forward;
         Vector3 left = -transform.right * msg.left;
         Vector3 rotationRad = new Vector3(0, -msg.radiansCounterClockwise, 0);
 
         var rb = GetComponent<Rigidbody>();
-        rb.linearVelocity = forward + left;
-        rb.angularVelocity = rotationRad;
 
         float dt = conn.physicsStepTime;
         rb.linearVelocity += (forward + left) * dt;

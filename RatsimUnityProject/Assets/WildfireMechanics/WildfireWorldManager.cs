@@ -135,11 +135,6 @@ public class WildfireWorldManager : MonoBehaviour
             Debug.Log($"Tree oscillation enabled set to: {treeOscillationEnabled}");
         });
 
-                /*"houseNumerosity" : 5.0,
-        "houseDoorDefaultType" : "none",
-        # "rewardDistribution" : "houses",
-        "rewardDistribution" : "everywhere",*/
-
 
         // houses
         conn.Subscribe<Float32Message>("/worldgen/houseNumerosity", (msg) => {
@@ -227,6 +222,13 @@ public class WildfireWorldManager : MonoBehaviour
             {
                 agent.GetComponent<RelativePoseSensor>().ResetOrigin();
             }
+
+            // Reset velocity if they have a Rigidbody
+            if(agent.GetComponent<Rigidbody>() != null)
+            {
+                agent.GetComponent<Rigidbody>().linearVelocity = Vector3.zero;
+                agent.GetComponent<Rigidbody>().angularVelocity = Vector3.zero;
+            }
         }
     }
 
@@ -282,27 +284,27 @@ public class WildfireWorldManager : MonoBehaviour
         rng = new System.Random(seed);
 
         // Clear all obstacles and rewards
-            foreach (var tree in trees)
+        foreach (var tree in trees)
+        {
+            DestroyImmediate(tree);
+        }
+        trees.Clear();
+            foreach (var house in houses)
             {
-                DestroyImmediate(tree);
+                DestroyImmediate(house);
             }
-            trees.Clear();
-                foreach (var house in houses)
-                {
-                    DestroyImmediate(house);
-                }
-                houses.Clear();
-                 foreach (var reward in rewardObjects)
-                {
-                    DestroyImmediate(reward);
-                }
-                rewardObjects.Clear();
+            houses.Clear();
+                foreach (var reward in rewardObjects)
+            {
+                DestroyImmediate(reward);
+            }
+            rewardObjects.Clear();
         
         // 3. CRITICAL: Sync transforms to physics engine
-    Physics.SyncTransforms();
+        Physics.SyncTransforms();
     
-    // 4. CRITICAL: Simulate one tiny step to clear collision state
-    Physics.Simulate(0.001f);  // Tiny simulation to flush state
+        // 4. CRITICAL: Simulate one tiny step to clear collision state
+        Physics.Simulate(0.001f);  // Tiny simulation to flush state
 
 
 

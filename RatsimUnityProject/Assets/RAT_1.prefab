@@ -175,7 +175,8 @@ MonoBehaviour:
   velCmdTopic: /cmd_vel
   accelCmdTopic: /cmd_accel
   accelModeLinearDrag: 0.3
-  accelModeAngularDrag: 0.8
+  accelModeAngularDrag: 0.3
+  verbose: 1
 --- !u!114 &7081735771137792426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -192,7 +193,7 @@ MonoBehaviour:
   angleStartDeg: -90
   angleEndDeg: 90
   angleIncrementDeg: 10
-  maxRange: 30
+  maxRange: 10
   topicName: /lidar2d
   debugDrawRays: 1
   numRays: 0
