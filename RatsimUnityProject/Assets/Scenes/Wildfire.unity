@@ -607,7 +607,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &425708172
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -832,7 +832,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1741282493}
   m_SourcePrefab: {fileID: 100100000, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
 --- !u!1 &991619180
 GameObject:
@@ -932,6 +935,175 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 1675505943394758802, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
   m_PrefabInstance: {fileID: 973860714}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &1741282492 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6529735708114265031, guid: 0ae93e67618110b34b723175f187b20e, type: 3}
+  m_PrefabInstance: {fileID: 973860714}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1741282493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1741282481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b421341fb60f95ac08a3f736b3f1f0a3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  RequiredLevel: 5
+  Radius: 100
+--- !u!1 &2005853714
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2005853720}
+  - component: {fileID: 2005853719}
+  - component: {fileID: 2005853718}
+  - component: {fileID: 2005853717}
+  - component: {fileID: 2005853716}
+  - component: {fileID: 2005853715}
+  - component: {fileID: 2005853721}
+  m_Layer: 0
+  m_Name: HierarchicalWorldLoader
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2005853715
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58ed202959fa1507caf01f6842d4b958, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  housePrefabs:
+  - {fileID: 7556120904209480306, guid: 81710b366b83ce10c8c6c18137695ff7, type: 3}
+--- !u!114 &2005853716
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa2be5540f2df82f4bf09d60aee950f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  treePrefabs:
+  - {fileID: 2462568519800153458, guid: 013d944ba76dc920d83d83b920691f1f, type: 3}
+  treeDensity: 0.05
+  planningLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+--- !u!114 &2005853717
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1dad90812f4753b389dde39aa51a0ee8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  houseNodePrefab: {fileID: 2779350576265178903, guid: a79858241057abdf3acc329a934ce476, type: 3}
+  minHouses: 5
+  maxHouses: 20
+  houseMinSize: {x: 4, y: 4}
+  houseMaxSize: {x: 10, y: 10}
+  placementAttempts: 10
+  planningLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+--- !u!114 &2005853718
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 833643e7ea3cbe68eb4fb069ce6e81d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cityNodePrefab: {fileID: 2779350576265178903, guid: a79858241057abdf3acc329a934ce476, type: 3}
+  minCities: 3
+  maxCities: 8
+  cityMinSize: {x: 30, y: 30}
+  cityMaxSize: {x: 80, y: 80}
+  placementAttempts: 10
+  planningLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+--- !u!114 &2005853719
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 057bfce2f3eb099a3be384c9762aa122, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxNodesLoadedPerFrame: 5
+  unloadRadiusMultiplier: 1.2
+  megachunkPlanner: {fileID: 2005853718}
+  cityPlanner: {fileID: 2005853717}
+  houseGenerator: {fileID: 2005853715}
+  treGenerator: {fileID: 2005853716}
+  masterSeed: 42
+  worldSize: {x: 10000, y: 100, z: 10000}
+--- !u!4 &2005853720
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -14.32303, y: 22.85854, z: 18.00626}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2005853721
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005853714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0f527aca2f196976975c8c98c3234df, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  worldLoader: {fileID: 2005853719}
+  agent: {fileID: 1741282492}
+  collisionLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  agentNudgeRadius: 2
+  seed: 0
 --- !u!1001 &5560483459733379799
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1010,3 +1182,4 @@ SceneRoots:
   - {fileID: 32341310}
   - {fileID: 156434157}
   - {fileID: 249835897}
+  - {fileID: 2005853720}
