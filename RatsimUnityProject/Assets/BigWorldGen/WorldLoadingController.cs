@@ -1,0 +1,154 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+
+public class WorldLoadingController : MonoBehaviour {
+    private static WorldLoadingController _instance;
+    public static WorldLoadingController instance {
+        get {
+            if (_instance == null) {
+                Debug.LogError("WorldLoadingController instance not found! Make sure a WorldLoadingController component exists in the scene.");
+            }
+            return _instance;
+        }
+    }
+
+    public bool debugPutAgentInCenterOnStart = true;
+    public bool randomizeAgentStartRotation = true;
+    public GameObject agentObject;
+
+    public void Awake()
+    {
+        _instance = this;
+    }
+
+
+    // --- Param Storage ---
+    private Dictionary<string, string> _params = new Dictionary<string, string>();
+    public int masterSeed = 0;
+    public float chunkWidth = 100f;
+
+    // --- Param Access ---
+    public static string GetParamString(string name) {
+        if (_instance._params.TryGetValue(name, out string val)) return val;
+        Debug.LogWarning($"WorldLoadingController: param '{name}' not found");
+        return null;
+    }
+
+    public static float GetParamFloat(string name) {
+        if (_instance._params.TryGetValue(name, out string val) && float.TryParse(val, out float result)) return result;
+        Debug.LogWarning($"WorldLoadingController: param '{name}' not found or not a float");
+        return 0f;
+    }
+
+    public static List<string> GetParamList(string name) {
+        if (_instance._params.TryGetValue(name, out string val))
+            return new List<string>(val.Split(',').Select(s => s.Trim()));
+        Debug.LogWarning($"WorldLoadingController: param '{name}' not found");
+        return new List<string>();
+    }
+
+    // Overloads with fallback values
+
+    public static float GetParamFloat(string name, float fallback) {
+        if (instance._params.TryGetValue(name, out string val) && float.TryParse(val, out float result)) return result;
+        return fallback;
+    }
+
+    public static int GetParamInt(string name, int fallback) {
+        if (instance._params.TryGetValue(name, out string val) && int.TryParse(val, out int result)) return result;
+        return fallback;
+    }
+
+    public static string GetParamString(string name, string fallback) {
+        if (instance._params.TryGetValue(name, out string val)) return val;
+        return fallback;
+    }
+
+
+
+    public static int GetSeed() => _instance.masterSeed;
+
+    public static float GetChunkWidth() => _instance.chunkWidth;
+
+    public static int GetDerivedSeed(string domain) => _instance.masterSeed ^ domain.GetHashCode();
+
+    // --- Config Loading ---
+    public void LoadConfig(string json, bool verbose = true) {
+        _params.Clear();
+        var parsed = JsonUtility.FromJson<WorldConfig>(json);
+        foreach (var entry in parsed.entries){
+            if (verbose) Debug.Log($"WorldLoadingController: setting param '{entry.key}' = '{entry.value}'");
+            _params[entry.key] = entry.value;
+        }
+        if (_params.TryGetValue("seed", out string seedStr) && int.TryParse(seedStr, out int seed))
+            masterSeed = seed;
+        else
+            Debug.LogWarning("WorldLoadingController: no seed found in config, defaulting to 0");
+    }
+
+    // --- Episode Control ---
+    public void StartEpisode() {
+        
+
+        // 2. Clear all modules in reverse registration order (reverse load-phase order)
+        for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
+            WorldLoadingModule.registered[i].Clear();
+        Debug.Log("All world loading modules cleared");
+
+        // 3. Respawn agents
+        if(debugPutAgentInCenterOnStart && agentObject != null) {
+            agentObject.transform.position = Vector3.zero;
+            if(randomizeAgentStartRotation)
+                agentObject.transform.rotation = Quaternion.Euler(0, UnityEngine.Random.Range(0f, 360f), 0);
+        }
+        Debug.Log("Agent respawned at start of episode");
+
+      
+    }
+
+    public void ResetEpisode(string json) {
+        LoadConfig(json);
+        StartEpisode();
+    }
+
+
+    // Debug control to manually trigger chunk load/unload (for testing), assume some chunkrequestor exists and is registered as the first requestor
+    [ContextMenu("Start Episode (current config)")]
+    private void Debug_StartEpisode() {
+        StartEpisode();
+        // Also tick all registered requstors
+        ChunkLoadingRequestor.registered.ForEach(r => r.Tick());
+        Debug.Log("Num registered requestors: " + ChunkLoadingRequestor.registered.Count);  
+        Debug.Log("Manually triggered StartEpisode and Tick on all requestors");
+    }
+
+    [ContextMenu("Clear All Modules")]
+    private void Debug_ClearAll() {
+        for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
+                WorldLoadingModule.registered[i].Clear();
+    }
+
+    [SerializeField] private TextAsset _configFile;
+
+    [ContextMenu("Load Config From File")]
+    private void Debug_LoadConfigFromFile() {
+        if (_configFile == null) { Debug.LogWarning("No config file assigned"); return; }
+        LoadConfig(_configFile.text);
+        Debug.Log($"WorldLoadingController: config loaded from {_configFile.name}");
+    }
+}
+
+// --- JSON Helpers ---
+[Serializable]
+public class WorldConfig {
+    public List<WorldConfigEntry> entries;
+}
+
+[Serializable]
+public class WorldConfigEntry {
+    public string key;
+    public string value;
+}

@@ -1,0 +1,15 @@
+{
+  "entries": [
+    { "key": "seed", "value": "42" },
+    { "key": "chunk_width", "value": "16" },
+    { "key": "tree_generation/density", "value": "0.03" },
+    { "key": "tree_generation/mode", "value": "uniform" },
+    { "key": "height_generation/mode", "value": "superflat" },
+    { "key": "height_generation/superflat_height", "value": "0" },
+    { "key": "house_generation/mode", "value": "uniform" },
+    { "key": "house_generation/allowed_prefabs", "value": "house1_small, mall1" },
+    { "key": "world_bounds/width", "value": "512" },
+    { "key": "world_bounds/height", "value": "512" },
+    { "key": "world_bounds/boundary_type", "value": "wall" }
+  ]
+}
