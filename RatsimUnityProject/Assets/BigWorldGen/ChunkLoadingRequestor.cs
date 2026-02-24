@@ -111,4 +111,12 @@ public class ChunkLoadingRequestor : MonoBehaviour {
     public Vector3 ChunkCenter(Vector2Int chunk) {
         return new Vector3((chunk.x + 0.5f) * WorldLoadingController.GetChunkWidth(), 0, (chunk.y + 0.5f) * WorldLoadingController.GetChunkWidth());
     }
+
+
+    // Debug tools
+    [ContextMenu("Tick Manually")]
+    private void Debug_Tick() {
+        Tick();
+    }
+
 }

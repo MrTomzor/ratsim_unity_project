@@ -36,7 +36,7 @@ public class TreeLoader : WorldLoadingModule {
 
     public override void OnChunkLoadRequested(int cx, int cz, int lod) {
         // trees only at LOD0
-        Debug.Log($"TreeLoader: Load requested for chunk ({cx}, {cz}) at LOD {lod}");
+        //Debug.Log($"TreeLoader: Load requested for chunk ({cx}, {cz}) at LOD {lod}");
 
         if (lod != 0) return;
 

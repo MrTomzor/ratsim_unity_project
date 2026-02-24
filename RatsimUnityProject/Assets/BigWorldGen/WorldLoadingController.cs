@@ -17,11 +17,35 @@ public class WorldLoadingController : MonoBehaviour {
 
     public bool debugPutAgentInCenterOnStart = true;
     public bool randomizeAgentStartRotation = true;
+    public bool debugStartEpisodeOnAwake = false;
+    public bool debugRandomizeSeedOnStart = false;
+
+    int numEpisodesStarted = 0;
     public GameObject agentObject;
 
     public void Awake()
     {
         _instance = this;
+        
+    }
+
+    public void Update()
+    {
+        if (debugStartEpisodeOnAwake && numEpisodesStarted == 0 )
+        {
+            // Apply the config
+            if (_configFile == null) { Debug.LogWarning("No config file assigned"); return; }
+            LoadConfig(_configFile.text);
+            
+
+            StartEpisode();
+            numEpisodesStarted++;
+
+            // Tick
+            ChunkLoadingRequestor.registered.ForEach(r => r.Tick());
+            Debug.Log("Num registered requestors: " + ChunkLoadingRequestor.registered.Count);
+            Debug.Log("Manually triggered StartEpisode and Tick on all requestors");
+        }
     }
 
 
@@ -91,12 +115,13 @@ public class WorldLoadingController : MonoBehaviour {
 
     // --- Episode Control ---
     public void StartEpisode() {
-        
+        if(debugRandomizeSeedOnStart)
+        {
+            masterSeed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
+            Debug.Log($"Randomized master seed for new episode: {masterSeed}");
+        }
 
-        // 2. Clear all modules in reverse registration order (reverse load-phase order)
-        for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
-            WorldLoadingModule.registered[i].Clear();
-        Debug.Log("All world loading modules cleared");
+        ClearAllWorldData();
 
         // 3. Respawn agents
         if(debugPutAgentInCenterOnStart && agentObject != null) {
@@ -107,6 +132,19 @@ public class WorldLoadingController : MonoBehaviour {
         Debug.Log("Agent respawned at start of episode");
 
       
+    }
+
+    public void ClearAllWorldData()
+    {
+        // 2. Clear all modules in reverse registration order (reverse load-phase order)
+        for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
+            WorldLoadingModule.registered[i].Clear();
+        Debug.Log("All world loading modules cleared");
+
+        // Clear the cache of all chunk loading requestors as well
+        foreach (var requestor in ChunkLoadingRequestor.registered)
+            requestor.Clear();
+        Debug.Log("All chunk loading requestors cleared");
     }
 
     public void ResetEpisode(string json) {
@@ -127,8 +165,7 @@ public class WorldLoadingController : MonoBehaviour {
 
     [ContextMenu("Clear All Modules")]
     private void Debug_ClearAll() {
-        for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
-                WorldLoadingModule.registered[i].Clear();
+        ClearAllWorldData();
     }
 
     [SerializeField] private TextAsset _configFile;
