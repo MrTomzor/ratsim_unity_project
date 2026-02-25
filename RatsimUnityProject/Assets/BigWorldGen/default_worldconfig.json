@@ -1,7 +1,7 @@
 {
   "entries": [
     { "key": "seed", "value": "42" },
-    { "key": "chunk_width", "value": "16" },
+    { "key": "chunk_width", "value": "128" },
     { "key": "tree_generation/density", "value": "0.03" },
     { "key": "tree_generation/mode", "value": "uniform" },
     { "key": "height_generation/mode", "value": "superflat" },
