@@ -20,6 +20,7 @@
     { "key": "layout/structures/orchard/max", "value": "3" },
     { "key": "layout/structures/farm/min",    "value": "0" },
     { "key": "layout/structures/farm/max",    "value": "3" },
+    { "key": "layout/structures/types", "value": "city, village, orchard, farm" },
     
     { "key": "layout/roads/mode", "value": "highway" }
   ]

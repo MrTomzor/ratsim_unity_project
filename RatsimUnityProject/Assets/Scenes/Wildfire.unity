@@ -1117,9 +1117,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   verbose: 1
-  debugStructureMaterial: {fileID: 2100000, guid: 90104945463d1b973b243aae1afaccb2, type: 2}
-  debugRoadMaterial: {fileID: 2100000, guid: 36f0b4f067e92c66e83ce61d2e9706bc, type: 2}
-  debugVisualizeLayoutOnGen: 1
+  perimeterSamples: 20
+  extraEdgeRatio: 0.3
+  roadWidth: 8
+  debugVisualizeLayoutOnGen: 0
+  debugEdgeMaterial: {fileID: 0}
 --- !u!4 &1472889262
 Transform:
   m_ObjectHideFlags: 0
