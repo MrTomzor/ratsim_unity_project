@@ -35,15 +35,11 @@ public class TreeLoader : WorldLoadingModule {
     // --- WorldLoadingModule ---
 
     public override void OnChunkLoadRequested(int cx, int cz, int lod) {
-        // trees only at LOD0
-        //Debug.Log($"TreeLoader: Load requested for chunk ({cx}, {cz}) at LOD {lod}");
-
         if (lod != 0) return;
 
         Vector2Int chunkID = new Vector2Int(cx, cz);
 
         if (_generatedChunks.Contains(chunkID)) {
-            // already generated — just re-enable
             if (_chunkObjects.TryGetValue(chunkID, out GameObject chunkObj))
                 chunkObj.SetActive(true);
             return;
@@ -56,8 +52,8 @@ public class TreeLoader : WorldLoadingModule {
         if (lod != 0) return;
 
         Vector2Int chunkID = new Vector2Int(cx, cz);
-        if (_chunkObjects.TryGetValue(chunkID, out GameObject chunkObj))
-            chunkObj.SetActive(false);
+        if (_chunkObjects.TryGetValue(chunkID, out GameObject obj))
+            obj.SetActive(false);
     }
 
     public override void Clear() {
@@ -70,11 +66,10 @@ public class TreeLoader : WorldLoadingModule {
     // --- Generation ---
 
     private void GenerateChunk(Vector2Int chunkID) {
-        // chunk bounds in world space
         float originX = chunkID.x * _chunkWidth;
         float originZ = chunkID.y * _chunkWidth;
 
-        // collect blocking colliders in this chunk area
+        // collect WorldGen-layer colliders overlapping this chunk
         Vector3 chunkCenter = new Vector3(originX + _chunkWidth * 0.5f, 0f, originZ + _chunkWidth * 0.5f);
         Collider[] blockers = Physics.OverlapBox(
             chunkCenter,
@@ -82,6 +77,17 @@ public class TreeLoader : WorldLoadingModule {
             Quaternion.identity,
             _worldGenLayer
         );
+
+        // build VegetationModification lookup: only blockers whose parent WorldStructure
+        // has a VegetationModification component affect tree placement.
+        // Blockers without it are ignored (e.g. city footprint won't suppress trees).
+        var vegMods = new Dictionary<Collider, VegetationModification>();
+        foreach (var col in blockers) {
+            WorldStructure ws = col.GetComponentInParent<WorldStructure>();
+            if (ws == null) continue;
+            VegetationModification vm = ws.GetComponent<VegetationModification>();
+            if (vm != null) vegMods[col] = vm;
+        }
 
         // create chunk parent
         GameObject chunkObj = new GameObject($"TreeChunk_{chunkID.x}_{chunkID.y}");
@@ -93,41 +99,136 @@ public class TreeLoader : WorldLoadingModule {
         int chunkSeed = _treeSeed ^ (chunkID.x * 1000003) ^ (chunkID.y * 999983);
         System.Random rng = new System.Random(chunkSeed);
 
-        // how many trees to attempt
         int treeCount = Mathf.RoundToInt(_density * _chunkWidth * _chunkWidth);
-        if(verbose) Debug.Log("Chunk w: " + _chunkWidth + ", tree count: " + treeCount);
-        if(verbose) Debug.Log($"TreeLoader: Generating chunk ({chunkID.x}, {chunkID.y}) with seed {chunkSeed}, attempting to place {treeCount} trees. Num blockers: {blockers.Length}");
+        if (verbose) Debug.Log($"TreeLoader: chunk ({chunkID.x},{chunkID.y}) seed={chunkSeed} attempting {treeCount} trees, {blockers.Length} blockers ({vegMods.Count} with VegMod)");
 
         for (int i = 0; i < treeCount; i++) {
             float x = originX + (float)rng.NextDouble() * _chunkWidth;
             float z = originZ + (float)rng.NextDouble() * _chunkWidth;
 
-            if (IsBlocked(new Vector2(x, z), blockers)) continue;
+            if (ShouldSkipTree(new Vector2(x, z), blockers, vegMods, rng)) continue;
 
             float y = WorldHeightLoader.GetTerrainHeight(x, z);
             GameObject tree = Instantiate(treePrefab, new Vector3(x, y, z), Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
             tree.transform.SetParent(chunkObj.transform);
         }
+
+        // extra trees for IncreaseDensity zones
+        PlaceIncreasedDensityTrees(chunkID, chunkSeed, originX, originZ, vegMods, chunkObj);
     }
 
-    // --- Blocking ---
+    // ─────────────────────────────────────────────
+    //  Vegetation-aware tree skip
+    // ─────────────────────────────────────────────
 
-    private bool IsBlocked(Vector2 point, Collider[] blockers) {
+    /// <summary>
+    /// Returns true if the tree at <paramref name="point"/> should be suppressed,
+    /// based on VegetationModification on overlapping blockers.
+    /// May consume an RNG draw for DecreaseDensity zones.
+    /// </summary>
+    private bool ShouldSkipTree(
+        Vector2 point,
+        Collider[] blockers,
+        Dictionary<Collider, VegetationModification> vegMods,
+        System.Random rng)
+    {
         foreach (var col in blockers) {
-            if (col is BoxCollider box && IsBlockedByBox(point, box)) return true;
-            if (col is CapsuleCollider cap && IsBlockedByCapsule(point, cap)) return true;
+            if (!IsPointInCollider(point, col)) continue;
+
+            if (!vegMods.TryGetValue(col, out VegetationModification vm)) continue;
+
+            switch (vm.mode) {
+                case VegetationModification.Mode.Remove:
+                    return true;
+
+                case VegetationModification.Mode.DecreaseDensity:
+                    // value = fraction of trees to keep (0 = none, 1 = all)
+                    // consume rng regardless to keep downstream sequence consistent
+                    if ((float)rng.NextDouble() > vm.value) return true;
+                    break;
+
+                // IncreaseDensity: always place; extras added in separate pass
+            }
         }
         return false;
     }
 
-    private bool IsBlockedByBox(Vector2 point, BoxCollider box) {
+    // ─────────────────────────────────────────────
+    //  IncreaseDensity extra-tree pass
+    // ─────────────────────────────────────────────
+
+    private void PlaceIncreasedDensityTrees(
+        Vector2Int chunkID,
+        int chunkSeed,
+        float originX,
+        float originZ,
+        Dictionary<Collider, VegetationModification> vegMods,
+        GameObject chunkObj)
+    {
+        // deduplicate: one extra pass per WorldStructure, not per collider
+        var processed = new HashSet<WorldStructure>();
+
+        foreach (var kvp in vegMods) {
+            if (kvp.Value.mode != VegetationModification.Mode.IncreaseDensity) continue;
+
+            WorldStructure ws = kvp.Key.GetComponentInParent<WorldStructure>();
+            if (ws == null || !processed.Add(ws)) continue;
+
+            Vector2 center = ws.GetCenter2D();
+            Vector2 size   = ws.GetSize();
+            float   area   = size.x * size.y;
+
+            int extraCount = Mathf.RoundToInt(_density * area * kvp.Value.value);
+            if (extraCount <= 0) continue;
+
+            // zone-specific seed: independent of main chunk rng
+            int zoneSeed = chunkSeed ^ (int)(center.x * 73856093) ^ (int)(center.y * 19349663);
+            System.Random zoneRng = new System.Random(zoneSeed);
+
+            // rotate local OBB coords → world
+            float rotRad = ws.GetRotationCCW() * Mathf.Deg2Rad;
+            float cos = Mathf.Cos(rotRad), sin = Mathf.Sin(rotRad);
+
+            for (int i = 0; i < extraCount; i++) {
+                float lx = ((float)zoneRng.NextDouble() - 0.5f) * size.x;
+                float lz = ((float)zoneRng.NextDouble() - 0.5f) * size.y;
+
+                // OBB local → world
+                float wx = center.x + lx * cos - lz * sin;
+                float wz = center.y + lx * sin + lz * cos;
+
+                // only place within this chunk's bounds
+                if (wx < originX || wx > originX + _chunkWidth) continue;
+                if (wz < originZ || wz > originZ + _chunkWidth) continue;
+
+                float wy = WorldHeightLoader.GetTerrainHeight(wx, wz);
+                GameObject tree = Instantiate(
+                    treePrefab,
+                    new Vector3(wx, wy, wz),
+                    Quaternion.Euler(0f, (float)zoneRng.NextDouble() * 360f, 0f));
+                tree.transform.SetParent(chunkObj.transform);
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  Point-in-collider geometry helpers
+    // ─────────────────────────────────────────────
+
+    private bool IsPointInCollider(Vector2 point, Collider col) {
+        if (col is BoxCollider box)     return IsPointInBox(point, box);
+        if (col is CapsuleCollider cap) return IsPointInCapsule(point, cap);
+        return false;
+    }
+
+    private bool IsPointInBox(Vector2 point, BoxCollider box) {
         Vector3 center3 = box.transform.TransformPoint(box.center);
-        Vector2 center = new Vector2(center3.x, center3.z);
-        Vector2 size = new Vector2(
+        Vector2 center  = new Vector2(center3.x, center3.z);
+        Vector2 size    = new Vector2(
             box.size.x * box.transform.lossyScale.x,
             box.size.z * box.transform.lossyScale.z
         );
-        float yRot = box.transform.eulerAngles.y;
+        float yRot = -box.transform.eulerAngles.y;
 
         Vector2 delta = point - center;
         float rad = -yRot * Mathf.Deg2Rad;
@@ -139,10 +240,10 @@ public class TreeLoader : WorldLoadingModule {
                Mathf.Abs(local.y) <= size.y * 0.5f;
     }
 
-    private bool IsBlockedByCapsule(Vector2 point, CapsuleCollider cap) {
+    private bool IsPointInCapsule(Vector2 point, CapsuleCollider cap) {
         Vector3 center3 = cap.transform.TransformPoint(cap.center);
-        Vector2 center = new Vector2(center3.x, center3.z);
-        float radius = cap.radius * Mathf.Max(cap.transform.lossyScale.x, cap.transform.lossyScale.z);
+        Vector2 center  = new Vector2(center3.x, center3.z);
+        float radius    = cap.radius * Mathf.Max(cap.transform.lossyScale.x, cap.transform.lossyScale.z);
         return (point - center).sqrMagnitude <= radius * radius;
     }
 }

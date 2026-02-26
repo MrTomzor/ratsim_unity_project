@@ -97,6 +97,9 @@ public class WorldLayoutLoader : WorldLoadingModule {
 
         if (debugVisualizeLayoutOnGen) Debug_VisualizeLayout();
         if (verbose) Debug.Log($"WorldLayoutLoader: {structures.Count} structures, {edges.Count} edges.");
+
+        // Clear transforms cuz we are modifying the colliders of the structs:
+        Physics.SyncTransforms();
     }
 
     // ─────────────────────────────────────────────
@@ -145,7 +148,7 @@ public class WorldLayoutLoader : WorldLoadingModule {
                 Bounds2D candidate = new Bounds2D(center, size, rot);
                 if (placed.Any(s => candidate.Overlaps(s.GetBoundingBox2D()))) continue;
 
-                WorldStructure instance = Instantiate(
+                /*WorldStructure instance = Instantiate(
                     prefab,
                     new Vector3(center.x, 0f, center.y),
                     Quaternion.Euler(0f, -rot, 0f),
@@ -154,7 +157,9 @@ public class WorldLayoutLoader : WorldLoadingModule {
                 instance.name = $"{type}_{placedCount}";
                 // WorldStructure.Awake registers with WorldData automatically
 
-                placed.Add(instance);
+                placed.Add(instance);*/
+                placed.Add(WorldData.SpawnStructure(type, center, rot, transform, sizeOverride: size));
+
                 placedCount++;
                 if (verbose) Debug.Log($"Placed {type} at {center}, rot={rot:F1}°, size={size}");
             }
@@ -241,24 +246,16 @@ public class WorldLayoutLoader : WorldLoadingModule {
     }
 
     private void SpawnRoadSegment(RoadEdge edge) {
-        WorldStructure roadPrefab = LoadPrefab("road");
-        if (roadPrefab == null) return;
-
-        Vector2 from   = edge.fromEP.position;
-        Vector2 to     = edge.toEP.position;
-        Vector2 mid    = (from + to) * 0.5f;
-        float   length = Vector2.Distance(from, to);
-        float   angle  = Mathf.Atan2(to.y - from.y, to.x - from.x) * Mathf.Rad2Deg;
-
-        WorldStructure road = Instantiate(
-            roadPrefab,
-            new Vector3(mid.x, 0f, mid.y),
-            Quaternion.Euler(0f, -angle, 0f),
-            transform
+        Vector2 mid    = (edge.fromEP.position + edge.toEP.position) * 0.5f;
+        float   length = Vector2.Distance(edge.fromEP.position, edge.toEP.position);
+        float   angle  = Mathf.Atan2(
+                            edge.toEP.position.y - edge.fromEP.position.y,
+                            edge.toEP.position.x - edge.fromEP.position.x) * Mathf.Rad2Deg;
+        Debug.Log($"Spawning road from {edge.fromEP.position} to {edge.toEP.position}, mid={mid}, length={length}, angle={angle}");
+        edge.roadStructure = WorldData.SpawnStructure(
+            "road", mid, angle, transform,
+            sizeOverride: new Vector2(length, edge.width)
         );
-        road.name = $"road_{edge.fromEP.structure.structureType}_to_{edge.toEP.structure.structureType}";
-        road.SetFootprintSize(new Vector2(length, edge.width));
-        edge.roadStructure = road;
     }
 
     // ─────────────────────────────────────────────
