@@ -33,7 +33,10 @@ public class SimpleStructureLoader : WorldStructureLoader {
         if (prefab == null) return; // no LOD variant for this type — leave existing visuals alone
 
         GameObject content = Instantiate(prefab, s.transform.position, s.transform.rotation, s.transform);
-        content.name = $"_Visual_{prefabName}";
+        content.name = prefabName;
+        // LOD content is not a WorldGen blocker — reset to Default layer so it
+        // renders in agent cameras and is excluded from WorldGen physics queries.
+        SetLayerRecursive(content, 0);
         _spawnedContent[s] = content;
     }
 
@@ -50,6 +53,12 @@ public class SimpleStructureLoader : WorldStructureLoader {
     // ─────────────────────────────────────────────
     //  Helpers
     // ─────────────────────────────────────────────
+
+    private static void SetLayerRecursive(GameObject go, int layer) {
+        go.layer = layer;
+        foreach (Transform child in go.transform)
+            SetLayerRecursive(child.gameObject, layer);
+    }
 
     private void DestroyContent(WorldStructure s) {
         if (_spawnedContent.TryGetValue(s, out GameObject old)) {
