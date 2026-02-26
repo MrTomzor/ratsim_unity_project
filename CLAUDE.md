@@ -14,7 +14,13 @@ The main scene is `RatsimUnityProject/Assets/Scenes/Wildfire.unity`.
 
 The simulation listens on **TCP port 9000**. External clients connect and drive the simulation step-by-step.
 
-## Architecture
+## Architecture Overview
+
+The WorldGen system follows an **ECS-like pattern**:
+
+- **Data** = JSON episode params (global, on `WorldLoadingController`) + typed MonoBehaviour data components on structures (e.g. `HouseData`, `BurnState`, `TreeModificationData`)
+- **Systems** = Loaders (`WorldLoadingModule` for chunks, `WorldStructureLoader` for structures) that read data and produce world content
+- **Runtime behaviours** = MonoBehaviours that tick each simulation step (fire spread, reward collection, regrowth) and mutate structure data + call `Reload()`
 
 ### TCP Communication Layer (`Assets/TCPConnector/`)
 
@@ -37,7 +43,9 @@ The simulation listens on **TCP port 9000**. External clients connect and drive 
 
 ### WorldGen System (`Assets/WorldGen/`)
 
-A chunk-based procedural world generation pipeline. The hierarchy:
+A two-layer chunk-based procedural world generation pipeline.
+
+#### Layer 1: Chunk Loading
 
 **`WorldLoadingController`** — scene singleton. Stores key-value config params (loaded from JSON). Controls episode lifecycle: `StartEpisode()` clears all modules, `ResetEpisode(json)` reloads config and restarts.
 
@@ -46,32 +54,106 @@ Config JSON format:
 {"entries": [{"key": "seed", "value": "42"}, {"key": "world_bounds/width", "value": "1000"}, ...]}
 ```
 
-**`WorldLoadingModule`** — abstract base class for all generator components. Subclasses override:
+**`WorldLoadingModule`** — abstract base class for chunk-level generator components. Subclasses override:
 - `OnChunkLoadRequested(cx, cz, lod)` — called when a chunk enters view range
 - `OnChunkUnloadRequested(cx, cz, lod)` — called when a chunk leaves range
 - `Clear()` — destroys all generated content, resets state
 
-Concrete modules (each is a MonoBehaviour on a scene GameObject):
-- `WorldHeightLoader` — provides `GetTerrainHeight(x,z)` via "superflat" or "perlin" mode
-- `TerrainMeshLoader` — generates mesh terrain per-chunk with LOD and normal stitching
-- `TerrainTextureLoader` — applies textures to terrain chunks
-- `WorldLayoutLoader` — places structures (cities, villages, etc.) and road network (MST + extra edges). Runs once on first chunk load.
-- `TreeLoader` — places tree prefabs per chunk at LOD0 only, respects structure footprints
-- `CityLoader` — fills each "city" structure with house prefabs
-
 **`ChunkLoadingRequestor`** — attaches to an agent, ticks every sim step. Maintains a set of loaded chunks: inner radius → LOD0, outer radius → LOD1. Notifies all registered `WorldLoadingModule`s when chunks load/unload.
 
-**`WorldData`** — static registry of all active `WorldStructure` instances, indexed by chunk. Use `WorldData.SpawnStructure(type, pos, rot, parent)` to instantiate structure prefabs.
+#### Layer 2: Structure Loading
 
-**`WorldStructure`** — MonoBehaviour on structure prefabs. Requires a `BoxCollider` child as `footprintCollider` to define the 2D footprint. Auto-registers with `WorldData` on Awake. Supports LOD switching via child GameObjects named "LOD0" / "LOD1".
+**`StructureLoadingCoordinator`** (`WorldLoadingModule`) — bridges chunk events into per-structure events. When a chunk loads, queries `WorldData` for structures in that chunk and fires `OnWorldStructureLoaded` on all `WorldStructureLoader`s. Also subscribes to `WorldData.OnNewStructureRegistered` for structures placed dynamically mid-generation (e.g. houses spawned by CityLoader inside a city).
+
+**`WorldStructureLoader`** — abstract base (extends `WorldLoadingModule`) for structure-level loaders. Subclasses override:
+- `OnWorldStructureLoaded(WorldStructure s, int lod)` — structure becomes visible
+- `OnWorldStructureUnloaded(WorldStructure s, int lod)` — structure fully out of range
+- `Clear()`
+
+**`SimpleStructureLoader`** — generic `WorldStructureLoader` that spawns `{type}_LOD{n}` prefabs from `Resources/WorldGen/WorldStructurePrefabs/` as children. Sets spawned content to Default layer (not WorldGen layer). If no LOD-specific prefab exists, does nothing.
+
+#### Data: WorldStructure and Typed Data Components
+
+**`WorldData`** — static spatial index of all `WorldStructure` instances, indexed by chunk. Factory: `WorldData.SpawnStructure(type, pos, rot, parent)`. Fires `OnNewStructureRegistered` event on registration.
+
+**`WorldStructure`** — MonoBehaviour on structure prefabs. Defines 2D footprint via `BoxCollider footprintCollider`. Tracks `currentLod` (-1 = not loaded, managed by coordinator). Auto-registers with `WorldData` on Awake.
+
+**Typed data components** — MonoBehaviours attached to structure GameObjects alongside `WorldStructure`. These hold typed, domain-specific state:
+- **Data components go on the WorldStructure GO, not the LOD child** — they persist across `Reload()` cycles
+- **Prefabs define defaults** — e.g. `house_basic` prefab has `HouseData { style: "suburban", floors: 1 }`
+- **Loaders set/override fields** — CityLoader may set `data.style = cityPalette`
+- **Loaders can add components dynamically** — e.g. add `BurnState` to structures in fire-prone areas
+- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`
+
+**Runtime state changes** use `WorldStructure.Reload()` — unloads then reloads at current LOD, causing loaders to regenerate content from the (now-mutated) data components.
+
+#### Config and Data Flow
+
+Two-layer config model:
+1. **JSON params** (`WorldLoadingController`) — episode-level policy knobs. High-level overrides like `"override_house_appearance"` = `"charred"`.
+2. **Typed data components** — concrete state on structures, set by loaders during generation, read by other loaders and runtime behaviours.
+
+Flow: JSON params influence **loaders** → loaders produce **structures with typed component data** → other loaders and runtime systems read/write that data.
+
+**Domain-specific spatial queries live on loaders, not WorldData:**
+- `WorldHeightLoader.GetTerrainHeight(x, z)` — existing pattern
+- `WaterLoader.IsWater(x, y)` — future example
+- Each loader owns its domain data and exposes a static query API
+- WorldData stays purely as the structure spatial index
+
+#### Concrete Modules
+
+Chunk-level (`WorldLoadingModule`):
+- `WorldHeightLoader` — `GetTerrainHeight(x,z)` via "superflat" or "perlin" mode
+- `TerrainMeshLoader` — generates mesh terrain per-chunk with LOD and normal stitching
+- `TerrainTextureLoader` — applies textures to terrain chunks
+- `WorldLayoutLoader` — places structures and road network (MST + extra edges). Runs once on first chunk load.
+- `TreeLoader` — places trees per chunk at LOD0, checks for `TreeModificationData` on overlapping structures
+- `StructureLoadingCoordinator` — bridges chunk → structure events
+
+Structure-level (`WorldStructureLoader`):
+- `SimpleStructureLoader` — spawns `{type}_LOD{n}` prefab as child
+- `CityLoader` — fills "city" structures with house WorldStructures, sets `HouseData`
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}` or `{type}_LOD{n}`. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
-**Key config params for WorldLayoutLoader:**
-- `layout/structures/types` — comma-separated list of structure types to place
-- `layout/structures/{type}/min` and `/max` — placement count range
-- `world_bounds/width` / `world_bounds/height`
-- `world_bounds/structures_margin`
+#### Scene Hierarchy Order (registration order matters)
+
+1. WorldHeightLoader
+2. TerrainMeshLoader / TerrainTextureLoader
+3. WorldLayoutLoader ← generates all structures once
+4. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
+5. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator
+6. TreeLoader
+
+`Clear()` is called in reverse order, so higher-level loaders clean up before lower-level ones destroy base structures.
+
+#### Adding New Content
+
+**New structure type loader:**
+1. Create class extending `WorldStructureLoader`
+2. Override `OnWorldStructureLoaded` (filter by `s.structureType`)
+3. Override `OnWorldStructureUnloaded` and `Clear()`
+4. Add to scene after `StructureLoadingCoordinator`
+
+**New data component:**
+1. Create a MonoBehaviour with plain serializable fields (no logic)
+2. Add to relevant prefabs for defaults
+3. Have loaders read/write it via `GetComponent<T>()`
+
+**New domain query (e.g. WaterLoader.IsWater):**
+1. Create a `WorldLoadingModule` that generates/tracks the data
+2. Expose a `public static` query method
+3. Other systems call it directly (like `WorldHeightLoader.GetTerrainHeight`)
+
+**Runtime state change (e.g. fire burns a house):**
+1. Mutate the structure's data component(s)
+2. Call `structure.Reload()` — triggers unload + reload at current LOD
+3. Loaders regenerate content from updated data
+
+**Key config params:**
+- `seed`, `world_bounds/width`, `world_bounds/height`, `world_bounds/structures_margin`
+- `layout/structures/types` (comma list), `layout/structures/{type}/min`, `/max`
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
@@ -95,11 +177,9 @@ Semantic objects implement `SemanticObject` (base class) — raycasts return des
 - Unity XZ plane is horizontal, Y is up.
 - 2D positions in WorldGen use `Vector2` where `.x` = world X and `.y` = world Z.
 - Rotations are stored as CCW degrees (`rotationCCW`). In Unity: `Quaternion.Euler(0f, -rotationCCW, 0f)`.
-- LOD integers: lower = more detailed (LOD0 = full detail, LOD1 = reduced).
+- LOD integers: lower = more detailed (LOD0 = full detail, LOD1 = reduced). LOD covers both visual and logic/physics detail — the `{type}_LOD{n}` prefabs should NOT be on the WorldGen layer (WorldGen layer is only for generation-time physics queries, not rendering).
 
-## Adding a New WorldLoadingModule
+## Layers
 
-1. Create a MonoBehaviour subclassing `WorldLoadingModule`
-2. Override `OnChunkLoadRequested`, `OnChunkUnloadRequested`, and `Clear`
-3. Add the component to a scene GameObject — it auto-registers via `OnEnable`/`OnDisable`
-4. Module ordering matters for `Clear()` (called in reverse registration order): place higher-level modules (e.g. CityLoader depends on WorldLayoutLoader) later in the scene hierarchy
+- **WorldGen** — used for generation-time physics queries (structure footprint colliders). Excluded from agent camera rendering. LOD content spawned by SimpleStructureLoader is set to Default layer, not WorldGen.
+- **Default** — standard rendering/physics layer for LOD content visible to agents.
