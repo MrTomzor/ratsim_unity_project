@@ -7,6 +7,12 @@ public class WorldStructure : MonoBehaviour {
     [Header("Footprint")]
     public BoxCollider footprintCollider;
 
+    /// <summary>
+    /// The LOD currently loaded by WorldStructureLoader components (-1 = not loaded).
+    /// Managed by StructureLoadingCoordinator.
+    /// </summary>
+    [HideInInspector] public int currentLod = -1;
+
     private bool _registered = false;
 
     private void Awake() {

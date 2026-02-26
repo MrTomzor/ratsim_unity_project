@@ -1,18 +1,83 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 
 public static class WorldData {
 
     private static readonly List<WorldStructure> _structures = new List<WorldStructure>();
-    private static readonly Dictionary<Vector2Int, List<WorldStructure>> _chunkToStructures 
+    private static readonly Dictionary<Vector2Int, List<WorldStructure>> _chunkToStructures
         = new Dictionary<Vector2Int, List<WorldStructure>>();
+
+    /// <summary>
+    /// Fired immediately after a WorldStructure is registered (e.g. after Instantiate).
+    /// StructureLoadingCoordinator subscribes to this to handle structures placed
+    /// dynamically mid-episode (e.g. houses spawned by CityLoader).
+    /// </summary>
+    public static event Action<WorldStructure> OnNewStructureRegistered;
+
+    public static WorldStructure SpawnStructure(
+        string    structureType,
+        Vector2   position2D,
+        float     rotationCCW,
+        Transform parent          = null,
+        Vector2?  sizeOverride    = null,
+        int       lod             = -1) {
+
+        string     prefabName = lod == -1 ? structureType : $"{structureType}_LOD{lod}";
+        string     path       = $"WorldGen/WorldStructurePrefabs/{prefabName}";
+        WorldStructure prefab = Resources.Load<WorldStructure>(path);
+
+        // fall back to LOD0 prefab if no LOD-specific one exists
+        if (prefab == null && lod > 0) {
+            prefab = Resources.Load<WorldStructure>($"WorldGen/WorldStructurePrefabs/{structureType}");
+            if (prefab != null && lod > 0)
+                Debug.LogWarning($"WorldData.SpawnStructure: no LOD{lod} prefab for '{structureType}', using LOD0");
+        }
+
+        if (prefab == null) {
+            Debug.LogWarning($"WorldData.SpawnStructure: prefab not found for '{prefabName}'");
+            return null;
+        }
+
+        float y  = 0;
+        var   go = UnityEngine.Object.Instantiate(
+            prefab,
+            new Vector3(position2D.x, y, position2D.y),
+            Quaternion.Euler(0f, -rotationCCW, 0f),
+            parent
+        );
+
+        if (sizeOverride.HasValue)
+            go.SetFootprintSize(sizeOverride.Value);
+
+        // registration happens in WorldStructure.Awake automatically
+        return go;
+    }
+
+    // convenience — despawn and optionally replace with different LOD
+    public static WorldStructure SwapStructureLOD(WorldStructure existing, int newLod) {
+        if (existing == null) return null;
+        string    type     = existing.structureType;
+        Vector2   pos      = existing.GetCenter2D();
+        float     rot      = existing.GetRotationCCW();
+        Transform parent   = existing.transform.parent;
+        Vector2   size     = existing.GetSize();
+
+        // unregister and destroy old
+        UnregisterStructure(existing);
+        UnityEngine.Object.Destroy(existing.gameObject);
+
+        // spawn new LOD
+        return SpawnStructure(type, pos, rot, parent, size, newLod);
+    }
 
     public static void RegisterStructure(WorldStructure s) {
         if (_structures.Contains(s)) return; // idempotent
         _structures.Add(s);
         RegisterInChunkDict(s);
+        OnNewStructureRegistered?.Invoke(s);
     }
 
     public static void UnregisterStructure(WorldStructure s) {
