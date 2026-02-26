@@ -27,13 +27,28 @@ public class SimpleStructureLoader : WorldStructureLoader {
         // Destroy existing content first (handles LOD upgrades/downgrades).
         DestroyContent(s);
 
-        string prefabName = $"{s.structureType}_LOD{lod}";
-        GameObject prefab = Resources.Load<GameObject>($"{PrefabFolder}{prefabName}");
+        string lodName = $"LOD{lod}";
 
-        if (prefab == null) return; // no LOD variant for this type — leave existing visuals alone
+        // 1. Try a dedicated prefab: Resources/.../house_basic_LOD0
+        string prefabName = $"{s.structureType}_{lodName}";
+        GameObject source = Resources.Load<GameObject>($"{PrefabFolder}{prefabName}");
 
-        GameObject content = Instantiate(prefab, s.transform.position, s.transform.rotation, s.transform);
-        content.name = prefabName;
+        // 2. Fall back: load base prefab and extract the named LOD child.
+        //    Only the extracted child is instantiated — disabled siblings never
+        //    enter the scene, so they don't cost runtime memory.
+        if (source == null) {
+            GameObject basePrefab = Resources.Load<GameObject>($"{PrefabFolder}{s.structureType}");
+            if (basePrefab != null) {
+                Transform lodChild = basePrefab.transform.Find(lodName);
+                if (lodChild != null)
+                    source = lodChild.gameObject;
+            }
+        }
+
+        if (source == null) return; // no LOD variant — leave existing visuals alone
+
+        GameObject content = Instantiate(source, s.transform.position, s.transform.rotation, s.transform);
+        content.name = lodName;
         // LOD content is not a WorldGen blocker — reset to Default layer so it
         // renders in agent cameras and is excluded from WorldGen physics queries.
         SetLayerRecursive(content, 0);

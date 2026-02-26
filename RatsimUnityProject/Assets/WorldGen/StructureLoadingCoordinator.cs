@@ -53,6 +53,11 @@ public class StructureLoadingCoordinator : WorldLoadingModule {
         // those arrive via HandleNewStructureRegistered instead.
         foreach (var s in structures.ToList())
             ProcessStructureLoad(s, key, lod);
+
+        // WorldStructureLoaders (e.g. CityLoader) may have instantiated new GameObjects
+        // during the above loop. Sync physics so that subsequent WorldLoadingModules
+        // (e.g. TreeLoader) can find those colliders via OverlapBox.
+        /* Physics.SyncTransforms(); */
     }
 
     public override void OnChunkUnloadRequested(int cx, int cz, int lod) {
