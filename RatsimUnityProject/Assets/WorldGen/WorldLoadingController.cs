@@ -119,6 +119,14 @@ public class WorldLoadingController : MonoBehaviour {
     // --- Config Loading ---
     public void LoadConfig(string json, bool verbose = true) {
         var parsed = JsonUtility.FromJson<WorldConfig>(json);
+        if (verbose)
+        {
+            Debug.Log($"WorldLoadingController: loading config with {parsed.entries.Count} entries:");
+            foreach (var entry in parsed.entries)
+                Debug.Log($"  - {entry.key} = {entry.value}");
+            Debug.Log("Raw string: " + json);
+        }
+        
         foreach (var entry in parsed.entries){
             if (verbose) Debug.Log($"WorldLoadingController: setting param '{entry.key}' = '{entry.value}'");
             _params[entry.key] = entry.value;
@@ -184,6 +192,16 @@ public class WorldLoadingController : MonoBehaviour {
         ChunkLoadingRequestor.registered.ForEach(r => r.Tick());
         Debug.Log("Num registered requestors: " + ChunkLoadingRequestor.registered.Count);  
         Debug.Log("Manually triggered StartEpisode and Tick on all requestors");
+    }
+
+    // Debug print of currenct config:
+    [ContextMenu("Print Current Config")]
+    private void Debug_PrintCurrentConfig() {
+        Debug.Log("Current World Config:");
+        foreach (var kvp in _params)
+        {
+            Debug.Log($"  - {kvp.Key} = {kvp.Value}");
+        }
     }
 
     [ContextMenu("Clear All Modules")]

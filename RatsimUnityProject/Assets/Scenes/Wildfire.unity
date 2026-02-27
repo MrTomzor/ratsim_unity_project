@@ -1203,7 +1203,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   debugPutAgentInCenterOnStart: 1
   randomizeAgentStartRotation: 1
-  debugStartEpisodeOnAwake: 1
+  debugStartEpisodeOnAwake: 0
   debugRandomizeSeedOnStart: 1
   agentObject: {fileID: 1741282481}
   masterSeed: 42
