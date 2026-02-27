@@ -164,9 +164,15 @@ public class WorldLoadingController : MonoBehaviour {
 
       
     }
+    
 
     public void ClearAllWorldData()
     {
+        // 1. Clear the static structure registry (must happen before modules,
+        //    so modules don't query stale destroyed structures during their Clear)
+        WorldData.Clear();
+        Debug.Log("WorldData structure registry cleared");
+
         // 2. Clear all modules in reverse registration order (reverse load-phase order)
         for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
             WorldLoadingModule.registered[i].Clear();

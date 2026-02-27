@@ -51,7 +51,7 @@ public class WorldLayoutLoader : WorldLoadingModule {
 
     public override void Clear() {
         for (int i = transform.childCount - 1; i >= 0; i--)
-            Destroy(transform.GetChild(i).gameObject);
+            DestroyImmediate(transform.GetChild(i).gameObject);
         _generated = false;
     }
 
