@@ -47,7 +47,7 @@ A two-layer chunk-based procedural world generation pipeline.
 
 #### Layer 1: Chunk Loading
 
-**`WorldLoadingController`** — scene singleton. Stores key-value config params (loaded from JSON). Controls episode lifecycle: `StartEpisode()` clears all modules, `ResetEpisode(json)` reloads config and restarts.
+**`WorldLoadingController`** — scene singleton. Stores key-value config params (loaded from JSON). Controls episode lifecycle: `StartEpisode()` → `ClearAllWorldData()` → `InitializeAllModules()`. Agent config is received separately on `/sim_control/agent_config` and stored for `AgentLoader` to read.
 
 Config JSON format:
 ```json
@@ -55,6 +55,7 @@ Config JSON format:
 ```
 
 **`WorldLoadingModule`** — abstract base class for chunk-level generator components. Subclasses override:
+- `Initialize()` — called once per episode after `Clear()`, before any chunk loading. Use for work that must happen regardless of chunk requests (e.g. spawning agents). Default is no-op.
 - `OnChunkLoadRequested(cx, cz, lod)` — called when a chunk enters view range
 - `OnChunkUnloadRequested(cx, cz, lod)` — called when a chunk leaves range
 - `Clear()` — destroys all generated content, resets state
@@ -110,6 +111,7 @@ Chunk-level (`WorldLoadingModule`):
 - `WorldLayoutLoader` — places structures and road network (MST + extra edges). Runs once on first chunk load.
 - `TreeLoader` — places trees per chunk at LOD0, checks for `TreeModificationData` on overlapping structures
 - `StructureLoadingCoordinator` — bridges chunk → structure events
+- `AgentLoader` — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Uses `Initialize()` (not `OnChunkLoadRequested`) because the agent carries the `ChunkLoadingRequestor`. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
 
 Structure-level (`WorldStructureLoader`):
 - `SimpleStructureLoader` — spawns `{type}_LOD{n}` prefab as child
@@ -119,12 +121,13 @@ Structure-level (`WorldStructureLoader`):
 
 #### Scene Hierarchy Order (registration order matters)
 
-1. WorldHeightLoader
-2. TerrainMeshLoader / TerrainTextureLoader
-3. WorldLayoutLoader ← generates all structures once
-4. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
-5. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator
-6. TreeLoader
+1. AgentLoader ← spawns agent in Initialize(), before chunk loading begins
+2. WorldHeightLoader
+3. TerrainMeshLoader / TerrainTextureLoader
+4. WorldLayoutLoader ← generates all structures once
+5. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
+6. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator
+7. TreeLoader
 
 `Clear()` is called in reverse order, so higher-level loaders clean up before lower-level ones destroy base structures.
 
@@ -151,12 +154,19 @@ Structure-level (`WorldStructureLoader`):
 2. Call `structure.Reload()` — triggers unload + reload at current LOD
 3. Loaders regenerate content from updated data
 
-**Key config params:**
+**Key world config params:**
 - `seed`, `world_bounds/width`, `world_bounds/height`, `world_bounds/structures_margin`
 - `layout/structures/types` (comma list), `layout/structures/{type}/min`, `/max`
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
+
+**Agent config params** (sent on `/sim_control/agent_config`, read by `AgentLoader`):
+- `prefab_name` — prefab loaded from `Resources/AgentPrefabs/{name}`
+- `name_prefix` — agent GameObject name
+- `sensors` — comma-separated sensor names: `lidar2d`, `rgbd`, `odom`, `collision`, `relative_pose`, `absolute_pose`
+- `actuators` — actuator mode (e.g. `velocity`)
+- `{sensor_name}/{field}` — override a public field on a sensor component (e.g. `lidar2d/maxRange`)
 
 ### Sensors and Actuators
 
