@@ -23,10 +23,27 @@ public class WorldLoadingController : MonoBehaviour {
     int numEpisodesStarted = 0;
     public GameObject agentObject;
 
+    private string _agentConfigJson;
+
     public void Awake()
     {
         _instance = this;
-        
+    }
+
+    void Start() {
+        var conn = RoslikeTCPServer.GetInstance();
+        conn.Subscribe<StringMessage>("/sim_control/world_config", (msg) => {
+            LoadConfig(msg.data, verbose: true);
+        });
+        conn.Subscribe<StringMessage>("/sim_control/agent_config", (msg) => {
+            LoadAgentConfig(msg.data);
+        });
+        conn.Subscribe<BoolMessage>("/sim_control/reset_episode", (msg) => {
+            if (msg.data) {
+                StartEpisode();
+                ChunkLoadingRequestor.registered.ForEach(r => r.Tick());
+            }
+        });
     }
 
     public void Update()
@@ -101,7 +118,6 @@ public class WorldLoadingController : MonoBehaviour {
 
     // --- Config Loading ---
     public void LoadConfig(string json, bool verbose = true) {
-        _params.Clear();
         var parsed = JsonUtility.FromJson<WorldConfig>(json);
         foreach (var entry in parsed.entries){
             if (verbose) Debug.Log($"WorldLoadingController: setting param '{entry.key}' = '{entry.value}'");
@@ -112,6 +128,13 @@ public class WorldLoadingController : MonoBehaviour {
         else
             Debug.LogWarning("WorldLoadingController: no seed found in config, defaulting to 0");
     }
+
+    public void LoadAgentConfig(string json) {
+        _agentConfigJson = json;
+        Debug.Log($"WorldLoadingController: agent config received ({json.Length} chars)");
+    }
+
+    public string GetAgentConfigJson() => _agentConfigJson;
 
     // --- Episode Control ---
     public void StartEpisode() {
