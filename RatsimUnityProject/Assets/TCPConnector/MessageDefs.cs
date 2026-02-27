@@ -51,11 +51,25 @@ public class VisualPointTrackerMessage : Message
     public float scaleFactor { get; set; }
 }
 
-public class Twist2DMessage : Message
+public class PoseMessage : Message
 {
-    public float forward { get; set; }
-    public float left { get; set; }
-    public float radiansCounterClockwise { get; set; }
+    public float x { get; set; }
+    public float y { get; set; }
+    public float z { get; set; }
+    public float qx { get; set; }
+    public float qy { get; set; }
+    public float qz { get; set; }
+    public float qw { get; set; }
+}
+
+public class TwistMessage : Message
+{
+    public float linear_x { get; set; }
+    public float linear_y { get; set; }
+    public float linear_z { get; set; }
+    public float angular_x { get; set; }
+    public float angular_y { get; set; }
+    public float angular_z { get; set; }
 }
 
 public class RGBDMessage : Message

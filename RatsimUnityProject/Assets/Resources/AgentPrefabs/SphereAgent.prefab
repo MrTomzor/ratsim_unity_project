@@ -105,8 +105,10 @@ GameObject:
   - component: {fileID: 749717876643433552}
   - component: {fileID: 8223704123116478089}
   - component: {fileID: 7339066846885824333}
+  - component: {fileID: -3310873936012990706}
+  - component: {fileID: 5127488391532725983}
   m_Layer: 7
-  m_Name: RAT_1
+  m_Name: SphereAgent
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -308,6 +310,40 @@ MonoBehaviour:
   considerOriginRotation: 0
   originPos: {x: 0, y: 0, z: 0}
   originRot: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &-3310873936012990706
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d6213d385c693453b7699d277f96e03, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cam: {fileID: 0}
+  rgbdTopic: /rgbd
+  intrinsicsTopic: /camera_intrinsics
+  imageWidth: 640
+  imageHeight: 480
+  depthImageMaxRange: 100
+  linearDepthShader: {fileID: 0}
+--- !u!114 &5127488391532725983
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8650841795b444b1af33cc84756fc0d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  radius: 3
+  longRangeRadius: 8
+  verbose: 0
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0

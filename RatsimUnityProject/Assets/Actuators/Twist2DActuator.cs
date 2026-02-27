@@ -21,33 +21,33 @@ public class Twist2DActuator : MonoBehaviour
     void Start()
     {
         conn = RoslikeTCPServer.GetInstance();
-        conn.Subscribe<Twist2DMessage>(velCmdTopic, OnVelTwist2DMessage);
-        conn.Subscribe<Twist2DMessage>(accelCmdTopic, OnAccelTwist2DMessage);
+        conn.Subscribe<TwistMessage>(velCmdTopic, OnVelTwistMessage);
+        conn.Subscribe<TwistMessage>(accelCmdTopic, OnAccelTwistMessage);
 
     }
 
-    public void OnVelTwist2DMessage(Twist2DMessage msg)
+    public void OnVelTwistMessage(TwistMessage msg)
     {
-        if(verbose)            
-            Debug.Log($"Received Twist2DMessage: forward={msg.forward}, left={msg.left}, radiansCounterClockwise={msg.radiansCounterClockwise}");
+        if(verbose)
+            Debug.Log($"Received TwistMessage: linear_x={msg.linear_x}, linear_y={msg.linear_y}, angular_z={msg.angular_z}");
         // Apply the twist to the GameObject
-        Vector3 forward = transform.forward * msg.forward;
-        Vector3 left = -transform.right * msg.left;
-        Vector3 rotationRad = new Vector3(0, -msg.radiansCounterClockwise, 0);
+        Vector3 forward = transform.forward * msg.linear_x;
+        Vector3 left = -transform.right * msg.linear_y;
+        Vector3 rotationRad = new Vector3(0, -msg.angular_z, 0);
 
         var rb = GetComponent<Rigidbody>();
         rb.linearVelocity = forward + left;
         rb.angularVelocity = rotationRad;
     }
 
-    public void OnAccelTwist2DMessage(Twist2DMessage msg)
+    public void OnAccelTwistMessage(TwistMessage msg)
     {
         if(verbose)
-            Debug.Log($"Received AccelTwist2DMessage: forward={msg.forward}, left={msg.left}, radiansCounterClockwise={msg.radiansCounterClockwise}");
+            Debug.Log($"Received AccelTwistMessage: linear_x={msg.linear_x}, linear_y={msg.linear_y}, angular_z={msg.angular_z}");
         // Apply the twist to the GameObject
-        Vector3 forward = transform.forward * msg.forward;
-        Vector3 left = -transform.right * msg.left;
-        Vector3 rotationRad = new Vector3(0, -msg.radiansCounterClockwise, 0);
+        Vector3 forward = transform.forward * msg.linear_x;
+        Vector3 left = -transform.right * msg.linear_y;
+        Vector3 rotationRad = new Vector3(0, -msg.angular_z, 0);
 
         var rb = GetComponent<Rigidbody>();
 

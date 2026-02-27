@@ -738,10 +738,13 @@ public class WildfireWorldManager : MonoBehaviour
     void PublishGoalPosition()
     {
         // Publish goal position
-        Twist2DMessage goalMsg = new Twist2DMessage();
-        goalMsg.forward = goalPosition.z;
-        goalMsg.left = -goalPosition.x;
-        goalMsg.radiansCounterClockwise = 0.0f; // No orientation for goal
+        PoseMessage goalMsg = new PoseMessage();
+        CoordConversion.UnityToRos(goalPosition, out float gx, out float gy, out float gz);
+        goalMsg.x = gx; goalMsg.y = gy; goalMsg.z = gz;
+        goalMsg.qx = 0f;
+        goalMsg.qy = 0f;
+        goalMsg.qz = 0f;
+        goalMsg.qw = 1f;
         conn.Publish(goalPosTopic, goalMsg);
     }
 

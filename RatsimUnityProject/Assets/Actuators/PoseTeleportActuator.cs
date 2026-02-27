@@ -8,7 +8,7 @@ public class PoseTeleportActuator : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        RoslikeTCPServer.GetInstance().Subscribe<Twist2DMessage>(topic, Teleport);
+        RoslikeTCPServer.GetInstance().Subscribe<PoseMessage>(topic, Teleport);
     }
 
     // Update is called once per frame
@@ -17,13 +17,10 @@ public class PoseTeleportActuator : MonoBehaviour
 
     }
 
-    void Teleport(Twist2DMessage msg)
+    void Teleport(PoseMessage msg)
     {
-        Vector3 newpos = transform.position;
-        newpos.x = -msg.left;
-        newpos.z = msg.forward;
-        transform.position = newpos;
-
-        transform.rotation = Quaternion.Euler(0, -msg.radiansCounterClockwise * Mathf.Rad2Deg, 0);
+        transform.position = CoordConversion.RosToUnity(msg.x, msg.y, msg.z);
+        float eulerY = CoordConversion.RosQuatToUnityEulerY(msg.qx, msg.qy, msg.qz, msg.qw);
+        transform.rotation = Quaternion.Euler(0, eulerY, 0);
     }
 }

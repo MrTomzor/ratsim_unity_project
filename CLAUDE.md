@@ -174,7 +174,9 @@ All sensors publish via `conn.Publish(topic, msg)` on a discrete timer. All actu
 
 **Sensors** (`Assets/Sensors/`): `SemanticLidarSensor`, `RGBDSensor`, `AbsolutePose2DSensor`, `Odom2DSensor`, `RelativePoseSensor`, `CollisionSensor`, `VirtualVisualTrackerSensor`
 
-**Actuators** (`Assets/Actuators/`): `Twist2DActuator` (velocity or acceleration control), `PoseTeleportActuator`
+**Actuators** (`Assets/Actuators/`): `Twist2DActuator` (subscribes to `TwistMessage` for velocity/acceleration control), `PoseTeleportActuator` (subscribes to `PoseMessage`)
+
+**Coordinate convention:** All data crossing TCP uses ROS standard (x=forward, y=left, z=up). Unity sensors/actuators convert internally via `CoordConversion.cs` (`Assets/TCPConnector/`). Sensors publish `PoseMessage`; actuators subscribe to `TwistMessage` or `PoseMessage`.
 
 Semantic objects implement `SemanticObject` (base class) — raycasts return descriptors from the hit object.
 

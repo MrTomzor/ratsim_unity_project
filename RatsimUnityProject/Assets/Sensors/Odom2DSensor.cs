@@ -31,16 +31,15 @@ public class Odom2DSensor : MonoBehaviour
         lastPos = transform.position;
         lastRot = transform.rotation;
 
-
-
-        var msg = new Twist2DMessage();
-        msg.forward = deltaVecInPrevFrame.z;
-        msg.left = -deltaVecInPrevFrame.x;
-        msg.radiansCounterClockwise = -deltaRot.eulerAngles.y * Mathf.Deg2Rad;
+        var msg = new PoseMessage();
+        CoordConversion.UnityToRos(deltaVecInPrevFrame, out float rx, out float ry, out float rz);
+        msg.x = rx; msg.y = ry; msg.z = rz;
+        CoordConversion.UnityRotToRosQuat(deltaRot.eulerAngles.y, out float qx, out float qy, out float qz, out float qw);
+        msg.qx = qx; msg.qy = qy; msg.qz = qz; msg.qw = qw;
         if (verbose)
         {
             float distTraveled = deltaVecInPrevFrame.magnitude;
-            Debug.Log("odom data: forward=" + msg.forward + ", left=" + msg.left + ", radiansCCW=" + msg.radiansCounterClockwise);
+            Debug.Log("odom data: x=" + msg.x + ", y=" + msg.y + ", qz=" + msg.qz + ", qw=" + msg.qw);
             Rigidbody rb = GetComponent<Rigidbody>();
             if (rb != null)            {
                 Debug.Log("velocity: " + rb.linearVelocity + ", angularVelocity: " + rb.angularVelocity);

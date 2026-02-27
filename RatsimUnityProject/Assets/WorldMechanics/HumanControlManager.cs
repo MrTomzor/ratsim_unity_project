@@ -4,7 +4,7 @@ public class HumanControlManager : MonoBehaviour
 {
     public bool humanControlEnabled = false;
     public string enableTopic = "/enable_human_control";
-    
+
     public GameObject cameraObject;
     public Twist2DActuator velocityController;
 
@@ -47,12 +47,10 @@ public class HumanControlManager : MonoBehaviour
 
     public void ApplyHumanControls()
     {
-        Twist2DMessage msg = new Twist2DMessage();
-        msg.forward = Input.GetAxis("Vertical") * velocityController.maxLinearVelocity;
-        //msg.left = Input.GetAxis("Horizontal");
-        msg.radiansCounterClockwise = - Input.GetAxis("Horizontal") * velocityController.maxAngularVelocity;
+        TwistMessage msg = new TwistMessage();
+        msg.linear_x = Input.GetAxis("Vertical") * velocityController.maxLinearVelocity;
+        msg.angular_z = - Input.GetAxis("Horizontal") * velocityController.maxAngularVelocity;
 
-        velocityController.OnVelTwist2DMessage(msg);
-        //msg.radiansCounterClockwise = Input.GetAxis("Mouse X") * 0.1f;
+        velocityController.OnVelTwistMessage(msg);
     }
 }

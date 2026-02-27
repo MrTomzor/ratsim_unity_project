@@ -15,10 +15,11 @@ public class AbsolutePose2DSensor : MonoBehaviour
 
     public void SenseAndPublish(TimerEvent ev)
     {
-        var msg = new Twist2DMessage();
-        msg.forward = transform.position.z;
-        msg.left = -transform.position.x;
-        msg.radiansCounterClockwise = -transform.rotation.eulerAngles.y * Mathf.Deg2Rad;
+        var msg = new PoseMessage();
+        CoordConversion.UnityToRos(transform.position, out float rx, out float ry, out float rz);
+        msg.x = rx; msg.y = ry; msg.z = rz;
+        CoordConversion.UnityRotToRosQuat(transform.rotation.eulerAngles.y, out float qx, out float qy, out float qz, out float qw);
+        msg.qx = qx; msg.qy = qy; msg.qz = qz; msg.qw = qw;
         conn.Publish(topic, msg);
     }
 }
