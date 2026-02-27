@@ -15,8 +15,6 @@ public class WorldLoadingController : MonoBehaviour {
         }
     }
 
-    public bool debugPutAgentInCenterOnStart = true;
-    public bool randomizeAgentStartRotation = true;
     public bool debugStartEpisodeOnAwake = false;
     public bool debugRandomizeSeedOnStart = false;
 
@@ -153,16 +151,7 @@ public class WorldLoadingController : MonoBehaviour {
         }
 
         ClearAllWorldData();
-
-        // 3. Respawn agents
-        if(debugPutAgentInCenterOnStart && agentObject != null) {
-            agentObject.transform.position = Vector3.zero;
-            if(randomizeAgentStartRotation)
-                agentObject.transform.rotation = Quaternion.Euler(0, UnityEngine.Random.Range(0f, 360f), 0);
-        }
-        Debug.Log("Agent respawned at start of episode");
-
-      
+        InitializeAllModules();
     }
     
 
@@ -182,6 +171,13 @@ public class WorldLoadingController : MonoBehaviour {
         foreach (var requestor in ChunkLoadingRequestor.registered)
             requestor.Clear();
         Debug.Log("All chunk loading requestors cleared");
+    }
+
+    public void InitializeAllModules()
+    {
+        foreach (var module in WorldLoadingModule.registered)
+            module.Initialize();
+        Debug.Log("All world loading modules initialized");
     }
 
     public void ResetEpisode(string json) {
