@@ -118,6 +118,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3914534990402166144}
   - component: {fileID: 3502047960091795794}
+  - component: {fileID: -1821230118684878504}
   m_Layer: 0
   m_Name: city
   m_TagString: Untagged
@@ -156,3 +157,19 @@ MonoBehaviour:
   structureType: city
   footprintCollider: {fileID: 1083731008295330661}
   currentLod: -1
+--- !u!114 &-1821230118684878504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8553926404309094537}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4815cd9ae126d97cb87339f9d200554c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mode: 0
+  targetHeight: 0
+  heightDelta: 0
+  blendMargin: 30

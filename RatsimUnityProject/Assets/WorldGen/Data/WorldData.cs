@@ -41,7 +41,7 @@ public static class WorldData {
             return null;
         }
 
-        float y  = 0;
+        float y  = WorldHeightLoader.GetTerrainHeight(position2D.x, position2D.y);
         var   go = UnityEngine.Object.Instantiate(
             prefab,
             new Vector3(position2D.x, y, position2D.y),

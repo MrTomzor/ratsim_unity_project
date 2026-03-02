@@ -135,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &25131559
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -149,12 +149,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   directionalLight: {fileID: 705507994}
+  fogSkyboxMaterial: {fileID: 2100000, guid: 90104945463d1b973b243aae1afaccb2, type: 2}
   defaultTimeOfDay: 12
   defaultTimeAdvanceRate: 0
   defaultMaxLightIntensity: 1.2
   defaultMaxAmbientIntensity: 1
   defaultSunAzimuth: 45
-  defaultFogEnabled: 1
+  defaultFogEnabled: 0
   defaultFogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   defaultFogDensity: 0.02
   defaultFogMode: 3
@@ -1159,7 +1160,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &982890397
 MonoBehaviour:
   m_ObjectHideFlags: 0

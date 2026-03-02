@@ -84,7 +84,7 @@ Config JSON format:
 - **Prefabs define defaults** — e.g. `house_basic` prefab has `HouseData { style: "suburban", floors: 1 }`
 - **Loaders set/override fields** — CityLoader may set `data.style = cityPalette`
 - **Loaders can add components dynamically** — e.g. add `BurnState` to structures in fire-prone areas
-- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`
+- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`, `TerrainModification { mode: Flatten|SetHeight|AddHeight, targetHeight, heightDelta, blendMargin }`
 
 **Runtime state changes** use `WorldStructure.Reload()` — unloads then reloads at current LOD, causing loaders to regenerate content from the (now-mutated) data components.
 
@@ -105,7 +105,7 @@ Flow: JSON params influence **loaders** → loaders produce **structures with ty
 #### Concrete Modules
 
 Chunk-level (`WorldLoadingModule`):
-- `WorldHeightLoader` — `GetTerrainHeight(x,z)` via "superflat" or "perlin" mode
+- `WorldHeightLoader` — `GetTerrainHeight(x,z)` via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
 - `TerrainMeshLoader` — generates mesh terrain per-chunk with LOD and normal stitching
 - `TerrainTextureLoader` — applies textures to terrain chunks
 - `WorldLayoutLoader` — places structures and road network (MST + extra edges). Runs eagerly in `Initialize()`.

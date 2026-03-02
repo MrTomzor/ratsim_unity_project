@@ -125,6 +125,11 @@ public class WorldLayoutLoader : WorldLoadingModule {
 
         // Clear transforms cuz we are modifying the colliders of the structs:
         Physics.SyncTransforms();
+
+        // Process terrain modifications now that all structures are placed.
+        // This scans structures for TerrainModification components, registers
+        // height influence zones, and repositions structures to match terrain.
+        WorldHeightLoader.instance.ProcessTerrainModifications();
     }
 
     // ─────────────────────────────────────────────
