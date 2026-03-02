@@ -6,6 +6,8 @@ using UnityEngine;
 
 public class AgentLoader : WorldLoadingModule {
 
+    public TopdownCameraFollower agentCameraFollower;
+
     public static AgentLoader instance;
 
     private bool _spawned = false;
@@ -92,6 +94,9 @@ public class AgentLoader : WorldLoadingModule {
         string namePrefix;
         if (config.TryGetValue("name_prefix", out namePrefix))
             agent.name = namePrefix;
+
+        if (agentCameraFollower != null)
+            agentCameraFollower.target = agent; // Clear camera target before destroying old agent
 
         // Disable all known sensor types
         foreach (var kvp in SensorNameToType) {

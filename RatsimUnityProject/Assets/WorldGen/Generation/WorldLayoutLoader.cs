@@ -7,6 +7,8 @@ public class WorldLayoutLoader : WorldLoadingModule {
     public bool verbose = false;
     public static WorldLayoutLoader instance;
     private bool _generated = false;
+    private readonly Dictionary<WorldStructure, List<EntryPoint>> _structureEntryPoints
+        = new Dictionary<WorldStructure, List<EntryPoint>>();
 
     [Header("Road Generation")]
     public int   perimeterSamples = 20;
@@ -19,6 +21,20 @@ public class WorldLayoutLoader : WorldLoadingModule {
     private void Awake() {
         if (instance != null && instance != this) { Destroy(gameObject); return; }
         instance = this;
+    }
+
+    public List<EntryPoint> GetEntryPoints(WorldStructure s) {
+        return _structureEntryPoints.TryGetValue(s, out List<EntryPoint> eps) ? eps : new List<EntryPoint>();
+    }
+
+    private void RegisterEntryPoint(EntryPoint ep) {
+        if (ep.structure == null) return;
+        if (!_structureEntryPoints.TryGetValue(ep.structure, out List<EntryPoint> list)) {
+            list = new List<EntryPoint>();
+            _structureEntryPoints[ep.structure] = list;
+        }
+        if (!list.Contains(ep))
+            list.Add(ep);
     }
 
     // ─────────────────────────────────────────────
@@ -61,6 +77,7 @@ public class WorldLayoutLoader : WorldLoadingModule {
         for (int i = transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(transform.GetChild(i).gameObject);
         _generated = false;
+        _structureEntryPoints.Clear();
     }
 
     // ─────────────────────────────────────────────
@@ -239,6 +256,8 @@ public class WorldLayoutLoader : WorldLoadingModule {
             }
 
             SpawnRoadSegment(edge);
+            RegisterEntryPoint(edge.fromEP);
+            RegisterEntryPoint(edge.toEP);
             edges.Add(edge);
 
             if (!Connected(iA, iB)) {

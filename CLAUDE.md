@@ -165,6 +165,12 @@ Current required order:
 - `seed`, `world_bounds/width`, `world_bounds/height`, `world_bounds/structures_margin`
 - `layout/structures/types` (comma list), `layout/structures/{type}/min`, `/max`
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
+- `city/layout_mode`: `"random"` (default, scatter) or `"grid"` (US-style street grid)
+- `city/grid_road_spacing`: default target distance between grid lines (default 30); overridden per-axis by `_x`/`_z` variants
+- `city/grid_road_spacing_x`: N-S road separation (block width); defaults to `city/grid_road_spacing`
+- `city/grid_road_spacing_z`: E-W road separation (block height); defaults to `city/grid_road_spacing`
+- `city/grid_margin`: inset from city OBB edge to inner grid boundary (default 15)
+- `city/grid_road_width`: width of inner-city grid roads (default 6)
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
 - `world_bounds/boundary_type`: `none` (default, no walls) or `visible_wall` (spawn four wall structures)
