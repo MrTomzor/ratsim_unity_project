@@ -41,6 +41,14 @@ public class WorldLayoutLoader : WorldLoadingModule {
     //  WorldLoadingModule
     // ─────────────────────────────────────────────
 
+    // Run generation eagerly so structures are in WorldData before AgentLoader.Initialize() runs.
+    // The _generated guard makes this idempotent — OnChunkLoadRequested is a no-op if already done.
+    public override void Initialize() {
+        if (_generated) return;
+        _generated = true;
+        Generate();
+    }
+
     public override void OnChunkLoadRequested(int cx, int cz, int lod) {
         if (_generated) return;
         _generated = true;

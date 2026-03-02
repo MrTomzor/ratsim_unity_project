@@ -19,6 +19,15 @@ public class TreeLoader : WorldLoadingModule {
     // chunkID → whether it has been generated (to distinguish "never generated" from "disabled")
     private HashSet<Vector2Int> _generatedChunks = new HashSet<Vector2Int>();
 
+    // Registered by AgentLoader for city_outskirts spawn: no trees inside these circles.
+    // Cleared each episode in Clear() before AgentLoader re-registers for the new episode.
+    private struct ClearZone { public Vector2 center; public float radius; }
+    private static readonly List<ClearZone> _clearZones = new List<ClearZone>();
+
+    public static void RegisterClearZone(Vector2 center, float radius) {
+        _clearZones.Add(new ClearZone { center = center, radius = radius });
+    }
+
     private void Awake() {
         if (instance != null && instance != this) { Destroy(gameObject); return; }
         instance = this;
@@ -61,6 +70,7 @@ public class TreeLoader : WorldLoadingModule {
             if (kvp.Value != null) Destroy(kvp.Value);
         _chunkObjects.Clear();
         _generatedChunks.Clear();
+        _clearZones.Clear();
     }
 
     // --- Generation ---
@@ -132,6 +142,12 @@ public class TreeLoader : WorldLoadingModule {
         Dictionary<Collider, VegetationModification> vegMods,
         System.Random rng)
     {
+        // Suppress trees inside AgentLoader-registered clear zones (e.g. city_outskirts spawn).
+        foreach (ClearZone zone in _clearZones) {
+            if ((point - zone.center).sqrMagnitude <= zone.radius * zone.radius)
+                return true;
+        }
+
         foreach (var col in blockers) {
             if (!IsPointInCollider(point, col)) continue;
 

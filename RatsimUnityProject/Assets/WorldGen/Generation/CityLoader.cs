@@ -43,6 +43,19 @@ public class CityLoader : WorldStructureLoader {
     //  WorldStructureLoader
     // ─────────────────────────────────────────────
 
+    // Eagerly populate all cities that WorldLayoutLoader.Initialize() has already placed,
+    // so house footprints are in WorldData before AgentLoader.Initialize() needs them.
+    // The _processedCities guard prevents double-processing via OnWorldStructureLoaded later.
+    public override void Initialize() {
+        if (_housePrefabs.Length == 0) return;
+        foreach (WorldStructure s in WorldData.GetStructures()) {
+            if (s.structureType != "city") continue;
+            if (_processedCities.Contains(s)) continue;
+            _processedCities.Add(s);
+            GenerateCityHouses(s);
+        }
+    }
+
     public override void OnWorldStructureLoaded(WorldStructure s, int lod) {
         if (s.structureType != "city") return;
         if (_housePrefabs.Length == 0) return;

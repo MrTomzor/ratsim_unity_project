@@ -119,15 +119,20 @@ Structure-level (`WorldStructureLoader`):
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}` or `{type}_LOD{n}`. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
-#### Scene Hierarchy Order (registration order matters)
+#### Module Registration Order (registration order matters)
 
-1. AgentLoader ← spawns agent in Initialize(), before chunk loading begins
-2. WorldHeightLoader
-3. TerrainMeshLoader / TerrainTextureLoader
-4. WorldLayoutLoader ← generates all structures once
-5. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
-6. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator
-7. TreeLoader
+Registration order is controlled by **Unity's Script Execution Order** (Edit → Project Settings → Script Execution Order), not by scene hierarchy position. `WorldLoadingModule.OnEnable()` appends to `registered`, so whichever script's `OnEnable` fires first is registered first. Set the execution order there when adding new modules.
+
+Current required order:
+1. WorldHeightLoader ← terrain heights available for all subsequent Initialize() calls
+2. TerrainMeshLoader / TerrainTextureLoader
+3. WorldLayoutLoader ← **Initialize() now generates all structures eagerly** (cities, roads, …)
+4. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
+5. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator;
+   **CityLoader.Initialize() now places houses eagerly** so AgentLoader can see their footprints
+6. AgentLoader ← spawns agent in Initialize(); city/city_outskirts modes need cities+houses
+   already in WorldData (satisfied by the order above)
+7. TreeLoader ← OnChunkLoadRequested generates trees; respects AgentLoader-registered clear zones
 
 `Clear()` is called in reverse order, so higher-level loaders clean up before lower-level ones destroy base structures.
 
@@ -160,6 +165,12 @@ Structure-level (`WorldStructureLoader`):
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
+- `agents_spawn_pos`: `origin` (default, random within world bounds), `city` (inside city OBB
+  outside house footprints; falls back to `city_outskirts`), or `city_outskirts` (radially
+  outside city OBB, clears a tree-free zone at the spawn point)
+- `agents_city_spawn_attempts`: max random tries to find an open spot inside a city (default 200)
+- `agents_outskirts_margin`: extra radial distance past city half-diagonal for outskirts spawn (default 15)
+- `agents_outskirts_clear_radius`: radius of tree-suppression zone registered at outskirts spawn (default 5)
 
 **Agent config params** (sent on `/sim_control/agent_config`, read by `AgentLoader`):
 - `prefab_name` — prefab loaded from `Resources/AgentPrefabs/{name}`
