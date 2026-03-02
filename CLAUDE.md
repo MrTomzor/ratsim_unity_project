@@ -171,6 +171,16 @@ Current required order:
 - `city/grid_road_spacing_z`: E-W road separation (block height); defaults to `city/grid_road_spacing`
 - `city/grid_margin`: inset from city OBB edge to inner grid boundary (default 15)
 - `city/grid_road_width`: width of inner-city grid roads (default 6)
+- `lighting/time_of_day`: initial hour 0–24 (default 12 = noon)
+- `lighting/time_advance_rate`: in-game hours per simulated second; 0 = static (default 0)
+- `lighting/max_light_intensity`: directional light intensity at noon (default 1.2)
+- `lighting/max_ambient_intensity`: ambient intensity at noon (default 1)
+- `lighting/sun_azimuth`: Y rotation of directional light (default 45)
+- `fog/enabled`: 0 or 1 (default 0)
+- `fog/color_preset`: `"gray"` | `"ocean"` | `""` (falls back to `fog/color_r/g/b`)
+- `fog/color_r`, `fog/color_g`, `fog/color_b`: fog RGB components 0–1
+- `fog/density`: fog density (default 0.02)
+- `fog/mode`: `"linear"` | `"exponential"` | `"exponential_squared"` (default)
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
 - `world_bounds/boundary_type`: `none` (default, no walls) or `visible_wall` (spawn four wall structures)

@@ -119,6 +119,60 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &25131558
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 25131560}
+  - component: {fileID: 25131559}
+  m_Layer: 0
+  m_Name: LightingLoader
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &25131559
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 25131558}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be7dd37b6a88a8b50b1cc4f5dc0af2b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  directionalLight: {fileID: 705507994}
+  defaultTimeOfDay: 12
+  defaultTimeAdvanceRate: 0
+  defaultMaxLightIntensity: 1.2
+  defaultMaxAmbientIntensity: 1
+  defaultSunAzimuth: 45
+  defaultFogEnabled: 1
+  defaultFogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  defaultFogDensity: 0.02
+  defaultFogMode: 3
+--- !u!4 &25131560
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 25131558}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 581.38837, y: -65.07024, z: -635.14734}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &32341306
 GameObject:
   m_ObjectHideFlags: 0
@@ -1620,3 +1674,4 @@ SceneRoots:
   - {fileID: 2046902789}
   - {fileID: 831603861}
   - {fileID: 482559268}
+  - {fileID: 25131560}
