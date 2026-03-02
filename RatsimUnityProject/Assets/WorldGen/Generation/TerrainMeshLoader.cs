@@ -234,7 +234,12 @@ public class TerrainMeshLoader : WorldLoadingModule {
 
     public void SetChunkTexture(int cx, int cz, Texture2D tex) {
         if (!_chunks.TryGetValue(new Vector2Int(cx, cz), out ChunkData data)) return;
-        // instance material per chunk so they don't share the same texture
-        data.go.GetComponent<MeshRenderer>().material.mainTexture = tex;
+        // Use MaterialPropertyBlock to override texture per-renderer without
+        // creating material instances (avoids breaking shader keywords/shadow passes).
+        var renderer = data.go.GetComponent<MeshRenderer>();
+        var block = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(block);
+        block.SetTexture("_MainTex", tex);
+        renderer.SetPropertyBlock(block);
     }
 }
