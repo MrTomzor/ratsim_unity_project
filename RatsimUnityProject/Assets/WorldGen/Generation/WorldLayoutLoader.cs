@@ -120,6 +120,8 @@ public class WorldLayoutLoader : WorldLoadingModule {
             .Where(s => s.transform.parent != transform)
             .ToList();
 
+        
+
         if (verbose && placed.Count > 0)
             Debug.Log($"WorldLayoutLoader: found {placed.Count} manually placed structures");
 

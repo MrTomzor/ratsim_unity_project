@@ -108,10 +108,11 @@ Chunk-level (`WorldLoadingModule`):
 - `WorldHeightLoader` — `GetTerrainHeight(x,z)` via "superflat" or "perlin" mode
 - `TerrainMeshLoader` — generates mesh terrain per-chunk with LOD and normal stitching
 - `TerrainTextureLoader` — applies textures to terrain chunks
-- `WorldLayoutLoader` — places structures and road network (MST + extra edges). Runs once on first chunk load.
-- `TreeLoader` — places trees per chunk at LOD0, checks for `TreeModificationData` on overlapping structures
+- `WorldLayoutLoader` — places structures and road network (MST + extra edges). Runs eagerly in `Initialize()`.
+- `WorldBoundaryLoader` — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Fully rebuilt each episode so dim changes are picked up. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
+- `TreeLoader` — places trees per chunk at LOD0, checks for `VegetationModification` on overlapping structures; also checks `RegisterClearZone()` zones added by AgentLoader
 - `StructureLoadingCoordinator` — bridges chunk → structure events
-- `AgentLoader` — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Uses `Initialize()` (not `OnChunkLoadRequested`) because the agent carries the `ChunkLoadingRequestor`. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
+- `AgentLoader` — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Uses `Initialize()`. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
 
 Structure-level (`WorldStructureLoader`):
 - `SimpleStructureLoader` — spawns `{type}_LOD{n}` prefab as child
@@ -127,12 +128,13 @@ Current required order:
 1. WorldHeightLoader ← terrain heights available for all subsequent Initialize() calls
 2. TerrainMeshLoader / TerrainTextureLoader
 3. WorldLayoutLoader ← **Initialize() now generates all structures eagerly** (cities, roads, …)
-4. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
-5. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator;
+4. WorldBoundaryLoader ← Initialize() spawns boundary walls; needs WorldHeightLoader only
+5. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
+6. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator;
    **CityLoader.Initialize() now places houses eagerly** so AgentLoader can see their footprints
-6. AgentLoader ← spawns agent in Initialize(); city/city_outskirts modes need cities+houses
+7. AgentLoader ← spawns agent in Initialize(); city/city_outskirts modes need cities+houses
    already in WorldData (satisfied by the order above)
-7. TreeLoader ← OnChunkLoadRequested generates trees; respects AgentLoader-registered clear zones
+8. TreeLoader ← OnChunkLoadRequested generates trees; respects AgentLoader-registered clear zones
 
 `Clear()` is called in reverse order, so higher-level loaders clean up before lower-level ones destroy base structures.
 
@@ -165,6 +167,8 @@ Current required order:
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
+- `world_bounds/boundary_type`: `none` (default, no walls) or `visible_wall` (spawn four wall structures)
+- `world_bounds/boundary_height`: Y scale of each wall (default 10)
 - `agents_spawn_pos`: `origin` (default, random within world bounds), `city` (inside city OBB
   outside house footprints; falls back to `city_outskirts`), or `city_outskirts` (radially
   outside city OBB, clears a tree-free zone at the spawn point)
