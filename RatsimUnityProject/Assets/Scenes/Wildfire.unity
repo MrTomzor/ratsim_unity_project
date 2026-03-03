@@ -812,7 +812,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   target: {fileID: 0}
-  height: 50
+  height: 100
   lockRotation: 1
   rotationAngle: 0
 --- !u!114 &482559265
@@ -1474,6 +1474,8 @@ MonoBehaviour:
   resolutionScale: 4
   verbose: 0
   terrainMaterial: {fileID: 0}
+  triangleDarkenDensity: 0.531
+  triangleDarkenMax: 0.783
   heightScale: 30
   noiseScale: 0.01
 --- !u!4 &1656317691

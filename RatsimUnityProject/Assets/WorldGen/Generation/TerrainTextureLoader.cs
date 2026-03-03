@@ -24,6 +24,15 @@ public class TerrainTextureLoader : WorldLoadingModule {
     public Color rockColor       = new Color(0.45f, 0.40f, 0.35f);
     public Color snowColor       = new Color(0.95f, 0.95f, 1.00f);
 
+    [Header("Surface Noise (for visual odometry / optical flow)")]
+    [Tooltip("Fraction of mesh quads that get randomly darkened (0 = none, 1 = all).")]
+    [Range(0f, 1f)]
+    public float quadDarkenDensity = 0.15f;
+
+    [Tooltip("Maximum darkening amount (0 = invisible, 1 = fully black).")]
+    [Range(0f, 1f)]
+    public float quadDarkenMax = 0.35f;
+
     private int   _chunkWidthInt;
 
     private void Awake() {
@@ -37,7 +46,7 @@ public class TerrainTextureLoader : WorldLoadingModule {
     // ─────────────────────────────────────────────
 
     public override void OnChunkLoadRequested(int cx, int cz, int lod) {
-        Texture2D tex = GenerateTexture(cx, cz);
+        Texture2D tex = GenerateTexture(cx, cz, lod);
         TerrainMeshLoader.instance.SetChunkTexture(cx, cz, tex);
     }
 
@@ -51,25 +60,55 @@ public class TerrainTextureLoader : WorldLoadingModule {
     //  Texture generation
     // ─────────────────────────────────────────────
 
-    private Texture2D GenerateTexture(int cx, int cz) {
+    private Texture2D GenerateTexture(int cx, int cz, int lod) {
         float ox = cx * _chunkWidthInt;
         float oz = cz * _chunkWidthInt;
 
-        Texture2D tex = new Texture2D(textureResolution, textureResolution, TextureFormat.RGB24, false);
-        tex.filterMode = FilterMode.Bilinear;
+        // Use mesh-aligned resolution: one texel per quad ensures crisp per-quad coloring.
+        int quadsPerSide = TerrainMeshLoader.instance.GetQuadsPerSide(lod);
+        int res = Mathf.Max(quadsPerSide, textureResolution);
+
+        Texture2D tex = new Texture2D(res, res, TextureFormat.RGB24, false);
+        tex.filterMode = FilterMode.Point; // no blending — each quad maps to sharp texels
         tex.wrapMode   = TextureWrapMode.Clamp;
 
-        Color[] pixels = new Color[textureResolution * textureResolution];
+        Color[] pixels = new Color[res * res];
 
-        for (int z = 0; z < textureResolution; z++)
-        for (int x = 0; x < textureResolution; x++) {
-            float worldX = ox + ((float)x / (textureResolution - 1)) * _chunkWidthInt;
-            float worldZ = oz + ((float)z / (textureResolution - 1)) * _chunkWidthInt;
+        // Base height-based coloring
+        for (int z = 0; z < res; z++)
+        for (int x = 0; x < res; x++) {
+            float worldX = ox + ((float)x / (res - 1)) * _chunkWidthInt;
+            float worldZ = oz + ((float)z / (res - 1)) * _chunkWidthInt;
             float height = WorldHeightLoader.GetTerrainHeight(worldX, worldZ);
-            pixels[z * textureResolution + x] = HeightToColor(height);
-            if (verbose)
-            {
-                Debug.Log($"Generated pixel ({x},{z}) for chunk ({cx},{cz}): world pos ({worldX:F1}, {worldZ:F1}), height {height:F1}, color {pixels[z * textureResolution + x]}");
+            pixels[z * res + x] = HeightToColor(height);
+        }
+
+        // Per-quad darkening overlay, aligned to the mesh grid
+        if (quadDarkenDensity > 0f && quadsPerSide > 0) {
+            int seed = WorldLoadingController.GetDerivedSeed("terrain_texture")
+                       ^ (cx * 1000003) ^ (cz * 999983);
+            System.Random rng = new System.Random(seed);
+
+            // Build a per-quad darkening map
+            float[] quadDarken = new float[quadsPerSide * quadsPerSide];
+            for (int i = 0; i < quadDarken.Length; i++) {
+                quadDarken[i] = rng.NextDouble() < quadDarkenDensity
+                    ? (float)rng.NextDouble() * quadDarkenMax
+                    : 0f;
+            }
+
+            // Apply: map each texel to its mesh quad and darken
+            for (int z = 0; z < res; z++)
+            for (int x = 0; x < res; x++) {
+                int qx = Mathf.Min((int)((float)x / res * quadsPerSide), quadsPerSide - 1);
+                int qz = Mathf.Min((int)((float)z / res * quadsPerSide), quadsPerSide - 1);
+                float darken = quadDarken[qz * quadsPerSide + qx];
+                if (darken > 0f) {
+                    int idx = z * res + x;
+                    Color c = pixels[idx];
+                    float m = 1f - darken;
+                    pixels[idx] = new Color(c.r * m, c.g * m, c.b * m);
+                }
             }
         }
 

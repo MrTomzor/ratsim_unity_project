@@ -12,8 +12,6 @@ public class TerrainMeshLoader : WorldLoadingModule {
     [Header("Mesh Settings")]
     public Material terrainMaterial;
 
-    
-
     [Header("Perlin (used only if WorldHeightLoader is not present)")]
     public float heightScale = 30f;
     public float noiseScale  = 0.01f;
@@ -153,9 +151,6 @@ public class TerrainMeshLoader : WorldLoadingModule {
             triangles[t++] = br; triangles[t++] = tl; triangles[t++] = tr;
         }
 
-        // ... rest of mesh setup unchanged
-
-
         Mesh mesh = new Mesh();
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.vertices    = vertices;
@@ -173,7 +168,8 @@ public class TerrainMeshLoader : WorldLoadingModule {
             ? terrainMaterial : CreateDefaultMaterial();
         go.AddComponent<MeshCollider>().sharedMesh   = mesh;
 
-        return new ChunkData { go = go, mesh = mesh, vertices = vertices, normals = normals, vertsPerSide = vertsPerSide, lod = origLOD };    }
+        return new ChunkData { go = go, mesh = mesh, vertices = vertices, normals = normals, vertsPerSide = vertsPerSide, lod = origLOD };
+    }
 
     // ─────────────────────────────────────────────
     //  Normal stitching
@@ -220,6 +216,20 @@ public class TerrainMeshLoader : WorldLoadingModule {
         data.mesh.normals = data.normals;
         MeshCollider mc = data.go.GetComponent<MeshCollider>();
         if (mc != null) mc.sharedMesh = data.mesh;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Public API
+    // ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the mesh quad grid resolution for a chunk at the given LOD.
+    /// TerrainTextureLoader uses this to align texture darkening to the mesh grid.
+    /// </summary>
+    public int GetQuadsPerSide(int lod) {
+        int effectiveLod = lod + resolutionScale;
+        int step = (int)Mathf.Pow(2, effectiveLod);
+        return _chunkWidthInt / step;
     }
 
     // ─────────────────────────────────────────────
