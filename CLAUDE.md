@@ -115,10 +115,10 @@ Chunk-level (`WorldLoadingModule`):
 - `AgentLoader` — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Uses `Initialize()`. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
 
 Structure-level (`WorldStructureLoader`):
-- `SimpleStructureLoader` — spawns `{type}_LOD{n}` prefab as child
+- `SimpleStructureLoader` — manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances; enables the matching LOD child, disables others, sets Default layer
 - `CityLoader` — fills "city" structures with house WorldStructures, sets `HouseData`
 
-**Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}` or `{type}_LOD{n}`. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
+**Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
 #### Module Registration Order (registration order matters)
 
@@ -183,6 +183,9 @@ Current required order:
 - `fog/mode`: `"linear"` | `"exponential"` | `"exponential_squared"` (default)
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
+- `meta_height_generation/mode`: `"disabled"` (default) or `"valley"` (terrain rises towards world edges)
+- `meta_height_generation/valley_edge_height`: max height added at world edge (default 50)
+- `meta_height_generation/valley_exponent`: curve power — 1=linear, 2=quadratic (default 2)
 - `world_bounds/boundary_type`: `none` (default, no walls) or `visible_wall` (spawn four wall structures)
 - `world_bounds/boundary_height`: Y scale of each wall (default 10)
 - `agents_spawn_pos`: `origin` (default, random within world bounds), `city` (inside city OBB

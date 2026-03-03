@@ -1187,6 +1187,8 @@ MonoBehaviour:
   dryGrassColor: {r: 0.55, g: 0.6, b: 0.25, a: 1}
   rockColor: {r: 0.45, g: 0.4, b: 0.35, a: 1}
   snowColor: {r: 0.95, g: 0.95, b: 1, a: 1}
+  quadDarkenDensity: 0.15
+  quadDarkenMax: 0.35
 --- !u!4 &982890398
 Transform:
   m_ObjectHideFlags: 0
@@ -1474,8 +1476,6 @@ MonoBehaviour:
   resolutionScale: 4
   verbose: 0
   terrainMaterial: {fileID: 0}
-  triangleDarkenDensity: 0.531
-  triangleDarkenMax: 0.783
   heightScale: 30
   noiseScale: 0.01
 --- !u!4 &1656317691
@@ -1526,6 +1526,9 @@ MonoBehaviour:
   superflatHeight: -10
   perlinScale: 200
   perlinAmplitude: 100
+  metaHeightMode: valley
+  valleyEdgeHeight: 100
+  valleyExponent: 6
 --- !u!4 &1869060069
 Transform:
   m_ObjectHideFlags: 0

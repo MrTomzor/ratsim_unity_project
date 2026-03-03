@@ -15,8 +15,15 @@ public class WorldHeightLoader : WorldLoadingModule {
     public float perlinScale     = 200f;
     public float perlinAmplitude = 50f;
 
+    [Header("Meta Height")]
+    public string metaHeightMode   = "disabled";  // "disabled" | "valley"
+    public float valleyEdgeHeight  = 50f;
+    public float valleyExponent    = 2f;
+
     private float _perlinOffsetX;
     private float _perlinOffsetZ;
+    private float _worldHalfW;
+    private float _worldHalfH;
 
     // ─────────────────────────────────────────────
     //  Height influence zones
@@ -47,6 +54,15 @@ public class WorldHeightLoader : WorldLoadingModule {
         superflatHeight  = WorldLoadingController.GetParamFloat ("height_generation/superflat_height",  superflatHeight);
         perlinScale      = WorldLoadingController.GetParamFloat ("height_generation/perlin_scale",      perlinScale);
         perlinAmplitude  = WorldLoadingController.GetParamFloat ("height_generation/perlin_amplitude",  perlinAmplitude);
+
+        metaHeightMode  = WorldLoadingController.GetParamString("meta_height_generation/mode",               metaHeightMode);
+        valleyEdgeHeight = WorldLoadingController.GetParamFloat("meta_height_generation/valley_edge_height", valleyEdgeHeight);
+        valleyExponent   = WorldLoadingController.GetParamFloat("meta_height_generation/valley_exponent",    valleyExponent);
+
+        float worldW = WorldLoadingController.GetParamFloat("world_bounds/width",  200f);
+        float worldH = WorldLoadingController.GetParamFloat("world_bounds/height", 200f);
+        _worldHalfW = worldW * 0.5f;
+        _worldHalfH = worldH * 0.5f;
 
         int seed = WorldLoadingController.GetDerivedSeed("height");
         System.Random rng = new System.Random(seed);
@@ -141,11 +157,21 @@ public class WorldHeightLoader : WorldLoadingModule {
     }
 
     private float GetBaseHeight(float x, float z) {
-        return mode switch {
+        float baseH = mode switch {
             "superflat" => superflatHeight,
             "perlin"    => SamplePerlin(x, z),
             _           => superflatHeight
         };
+        return baseH + SampleMetaHeight(x, z);
+    }
+
+    private float SampleMetaHeight(float x, float z) {
+        if (metaHeightMode != "valley") return 0f;
+
+        float dx = Mathf.Clamp01(Mathf.Abs(x) / _worldHalfW);
+        float dz = Mathf.Clamp01(Mathf.Abs(z) / _worldHalfH);
+        float edgeFactor = Mathf.Max(dx, dz);
+        return valleyEdgeHeight * Mathf.Pow(edgeFactor, valleyExponent);
     }
 
     private float ApplyInfluenceZones(float x, float z, float baseH) {
