@@ -119,7 +119,8 @@ GameObject:
   - component: {fileID: 950743269551053324}
   - component: {fileID: 1642923023854324051}
   - component: {fileID: -1276591421263920326}
-  m_Layer: 0
+  - component: {fileID: -4976444800610618534}
+  m_Layer: 8
   m_Name: farm
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -171,3 +172,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mode: 0
   value: 1
+--- !u!114 &-4976444800610618534
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6527212090436357932}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4815cd9ae126d97cb87339f9d200554c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mode: 0
+  targetHeight: 0
+  heightDelta: 0
+  blendMargin: 10
