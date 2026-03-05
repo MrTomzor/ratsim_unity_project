@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 8110354932568913844}
   - component: {fileID: 1265710530312027631}
   m_Layer: 0
-  m_Name: reward
+  m_Name: reward_obj1
   m_TagString: reward
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

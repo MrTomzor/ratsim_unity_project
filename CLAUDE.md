@@ -119,6 +119,7 @@ Chunk-level (`WorldLoadingModule`):
 Structure-level (`WorldStructureLoader`):
 - `SimpleStructureLoader` — manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances; enables the matching LOD child, disables others, sets Default layer
 - `HouseLoader` — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG
+- `RewardObjectLoader` — spawns reward objects via two parallel modes: uniform (per-chunk density) and structure-based (at `rewardSpawnPositions` in allowed structure types)
 - `CityLoader` — fills "city" structures with house WorldStructures
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
@@ -133,9 +134,10 @@ Current required order:
 3. WorldLayoutLoader ← **Initialize() now generates all structures eagerly** (cities, roads, …)
 4. WorldBoundaryLoader ← Initialize() spawns boundary walls; needs WorldHeightLoader only
 5. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
-6. SimpleStructureLoader, CityLoader, HouseLoader, other WorldStructureLoaders ← AFTER coordinator;
+6. SimpleStructureLoader, CityLoader, HouseLoader, RewardObjectLoader, other WorldStructureLoaders ← AFTER coordinator;
    **CityLoader.Initialize() now places houses eagerly** so AgentLoader can see their footprints;
-   **HouseLoader must be AFTER SimpleStructureLoader** (needs LOD children enabled first)
+   **HouseLoader must be AFTER SimpleStructureLoader** (needs LOD children enabled first);
+   **RewardObjectLoader must be AFTER SimpleStructureLoader** (needs LOD children for rewardSpawnPositions)
 7. AgentLoader ← spawns agent in Initialize(); city/city_outskirts modes need cities+houses
    already in WorldData (satisfied by the order above)
 8. TreeLoader ← OnChunkLoadRequested generates trees; respects AgentLoader-registered clear zones
@@ -193,6 +195,11 @@ Current required order:
 - `house/clutter_density`: 0.0–1.0, fraction of clutter objects enabled (default 1)
 - `house/allowed_car_prefabs`: comma list of car prefab names in `Resources/WorldGen/HouseModulePrefabs/`
 - `house/car_spawn_chance`: 0.0–1.0 per car spawn position (default 0)
+- `reward_objects/prefab_name`: reward prefab in `Resources/WorldGen/RewardObjectPrefabs/` (default `"reward_obj1"`)
+- `reward_objects/uniform_density`: objects per unit² for uniform world spawning (default 0 = disabled)
+- `reward_objects/allowed_structures`: comma list of structure types for structure-based spawning (default `""` = disabled)
+- `reward_objects/{type}/spawn_probability`: 0.0–1.0 per spawn position within a structure (default 1)
+- `reward_objects/{type}/skip_probability`: 0.0–1.0 chance to skip an entire structure (default 0)
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
 - `meta_height_generation/mode`: `"disabled"` (default) or `"valley"` (terrain rises towards world edges)
