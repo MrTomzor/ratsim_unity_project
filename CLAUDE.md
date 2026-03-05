@@ -96,6 +96,8 @@ Two-layer config model:
 
 Flow: JSON params influence **loaders** → loaders produce **structures with typed component data** → other loaders and runtime systems read/write that data.
 
+**Editor-default convention:** All loader config values must be `public` serialized fields on the MonoBehaviour, editable in the Unity Inspector. `LoadParams()` uses the field's current value as the default fallback: `field = WorldLoadingController.GetParamFloat("key", field)`. This way the Inspector values work standalone, and episode JSON overrides them at runtime.
+
 **Domain-specific spatial queries live on loaders, not WorldData:**
 - `WorldHeightLoader.GetTerrainHeight(x, z)` — existing pattern
 - `WaterLoader.IsWater(x, y)` — future example
@@ -116,7 +118,8 @@ Chunk-level (`WorldLoadingModule`):
 
 Structure-level (`WorldStructureLoader`):
 - `SimpleStructureLoader` — manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances; enables the matching LOD child, disables others, sets Default layer
-- `CityLoader` — fills "city" structures with house WorldStructures, sets `HouseData`
+- `HouseLoader` — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG
+- `CityLoader` — fills "city" structures with house WorldStructures
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
@@ -130,8 +133,9 @@ Current required order:
 3. WorldLayoutLoader ← **Initialize() now generates all structures eagerly** (cities, roads, …)
 4. WorldBoundaryLoader ← Initialize() spawns boundary walls; needs WorldHeightLoader only
 5. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
-6. SimpleStructureLoader, CityLoader, other WorldStructureLoaders ← AFTER coordinator;
-   **CityLoader.Initialize() now places houses eagerly** so AgentLoader can see their footprints
+6. SimpleStructureLoader, CityLoader, HouseLoader, other WorldStructureLoaders ← AFTER coordinator;
+   **CityLoader.Initialize() now places houses eagerly** so AgentLoader can see their footprints;
+   **HouseLoader must be AFTER SimpleStructureLoader** (needs LOD children enabled first)
 7. AgentLoader ← spawns agent in Initialize(); city/city_outskirts modes need cities+houses
    already in WorldData (satisfied by the order above)
 8. TreeLoader ← OnChunkLoadRequested generates trees; respects AgentLoader-registered clear zones
@@ -181,6 +185,14 @@ Current required order:
 - `fog/color_r`, `fog/color_g`, `fog/color_b`: fog RGB components 0–1
 - `fog/density`: fog density (default 0.02)
 - `fog/mode`: `"linear"` | `"exponential"` | `"exponential_squared"` (default)
+- `house/allowed_door_prefabs`: comma list of door prefab names in `Resources/WorldGen/HouseModulePrefabs/`
+- `house/{door_name}/probability`: relative weight for a door type (default 1)
+- `house/enable_roofs`: 0 or 1 (default 1)
+- `house/chance_wall_broken`: 0.0–1.0 per breakable wall (default 0)
+- `house/rubble_prefab`: prefab name for wall rubble replacement
+- `house/clutter_density`: 0.0–1.0, fraction of clutter objects enabled (default 1)
+- `house/allowed_car_prefabs`: comma list of car prefab names in `Resources/WorldGen/HouseModulePrefabs/`
+- `house/car_spawn_chance`: 0.0–1.0 per car spawn position (default 0)
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
 - `meta_height_generation/mode`: `"disabled"` (default) or `"valley"` (terrain rises towards world edges)
