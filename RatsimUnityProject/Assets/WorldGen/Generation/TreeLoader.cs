@@ -13,6 +13,15 @@ public class TreeLoader : WorldLoadingModule {
     private int _treeSeed;
 
     public bool verbose;
+    bool paramsInitialized = false;
+
+    private const string VegetationPrefabPath = "WorldGen/VegetationPrefabs/";
+
+    private struct VegetationEntry {
+        public GameObject prefab;
+        public float density;
+    }
+    private List<VegetationEntry> _vegetationEntries = new List<VegetationEntry>();
 
     // chunkID → chunk parent GameObject
     private Dictionary<Vector2Int, GameObject> _chunkObjects = new Dictionary<Vector2Int, GameObject>();
@@ -31,20 +40,55 @@ public class TreeLoader : WorldLoadingModule {
     private void Awake() {
         if (instance != null && instance != this) { Destroy(gameObject); return; }
         instance = this;
-        LoadParams();
     }
 
     private void LoadParams() {
         _worldGenLayer = LayerMask.GetMask("WorldGen");
-        _density       = WorldLoadingController.GetParamFloat("tree_generation/density", _density);
         _chunkWidth    = WorldLoadingController.GetChunkWidth();
         _treeSeed      = WorldLoadingController.GetDerivedSeed("trees");
+
+        _vegetationEntries.Clear();
+        string allowedPrefabs = WorldLoadingController.GetParamString("vegetation/allowed_prefabs", "");
+        Debug.Log("TreeLoader: loading vegetation prefabs, allowed_prefabs=" + allowedPrefabs);
+
+        if (!string.IsNullOrEmpty(allowedPrefabs)) {
+            // New config-driven vegetation
+            string[] names = allowedPrefabs.Split(',');
+            foreach (string raw in names) {
+                string name = raw.Trim();
+                if (string.IsNullOrEmpty(name)) continue;
+
+                GameObject prefab = Resources.Load<GameObject>(VegetationPrefabPath + name);
+                if (prefab == null) {
+                    Debug.LogWarning($"TreeLoader: vegetation prefab not found at Resources/{VegetationPrefabPath}{name}");
+                    continue;
+                }
+                float density = WorldLoadingController.GetParamFloat($"vegetation/{name}/density", 0f);
+                _vegetationEntries.Add(new VegetationEntry { prefab = prefab, density = density });
+            }
+            Debug.Log($"TreeLoader: loaded {_vegetationEntries.Count} vegetation prefabs from config");
+        }
+        else
+        {
+            Debug.LogWarning("TreeLoader: no vegetation prefabs configured");
+        }
+
+        if (_vegetationEntries.Count == 0 && treePrefab != null) {
+            Debug.LogWarning("TreeLoader: no vegetation prefabs configured, falling back to treePrefab with density param");
+            // Backward compat: fall back to SerializeField treePrefab + old density key
+            _density = WorldLoadingController.GetParamFloat("tree_generation/density", _density);
+            _vegetationEntries.Add(new VegetationEntry { prefab = treePrefab, density = _density });
+        }
     }
 
     // --- WorldLoadingModule ---
 
     public override void OnChunkLoadRequested(int cx, int cz, int lod) {
         if (lod != 0) return;
+        if(!paramsInitialized) {
+            LoadParams();
+            paramsInitialized = true;
+        }
 
         Vector2Int chunkID = new Vector2Int(cx, cz);
 
@@ -105,26 +149,32 @@ public class TreeLoader : WorldLoadingModule {
         _chunkObjects[chunkID] = chunkObj;
         _generatedChunks.Add(chunkID);
 
-        // deterministic rng for this chunk
-        int chunkSeed = _treeSeed ^ (chunkID.x * 1000003) ^ (chunkID.y * 999983);
-        System.Random rng = new System.Random(chunkSeed);
+        int baseChunkSeed = _treeSeed ^ (chunkID.x * 1000003) ^ (chunkID.y * 999983);
 
-        int treeCount = Mathf.RoundToInt(_density * _chunkWidth * _chunkWidth);
-        if (verbose) Debug.Log($"TreeLoader: chunk ({chunkID.x},{chunkID.y}) seed={chunkSeed} attempting {treeCount} trees, {blockers.Length} blockers ({vegMods.Count} with VegMod)");
+        for (int vi = 0; vi < _vegetationEntries.Count; vi++) {
+            VegetationEntry entry = _vegetationEntries[vi];
 
-        for (int i = 0; i < treeCount; i++) {
-            float x = originX + (float)rng.NextDouble() * _chunkWidth;
-            float z = originZ + (float)rng.NextDouble() * _chunkWidth;
+            // each prefab type gets a slightly different seed for independent placement
+            int chunkSeed = baseChunkSeed ^ (vi * 7919);
+            System.Random rng = new System.Random(chunkSeed);
 
-            if (ShouldSkipTree(new Vector2(x, z), blockers, vegMods, rng)) continue;
+            int count = Mathf.RoundToInt(entry.density * _chunkWidth * _chunkWidth);
+            if (verbose) Debug.Log($"TreeLoader: chunk ({chunkID.x},{chunkID.y}) prefab={entry.prefab.name} seed={chunkSeed} attempting {count} placements, {blockers.Length} blockers ({vegMods.Count} with VegMod)");
 
-            float y = WorldHeightLoader.GetTerrainHeight(x, z);
-            GameObject tree = Instantiate(treePrefab, new Vector3(x, y, z), Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
-            tree.transform.SetParent(chunkObj.transform);
+            for (int i = 0; i < count; i++) {
+                float x = originX + (float)rng.NextDouble() * _chunkWidth;
+                float z = originZ + (float)rng.NextDouble() * _chunkWidth;
+
+                if (ShouldSkipTree(new Vector2(x, z), blockers, vegMods, rng)) continue;
+
+                float y = WorldHeightLoader.GetTerrainHeight(x, z);
+                GameObject obj = Instantiate(entry.prefab, new Vector3(x, y, z), Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
+                obj.transform.SetParent(chunkObj.transform);
+            }
+
+            // extra vegetation for IncreaseDensity zones
+            PlaceIncreasedDensityVegetation(chunkID, chunkSeed, originX, originZ, vegMods, chunkObj, entry);
         }
-
-        // extra trees for IncreaseDensity zones
-        PlaceIncreasedDensityTrees(chunkID, chunkSeed, originX, originZ, vegMods, chunkObj);
     }
 
     // ─────────────────────────────────────────────
@@ -173,13 +223,14 @@ public class TreeLoader : WorldLoadingModule {
     //  IncreaseDensity extra-tree pass
     // ─────────────────────────────────────────────
 
-    private void PlaceIncreasedDensityTrees(
+    private void PlaceIncreasedDensityVegetation(
         Vector2Int chunkID,
         int chunkSeed,
         float originX,
         float originZ,
         Dictionary<Collider, VegetationModification> vegMods,
-        GameObject chunkObj)
+        GameObject chunkObj,
+        VegetationEntry entry)
     {
         // deduplicate: one extra pass per WorldStructure, not per collider
         var processed = new HashSet<WorldStructure>();
@@ -194,7 +245,7 @@ public class TreeLoader : WorldLoadingModule {
             Vector2 size   = ws.GetSize();
             float   area   = size.x * size.y;
 
-            int extraCount = Mathf.RoundToInt(_density * area * kvp.Value.value);
+            int extraCount = Mathf.RoundToInt(entry.density * area * kvp.Value.value);
             if (extraCount <= 0) continue;
 
             // zone-specific seed: independent of main chunk rng
@@ -218,11 +269,11 @@ public class TreeLoader : WorldLoadingModule {
                 if (wz < originZ || wz > originZ + _chunkWidth) continue;
 
                 float wy = WorldHeightLoader.GetTerrainHeight(wx, wz);
-                GameObject tree = Instantiate(
-                    treePrefab,
+                GameObject obj = Instantiate(
+                    entry.prefab,
                     new Vector3(wx, wy, wz),
                     Quaternion.Euler(0f, (float)zoneRng.NextDouble() * 360f, 0f));
-                tree.transform.SetParent(chunkObj.transform);
+                obj.transform.SetParent(chunkObj.transform);
             }
         }
     }

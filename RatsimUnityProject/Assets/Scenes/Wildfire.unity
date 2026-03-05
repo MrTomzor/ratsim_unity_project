@@ -1326,7 +1326,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9deaacb74333d5d41b602b87240eb58d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  treePrefab: {fileID: 2462568519800153458, guid: 013d944ba76dc920d83d83b920691f1f, type: 3}
+  treePrefab: {fileID: 0}
   _density: 0.01
   verbose: 0
 --- !u!4 &1289060173
