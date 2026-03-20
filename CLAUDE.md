@@ -19,7 +19,7 @@ The simulation listens on **TCP port 9000**. External clients connect and drive 
 The WorldGen system follows an **ECS-like pattern**:
 
 - **Data** = JSON episode params (global, on `WorldLoadingController`) + typed MonoBehaviour data components on structures (e.g. `HouseData`, `BurnState`, `TreeModificationData`)
-- **Systems** = Loaders (`WorldLoadingModule` for chunks, `WorldStructureLoader` for structures) that read data and produce world content
+- **Systems** = Providers (`WorldDataProvider` for chunk-level generation, `WorldStructureProvider` for per-structure reactions) that declare dependencies and produce world content
 - **Runtime behaviours** = MonoBehaviours that tick each simulation step (fire spread, reward collection, regrowth) and mutate structure data + call `Reload()`
 
 ### TCP Communication Layer (`Assets/TCPConnector/`)
@@ -47,31 +47,42 @@ A two-layer chunk-based procedural world generation pipeline.
 
 #### Layer 1: Chunk Loading
 
-**`WorldLoadingController`** — scene singleton. Stores key-value config params (loaded from JSON). Controls episode lifecycle: `StartEpisode()` → `ClearAllWorldData()` → `InitializeAllModules()`. Agent config is received separately on `/sim_control/agent_config` and stored for `AgentLoader` to read.
+**`WorldLoadingController`** — scene singleton. Stores key-value config params (loaded from JSON). Controls episode lifecycle: `StartEpisode()` → `ClearAllWorldData()` → `InitializeAllModules()`. Uses topological sort (Kahn's algorithm) on provider dependency declarations — `Generate()` runs in dependency order, `Clear()` runs in reverse. Agent config is received separately on `/sim_control/agent_config` and stored for `AgentLoader` to read.
 
 Config JSON format:
 ```json
 {"entries": [{"key": "seed", "value": "42"}, {"key": "world_bounds/width", "value": "1000"}, ...]}
 ```
 
-**`WorldLoadingModule`** — abstract base class for chunk-level generator components. Subclasses override:
-- `Initialize()` — called once per episode after `Clear()`, before any chunk loading. Use for work that must happen regardless of chunk requests (e.g. spawning agents). Default is no-op.
-- `OnChunkLoadRequested(cx, cz, lod)` — called when a chunk enters view range
-- `OnChunkUnloadRequested(cx, cz, lod)` — called when a chunk leaves range
+**`WorldDataType`** — enum defining all data products in the pipeline: `Height`, `Layout`, `Boundaries`, `StructureEvents`, `StructureContent`, `Rewards`, `Agents`, `Vegetation`, `TerrainMesh`, `TerrainTexture`, `Lighting`.
+
+**`WorldDataProvider`** — abstract base class for all world generation components. Each provider declares:
+- `Provides` — `WorldDataType[]` of data products it creates
+- `DependsOn` — `WorldDataType[]` of data products it requires (determines initialization order)
+- `Generate()` — called once per episode in dependency order, for global (non-spatial) work
+- `GenerateChunk(cx, cz, lod)` — called when a chunk enters view range
+- `ClearChunk(cx, cz, lod)` — called when a chunk leaves range
 - `Clear()` — destroys all generated content, resets state
 
-**`ChunkLoadingRequestor`** — attaches to an agent, ticks every sim step. Maintains a set of loaded chunks: inner radius → LOD0, outer radius → LOD1. Notifies all registered `WorldLoadingModule`s when chunks load/unload.
+**`WorldServices`** — static service locator for cross-provider queries. Providers register typed interfaces in `OnEnable()` (e.g. `WorldServices.Register<IHeightProvider>(this)`). Consumers query without knowing concrete classes: `WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z)`.
+
+Service interfaces:
+- `IHeightProvider` — terrain height queries, terrain modification processing. Implemented by `WorldHeightLoader`.
+- `ITerrainMeshProvider` — mesh resolution queries, chunk texturing, terrain collider identification. Implemented by `TerrainMeshLoader`.
+- `ILayoutProvider` — entry point queries for road connections. Implemented by `WorldLayoutLoader`.
+
+**`ChunkLoadingRequestor`** — attaches to an agent, ticks every sim step. Maintains a set of loaded chunks: inner radius → LOD0, outer radius → LOD1. Notifies all registered `WorldDataProvider`s when chunks load/unload.
 
 #### Layer 2: Structure Loading
 
-**`StructureLoadingCoordinator`** (`WorldLoadingModule`) — bridges chunk events into per-structure events. When a chunk loads, queries `WorldData` for structures in that chunk and fires `OnWorldStructureLoaded` on all `WorldStructureLoader`s. Also subscribes to `WorldData.OnNewStructureRegistered` for structures placed dynamically mid-generation (e.g. houses spawned by CityLoader inside a city).
+**`StructureLoadingCoordinator`** (`WorldDataProvider`, provides `StructureEvents`, depends on `Layout`) — bridges chunk events into per-structure events. When a chunk loads, queries `WorldData` for structures in that chunk and fires `OnWorldStructureLoaded` on all `WorldStructureProvider`s. Also subscribes to `WorldData.OnNewStructureRegistered` for structures placed dynamically mid-generation (e.g. houses spawned by CityLoader inside a city).
 
-**`WorldStructureLoader`** — abstract base (extends `WorldLoadingModule`) for structure-level loaders. Subclasses override:
+**`WorldStructureProvider`** — abstract base (extends `WorldDataProvider`) for structure-level providers. Subclasses override:
 - `OnWorldStructureLoaded(WorldStructure s, int lod)` — structure becomes visible
 - `OnWorldStructureUnloaded(WorldStructure s, int lod)` — structure fully out of range
 - `Clear()`
 
-**`SimpleStructureLoader`** — generic `WorldStructureLoader` that spawns `{type}_LOD{n}` prefabs from `Resources/WorldGen/WorldStructurePrefabs/` as children. Sets spawned content to Default layer (not WorldGen layer). If no LOD-specific prefab exists, does nothing.
+**`SimpleStructureLoader`** — generic `WorldStructureProvider` that manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances. Enables matching LOD child, disables others, sets Default layer.
 
 #### Data: WorldStructure and Typed Data Components
 
@@ -98,69 +109,72 @@ Flow: JSON params influence **loaders** → loaders produce **structures with ty
 
 **Editor-default convention:** All loader config values must be `public` serialized fields on the MonoBehaviour, editable in the Unity Inspector. `LoadParams()` uses the field's current value as the default fallback: `field = WorldLoadingController.GetParamFloat("key", field)`. This way the Inspector values work standalone, and episode JSON overrides them at runtime.
 
-**Domain-specific spatial queries live on loaders, not WorldData:**
-- `WorldHeightLoader.GetTerrainHeight(x, z)` — existing pattern
-- `WaterLoader.IsWater(x, y)` — future example
-- Each loader owns its domain data and exposes a static query API
+**Domain-specific spatial queries use WorldServices interfaces, not static singletons:**
+- `WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z)`
+- `WorldServices.Get<ITerrainMeshProvider>().IsTerrainCollider(col)`
+- `WorldServices.Get<ILayoutProvider>().GetEntryPoints(structure)`
+- Each provider owns its domain data and registers a typed interface
 - WorldData stays purely as the structure spatial index
 
 #### Concrete Modules
 
-Chunk-level (`WorldLoadingModule`):
-- `WorldHeightLoader` — `GetTerrainHeight(x,z)` via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
-- `TerrainMeshLoader` — generates mesh terrain per-chunk with LOD and normal stitching
-- `TerrainTextureLoader` — applies textures to terrain chunks
-- `WorldLayoutLoader` — places structures and road network (MST + extra edges). Runs eagerly in `Initialize()`.
-- `WorldBoundaryLoader` — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Fully rebuilt each episode so dim changes are picked up. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
-- `TreeLoader` — places trees per chunk at LOD0, checks for `VegetationModification` on overlapping structures; also checks `RegisterClearZone()` zones added by AgentLoader
-- `StructureLoadingCoordinator` — bridges chunk → structure events
-- `AgentLoader` — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Uses `Initialize()`. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
+Global providers (run in `Generate()`, dependency-ordered):
+- `WorldHeightLoader` (provides `Height`) — `IHeightProvider`: terrain height via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
+- `WorldLayoutLoader` (provides `Layout`, depends on `Height`) — `ILayoutProvider`: places structures and road network (MST + extra edges). Runs eagerly in `Generate()`.
+- `WorldBoundaryLoader` (provides `Boundaries`, depends on `Height`, `Layout`) — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
+- `LightingAndFogLoader` (provides `Lighting`) — applies lighting/fog settings each episode, optionally advances time-of-day.
+- `AgentLoader` (provides `Agents`, depends on `Height`, `StructureContent`) — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
 
-Structure-level (`WorldStructureLoader`):
-- `SimpleStructureLoader` — manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances; enables the matching LOD child, disables others, sets Default layer
-- `HouseLoader` — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG
-- `RewardObjectLoader` — spawns reward objects via two parallel modes: uniform (per-chunk density) and structure-based (at `rewardSpawnPositions` in allowed structure types)
-- `CityLoader` — fills "city" structures with house WorldStructures
+Chunk-level providers (run in `GenerateChunk()`/`ClearChunk()`):
+- `TerrainMeshLoader` (provides `TerrainMesh`, depends on `Height`) — `ITerrainMeshProvider`: generates mesh terrain per-chunk with LOD and normal stitching.
+- `TerrainTextureLoader` (provides `TerrainTexture`, depends on `TerrainMesh`, `Height`) — applies textures to terrain chunks.
+- `StructureLoadingCoordinator` (provides `StructureEvents`, depends on `Layout`) — bridges chunk → structure events.
+- `TreeLoader` (provides `Vegetation`, depends on `Height`, `StructureContent`, `Agents`) — places trees per chunk at LOD0, checks for `VegetationModification` on overlapping structures; also checks `RegisterClearZone()` zones added by AgentLoader.
+
+Structure-level providers (`WorldStructureProvider`, respond to structure load/unload events):
+- `SimpleStructureLoader` (provides `StructureContent`, depends on `StructureEvents`) — manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances; enables the matching LOD child, disables others, sets Default layer.
+- `CityLoader` (provides `StructureContent`, depends on `StructureEvents`) — fills "city" structures with house WorldStructures.
+- `HouseLoader` (provides `StructureContent`, depends on `StructureEvents`) — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG.
+- `RewardObjectLoader` (provides `Rewards`, depends on `Height`, `StructureEvents`) — spawns reward objects via two parallel modes: uniform (per-chunk density) and structure-based (at `rewardSpawnPositions` in allowed structure types).
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
-#### Module Registration Order (registration order matters)
+#### Provider Ordering (automatic via dependency graph)
 
-Registration order is controlled by **Unity's Script Execution Order** (Edit → Project Settings → Script Execution Order), not by scene hierarchy position. `WorldLoadingModule.OnEnable()` appends to `registered`, so whichever script's `OnEnable` fires first is registered first. Set the execution order there when adding new modules.
+Ordering is determined automatically by `WorldLoadingController`'s topological sort based on each provider's `Provides` and `DependsOn` declarations. No manual script execution order or scene hierarchy ordering is needed.
 
-Current required order:
-1. WorldHeightLoader ← terrain heights available for all subsequent Initialize() calls
-2. TerrainMeshLoader / TerrainTextureLoader
-3. WorldLayoutLoader ← **Initialize() now generates all structures eagerly** (cities, roads, …)
-4. WorldBoundaryLoader ← Initialize() spawns boundary walls; needs WorldHeightLoader only
-5. StructureLoadingCoordinator ← must be AFTER WorldLayoutLoader
-6. SimpleStructureLoader, CityLoader, HouseLoader, RewardObjectLoader, other WorldStructureLoaders ← AFTER coordinator;
-   **CityLoader.Initialize() now places houses eagerly** so AgentLoader can see their footprints;
-   **HouseLoader must be AFTER SimpleStructureLoader** (needs LOD children enabled first);
-   **RewardObjectLoader must be AFTER SimpleStructureLoader** (needs LOD children for rewardSpawnPositions)
-7. AgentLoader ← spawns agent in Initialize(); city/city_outskirts modes need cities+houses
-   already in WorldData (satisfied by the order above)
-8. TreeLoader ← OnChunkLoadRequested generates trees; respects AgentLoader-registered clear zones
+The dependency graph produces this order:
+```
+Height → Layout → Boundaries
+Height → TerrainMesh → TerrainTexture
+Layout → StructureEvents → StructureContent (SimpleStructureLoader, CityLoader, HouseLoader)
+Height + StructureEvents → Rewards
+Height + StructureContent → Agents
+Height + StructureContent + Agents → Vegetation
+Lighting (no deps, runs early)
+```
 
-`Clear()` is called in reverse order, so higher-level loaders clean up before lower-level ones destroy base structures.
+`Generate()` runs in dependency order. `Clear()` runs in reverse, so higher-level providers clean up before lower-level ones destroy base structures.
 
 #### Adding New Content
 
 **New structure type loader:**
-1. Create class extending `WorldStructureLoader`
-2. Override `OnWorldStructureLoaded` (filter by `s.structureType`)
-3. Override `OnWorldStructureUnloaded` and `Clear()`
-4. Add to scene after `StructureLoadingCoordinator`
+1. Create class extending `WorldStructureProvider`
+2. Declare `Provides` (e.g. `StructureContent`) and `DependsOn` (at least `StructureEvents`)
+3. Override `OnWorldStructureLoaded` (filter by `s.structureType`)
+4. Override `OnWorldStructureUnloaded` and `Clear()`
+5. Add to scene — ordering is automatic via dependency graph
 
 **New data component:**
 1. Create a MonoBehaviour with plain serializable fields (no logic)
 2. Add to relevant prefabs for defaults
-3. Have loaders read/write it via `GetComponent<T>()`
+3. Have providers read/write it via `GetComponent<T>()`
 
 **New domain query (e.g. WaterLoader.IsWater):**
-1. Create a `WorldLoadingModule` that generates/tracks the data
-2. Expose a `public static` query method
-3. Other systems call it directly (like `WorldHeightLoader.GetTerrainHeight`)
+1. Create a `WorldDataProvider` that generates/tracks the data
+2. Define an interface (e.g. `IWaterProvider`) in `WorldServices.cs`
+3. Register it in `OnEnable()`: `WorldServices.Register<IWaterProvider>(this)`
+4. Consumers query: `WorldServices.Get<IWaterProvider>().IsWater(x, z)`
 
 **Runtime state change (e.g. fire burns a house):**
 1. Mutate the structure's data component(s)
