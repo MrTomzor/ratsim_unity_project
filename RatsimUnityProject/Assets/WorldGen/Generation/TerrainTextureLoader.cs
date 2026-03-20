@@ -1,8 +1,9 @@
 using UnityEngine;
 
-public class TerrainTextureLoader : WorldLoadingModule {
+public class TerrainTextureLoader : WorldDataProvider {
 
-    public static TerrainTextureLoader instance;
+    public override WorldDataType[] Provides => new[] { WorldDataType.TerrainTexture };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.TerrainMesh, WorldDataType.Height };
 
     [Header("Texture Settings")]
     public int textureResolution = 64;
@@ -36,21 +37,17 @@ public class TerrainTextureLoader : WorldLoadingModule {
     private int   _chunkWidthInt;
 
     private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
         _chunkWidthInt = (int)WorldLoadingController.GetChunkWidth();
     }
 
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) {
+    public override void GenerateChunk(int cx, int cz, int lod) {
         Texture2D tex = GenerateTexture(cx, cz, lod);
-        TerrainMeshLoader.instance.SetChunkTexture(cx, cz, tex);
+        WorldServices.Get<ITerrainMeshProvider>().SetChunkTexture(cx, cz, tex);
     }
-
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) { }
 
     public override void Clear() {
         _chunkWidthInt = (int)WorldLoadingController.GetChunkWidth();
@@ -65,7 +62,7 @@ public class TerrainTextureLoader : WorldLoadingModule {
         float oz = cz * _chunkWidthInt;
 
         // Use mesh-aligned resolution: one texel per quad ensures crisp per-quad coloring.
-        int quadsPerSide = TerrainMeshLoader.instance.GetQuadsPerSide(lod);
+        int quadsPerSide = WorldServices.Get<ITerrainMeshProvider>().GetQuadsPerSide(lod);
         int res = Mathf.Max(quadsPerSide, textureResolution);
 
         Texture2D tex = new Texture2D(res, res, TextureFormat.RGB24, false);
@@ -79,7 +76,7 @@ public class TerrainTextureLoader : WorldLoadingModule {
         for (int x = 0; x < res; x++) {
             float worldX = ox + ((float)x / (res - 1)) * _chunkWidthInt;
             float worldZ = oz + ((float)z / (res - 1)) * _chunkWidthInt;
-            float height = WorldHeightLoader.GetTerrainHeight(worldX, worldZ);
+            float height = WorldServices.Get<IHeightProvider>().GetTerrainHeight(worldX, worldZ);
             pixels[z * res + x] = HeightToColor(height);
         }
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// WorldLoadingModule that applies lighting and fog settings each episode,
+/// WorldDataProvider that applies lighting and fog settings each episode,
 /// and optionally advances time-of-day each physics step via a continuous timer.
 ///
 /// Time is expressed in hours (0–24):
@@ -23,7 +23,9 @@ using UnityEngine;
 ///   fog/density                   — fog density (exponential modes)
 ///   fog/mode                      — "linear" | "exponential" | "exponential_squared"
 /// </summary>
-public class LightingAndFogLoader : WorldLoadingModule {
+public class LightingAndFogLoader : WorldDataProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.Lighting };
 
     // ─────────────────────────────────────────────
     //  Inspector references
@@ -94,10 +96,10 @@ public class LightingAndFogLoader : WorldLoadingModule {
     }
 
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    public override void Initialize() {
+    public override void Generate() {
         _currentTimeOfDay    = WorldLoadingController.GetParamFloat("lighting/time_of_day",           defaultTimeOfDay);
         _timeAdvanceRate     = WorldLoadingController.GetParamFloat("lighting/time_advance_rate",      defaultTimeAdvanceRate);
         _maxLightIntensity   = WorldLoadingController.GetParamFloat("lighting/max_light_intensity",    defaultMaxLightIntensity);
@@ -114,8 +116,6 @@ public class LightingAndFogLoader : WorldLoadingModule {
         _advanceTime = false;
     }
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) { }
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) { }
 
     // ─────────────────────────────────────────────
     //  Timer callback

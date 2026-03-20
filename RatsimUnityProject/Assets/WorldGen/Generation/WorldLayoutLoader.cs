@@ -2,10 +2,12 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
-public class WorldLayoutLoader : WorldLoadingModule {
+public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.Layout };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Height };
 
     public bool verbose = false;
-    public static WorldLayoutLoader instance;
     private bool _generated = false;
     private readonly Dictionary<WorldStructure, List<EntryPoint>> _structureEntryPoints
         = new Dictionary<WorldStructure, List<EntryPoint>>();
@@ -18,9 +20,9 @@ public class WorldLayoutLoader : WorldLoadingModule {
     private const string PrefabPath = "WorldGen/WorldStructurePrefabs/";
     private readonly Dictionary<string, WorldStructure> _prefabCache = new Dictionary<string, WorldStructure>();
     
-    private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
+    protected override void OnEnable() {
+        base.OnEnable();
+        WorldServices.Register<ILayoutProvider>(this);
     }
 
     public List<EntryPoint> GetEntryPoints(WorldStructure s) {
@@ -54,24 +56,14 @@ public class WorldLayoutLoader : WorldLoadingModule {
     }
 
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    // Run generation eagerly so structures are in WorldData before AgentLoader.Initialize() runs.
-    // The _generated guard makes this idempotent — OnChunkLoadRequested is a no-op if already done.
-    public override void Initialize() {
+    public override void Generate() {
         if (_generated) return;
         _generated = true;
-        Generate();
+        DoGenerate();
     }
-
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) {
-        if (_generated) return;
-        _generated = true;
-        Generate();
-    }
-
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) { }
 
     public override void Clear() {
         for (int i = transform.childCount - 1; i >= 0; i--)
@@ -84,7 +76,7 @@ public class WorldLayoutLoader : WorldLoadingModule {
     //  Generation
     // ─────────────────────────────────────────────
 
-    private void Generate() {
+    private void DoGenerate() {
         System.Random rng = new System.Random(WorldLoadingController.GetDerivedSeed("layout"));
 
         float worldW = WorldLoadingController.GetParamFloat("world_bounds/width");
@@ -129,7 +121,7 @@ public class WorldLayoutLoader : WorldLoadingModule {
         // Process terrain modifications now that all structures are placed.
         // This scans structures for TerrainModification components, registers
         // height influence zones, and repositions structures to match terrain.
-        WorldHeightLoader.instance.ProcessTerrainModifications();
+        WorldServices.Get<IHeightProvider>().ProcessTerrainModifications();
     }
 
     // ─────────────────────────────────────────────

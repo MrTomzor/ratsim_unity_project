@@ -157,15 +157,16 @@ public class WorldLoadingController : MonoBehaviour {
 
     public void ClearAllWorldData()
     {
-        // 1. Clear the static structure registry (must happen before modules,
-        //    so modules don't query stale destroyed structures during their Clear)
+        // 1. Clear the static structure registry (must happen before providers,
+        //    so providers don't query stale destroyed structures during their Clear)
         WorldData.Clear();
         Debug.Log("WorldData structure registry cleared");
 
-        // 2. Clear all modules in reverse registration order (reverse load-phase order)
-        for (int i = WorldLoadingModule.registered.Count - 1; i >= 0; i--)
-            WorldLoadingModule.registered[i].Clear();
-        Debug.Log("All world loading modules cleared");
+        // 2. Clear all providers in reverse dependency order
+        var sorted = TopologicalSort(WorldDataProvider.registered);
+        for (int i = sorted.Count - 1; i >= 0; i--)
+            sorted[i].Clear();
+        Debug.Log("All world data providers cleared");
 
         // Clear the cache of all chunk loading requestors as well
         foreach (var requestor in ChunkLoadingRequestor.registered)
@@ -175,9 +176,71 @@ public class WorldLoadingController : MonoBehaviour {
 
     public void InitializeAllModules()
     {
-        foreach (var module in WorldLoadingModule.registered)
-            module.Initialize();
-        Debug.Log("All world loading modules initialized");
+        var sorted = TopologicalSort(WorldDataProvider.registered);
+        foreach (var provider in sorted)
+            provider.Generate();
+        Debug.Log("All world data providers initialized (Generate)");
+    }
+
+    // ─────────────────────────────────────────────
+    //  Topological sort by DependsOn → Provides
+    // ─────────────────────────────────────────────
+
+    private static List<WorldDataProvider> TopologicalSort(List<WorldDataProvider> providers)
+    {
+        // Build lookup: WorldDataType → provider(s) that produce it
+        var typeToProviders = new Dictionary<WorldDataType, List<WorldDataProvider>>();
+        foreach (var p in providers)
+            foreach (var t in p.Provides) {
+                if (!typeToProviders.TryGetValue(t, out var list)) {
+                    list = new List<WorldDataProvider>();
+                    typeToProviders[t] = list;
+                }
+                list.Add(p);
+            }
+
+        // Kahn's algorithm
+        var inDegree = new Dictionary<WorldDataProvider, int>();
+        var depEdges = new Dictionary<WorldDataProvider, List<WorldDataProvider>>(); // dep → dependents
+        foreach (var p in providers) {
+            if (!inDegree.ContainsKey(p)) inDegree[p] = 0;
+            if (!depEdges.ContainsKey(p)) depEdges[p] = new List<WorldDataProvider>();
+        }
+
+        foreach (var p in providers)
+            foreach (var dep in p.DependsOn) {
+                if (!typeToProviders.TryGetValue(dep, out var depProviders)) continue;
+                foreach (var dp in depProviders) {
+                    if (dp == p) continue;
+                    depEdges[dp].Add(p);
+                    inDegree[p]++;
+                }
+            }
+
+        var queue = new Queue<WorldDataProvider>();
+        foreach (var kvp in inDegree)
+            if (kvp.Value == 0) queue.Enqueue(kvp.Key);
+
+        var sorted = new List<WorldDataProvider>();
+        while (queue.Count > 0) {
+            var current = queue.Dequeue();
+            sorted.Add(current);
+            foreach (var dependent in depEdges[current]) {
+                inDegree[dependent]--;
+                if (inDegree[dependent] == 0)
+                    queue.Enqueue(dependent);
+            }
+        }
+
+        if (sorted.Count != providers.Count) {
+            var missing = providers.Where(p => !sorted.Contains(p)).Select(p => p.GetType().Name);
+            Debug.LogError($"WorldLoadingController: dependency cycle detected involving: {string.Join(", ", missing)}");
+            // Fall back to registration order for unsorted providers
+            foreach (var p in providers)
+                if (!sorted.Contains(p)) sorted.Add(p);
+        }
+
+        return sorted;
     }
 
     public void ResetEpisode(string json) {

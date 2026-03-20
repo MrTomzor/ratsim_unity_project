@@ -4,7 +4,7 @@ using System.Linq;
 
 /// <summary>
 /// Bridges chunk-level load/unload events into per-WorldStructure load/unload events
-/// for all registered WorldStructureLoader components.
+/// for all registered WorldStructureProvider components.
 ///
 /// Must be placed in the scene AFTER WorldLayoutLoader so that WorldLayoutLoader.Generate()
 /// has already populated WorldData by the time this coordinator processes a chunk.
@@ -12,7 +12,10 @@ using System.Linq;
 /// Also listens to WorldData.OnNewStructureRegistered so that structures added
 /// dynamically (e.g. houses placed by CityLoader) automatically get their load events fired.
 /// </summary>
-public class StructureLoadingCoordinator : WorldLoadingModule {
+public class StructureLoadingCoordinator : WorldDataProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.StructureEvents };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Layout };
 
     public bool verbose = false;
 
@@ -38,10 +41,10 @@ public class StructureLoadingCoordinator : WorldLoadingModule {
     }
 
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) {
+    public override void GenerateChunk(int cx, int cz, int lod) {
         var key = new Vector2Int(cx, cz);
         _loadedChunks[key] = lod;
 
@@ -54,13 +57,13 @@ public class StructureLoadingCoordinator : WorldLoadingModule {
         foreach (var s in structures.ToList())
             ProcessStructureLoad(s, key, lod);
 
-        // WorldStructureLoaders (e.g. CityLoader) may have instantiated new GameObjects
-        // during the above loop. Sync physics so that subsequent WorldLoadingModules
+        // WorldStructureProviders (e.g. CityLoader) may have instantiated new GameObjects
+        // during the above loop. Sync physics so that subsequent WorldDataProviders
         // (e.g. TreeLoader) can find those colliders via OverlapBox.
         /* Physics.SyncTransforms(); */
     }
 
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) {
+    public override void ClearChunk(int cx, int cz, int lod) {
         var key = new Vector2Int(cx, cz);
         _loadedChunks.Remove(key);
 
@@ -72,7 +75,7 @@ public class StructureLoadingCoordinator : WorldLoadingModule {
     }
 
     public override void Clear() {
-        // Reset LOD state on all tracked structures (WorldStructureLoaders already cleared themselves).
+        // Reset LOD state on all tracked structures (WorldStructureProviders already cleared themselves).
         foreach (var s in _structureChunks.Keys)
             if (s != null) s.currentLod = -1;
         _loadedChunks.Clear();
@@ -151,13 +154,13 @@ public class StructureLoadingCoordinator : WorldLoadingModule {
 
     private void NotifyLoaded(WorldStructure s, int lod) {
         if (verbose) Debug.Log($"StructureLoadingCoordinator: loading '{s.structureType}' at LOD{lod}");
-        foreach (var loader in WorldStructureLoader.registered)
+        foreach (var loader in WorldStructureProvider.registered)
             loader.OnWorldStructureLoaded(s, lod);
     }
 
     private void NotifyUnloaded(WorldStructure s, int lod) {
         if (verbose) Debug.Log($"StructureLoadingCoordinator: unloading '{s.structureType}' (was LOD{lod})");
-        foreach (var loader in WorldStructureLoader.registered)
+        foreach (var loader in WorldStructureProvider.registered)
             loader.OnWorldStructureUnloaded(s, lod);
     }
 

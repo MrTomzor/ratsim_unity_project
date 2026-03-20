@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class TreeLoader : WorldLoadingModule {
+public class TreeLoader : WorldDataProvider {
 
-    public static TreeLoader instance;
+    public override WorldDataType[] Provides => new[] { WorldDataType.Vegetation };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureContent, WorldDataType.Agents };
 
     [SerializeField] private GameObject treePrefab;
 
@@ -35,11 +36,6 @@ public class TreeLoader : WorldLoadingModule {
 
     public static void RegisterClearZone(Vector2 center, float radius) {
         _clearZones.Add(new ClearZone { center = center, radius = radius });
-    }
-
-    private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
     }
 
     private void LoadParams() {
@@ -81,9 +77,9 @@ public class TreeLoader : WorldLoadingModule {
         }
     }
 
-    // --- WorldLoadingModule ---
+    // --- WorldDataProvider ---
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) {
+    public override void GenerateChunk(int cx, int cz, int lod) {
         if (lod != 0) return;
         if(!paramsInitialized) {
             LoadParams();
@@ -101,7 +97,7 @@ public class TreeLoader : WorldLoadingModule {
         GenerateChunk(chunkID);
     }
 
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) {
+    public override void ClearChunk(int cx, int cz, int lod) {
         if (lod != 0) return;
 
         Vector2Int chunkID = new Vector2Int(cx, cz);
@@ -167,7 +163,7 @@ public class TreeLoader : WorldLoadingModule {
 
                 if (ShouldSkipTree(new Vector2(x, z), blockers, vegMods, rng)) continue;
 
-                float y = WorldHeightLoader.GetTerrainHeight(x, z);
+                float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
                 GameObject obj = Instantiate(entry.prefab, new Vector3(x, y, z), Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
                 obj.transform.SetParent(chunkObj.transform);
             }
@@ -268,7 +264,7 @@ public class TreeLoader : WorldLoadingModule {
                 if (wx < originX || wx > originX + _chunkWidth) continue;
                 if (wz < originZ || wz > originZ + _chunkWidth) continue;
 
-                float wy = WorldHeightLoader.GetTerrainHeight(wx, wz);
+                float wy = WorldServices.Get<IHeightProvider>().GetTerrainHeight(wx, wz);
                 GameObject obj = Instantiate(
                     entry.prefab,
                     new Vector3(wx, wy, wz),

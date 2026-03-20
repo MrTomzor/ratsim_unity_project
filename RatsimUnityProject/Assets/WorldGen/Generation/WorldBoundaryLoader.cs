@@ -19,9 +19,10 @@ using UnityEngine;
 ///   world_bounds/boundary_height  – wall Y scale (default 10)
 ///   world_bounds/boundary_type    – "visible_wall" to spawn; anything else = no walls
 /// </summary>
-public class WorldBoundaryLoader : WorldLoadingModule {
+public class WorldBoundaryLoader : WorldDataProvider {
 
-    public static WorldBoundaryLoader instance;
+    public override WorldDataType[] Provides => new[] { WorldDataType.Boundaries };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.Layout };
 
     [Header("Defaults")]
     public float defaultWallThickness = 1f;
@@ -30,16 +31,11 @@ public class WorldBoundaryLoader : WorldLoadingModule {
 
     private const string PrefabPath = "WorldGen/WorldStructurePrefabs/world_boundary";
 
-    private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
-    }
-
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    public override void Initialize() {
+    public override void Generate() {
         string boundaryType = WorldLoadingController.GetParamString("world_bounds/boundary_type", "none");
         if (!boundaryType.Equals("visible_wall", System.StringComparison.OrdinalIgnoreCase)){
             Debug.Log($"WorldBoundaryLoader: boundary_type = '{boundaryType}' (not 'visible_wall'), skipping wall spawning");
@@ -68,9 +64,6 @@ public class WorldBoundaryLoader : WorldLoadingModule {
         SpawnWall(prefab, new Vector2(-halfW, 0f),   thickness,  wallH, worldH);
     }
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) { }
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) { }
-
     // Called every episode reset — rebuilds walls from scratch so world_bounds
     // param changes (including different dimensions) are always reflected.
     public override void Clear() {
@@ -92,7 +85,7 @@ public class WorldBoundaryLoader : WorldLoadingModule {
         float          scaleZ)
     {
         // Sample terrain height at wall midpoint so walls sit flush on any terrain mode.
-        float   terrainY = WorldHeightLoader.GetTerrainHeight(center2D.x, center2D.y);
+        float   terrainY = WorldServices.Get<IHeightProvider>().GetTerrainHeight(center2D.x, center2D.y);
         Vector3 pos      = new Vector3(center2D.x, terrainY + scaleY * 0.5f, center2D.y);
 
         WorldStructure wall = Instantiate(prefab, pos, Quaternion.identity, transform);

@@ -4,11 +4,12 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
-public class AgentLoader : WorldLoadingModule {
+public class AgentLoader : WorldDataProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.Agents };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureContent };
 
     public TopdownCameraFollower agentCameraFollower;
-
-    public static AgentLoader instance;
 
     private bool _spawned = false;
     private readonly List<GameObject> _spawnedAgents = new List<GameObject>();
@@ -26,23 +27,16 @@ public class AgentLoader : WorldLoadingModule {
         { "absolute_pose",  typeof(AbsolutePose2DSensor) },
     };
 
-    private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
-    }
 
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    public override void Initialize() {
+    public override void Generate() {
         if (_spawned) return;
         _spawned = true;
         SpawnAgents();
     }
-
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) { }
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) { }
 
     public override void Clear() {
         for (int i = transform.childCount - 1; i >= 0; i--)
@@ -226,12 +220,12 @@ public class AgentLoader : WorldLoadingModule {
         for (int attempt = 0; attempt < maxPlacementAttempts; attempt++) {
             float x = (float)(rng.NextDouble() * (worldW - margin * 2f) + margin) - worldW * 0.5f;
             float z = (float)(rng.NextDouble() * (worldH - margin * 2f) + margin) - worldH * 0.5f;
-            float y = WorldHeightLoader.GetTerrainHeight(x, z) + colliderRadius + 0.1f;
+            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z) + colliderRadius + 0.1f;
             Vector3 pos = new Vector3(x, y, z);
             if (!IsPhysicsBlocked(pos, worldGenLayer)) return pos;
         }
 
-        float fallbackY = WorldHeightLoader.GetTerrainHeight(0, 0) + colliderRadius + 0.1f;
+        float fallbackY = WorldServices.Get<IHeightProvider>().GetTerrainHeight(0, 0) + colliderRadius + 0.1f;
         Debug.LogWarning("AgentLoader: could not find unblocked spawn position, using world center");
         return new Vector3(0, fallbackY, 0);
     }
@@ -253,7 +247,7 @@ public class AgentLoader : WorldLoadingModule {
         Bounds2D cityBounds = city.GetBoundingBox2D();
 
         // Collect house footprints to avoid spawning inside buildings.
-        // CityLoader.Initialize() places houses before AgentLoader runs (scene order requirement).
+        // CityLoader.Generate() places houses before AgentLoader runs (dependency graph guarantees this).
         List<Bounds2D> houseBounds = WorldData.GetStructures()
             .Where(s => s.structureType.StartsWith("house", StringComparison.OrdinalIgnoreCase))
             .Select(s => s.GetBoundingBox2D())
@@ -280,7 +274,7 @@ public class AgentLoader : WorldLoadingModule {
             }
             if (inHouse) continue;
 
-            float y = WorldHeightLoader.GetTerrainHeight(pos2D.x, pos2D.y) + colliderRadius + 0.1f;
+            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(pos2D.x, pos2D.y) + colliderRadius + 0.1f;
             Vector3 pos = new Vector3(pos2D.x, y, pos2D.y);
 
             if (!IsPhysicsBlocked(pos, worldGenLayer)) {
@@ -326,7 +320,7 @@ public class AgentLoader : WorldLoadingModule {
             Vector2 dir        = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
             Vector2 pos2D      = cityBounds.center + dir * radialDist;
 
-            float   y   = WorldHeightLoader.GetTerrainHeight(pos2D.x, pos2D.y) + colliderRadius + 0.1f;
+            float   y   = WorldServices.Get<IHeightProvider>().GetTerrainHeight(pos2D.x, pos2D.y) + colliderRadius + 0.1f;
             Vector3 pos = new Vector3(pos2D.x, y, pos2D.y);
 
             if (!IsPhysicsBlocked(pos, worldGenLayer)) {
@@ -339,7 +333,7 @@ public class AgentLoader : WorldLoadingModule {
 
         // Guaranteed fallback: fixed bearing (+X from city center), always clears trees
         Vector2 fallback2D = cityBounds.center + new Vector2(cityHalfDiag + 5f, 0f);
-        float fallbackY = WorldHeightLoader.GetTerrainHeight(fallback2D.x, fallback2D.y) + colliderRadius + 0.1f;
+        float fallbackY = WorldServices.Get<IHeightProvider>().GetTerrainHeight(fallback2D.x, fallback2D.y) + colliderRadius + 0.1f;
         TreeLoader.RegisterClearZone(fallback2D, clearRadius);
         Debug.LogWarning("AgentLoader: outskirts fallback position used; tree clearing applied");
         return new Vector3(fallback2D.x, fallbackY, fallback2D.y);
@@ -351,9 +345,10 @@ public class AgentLoader : WorldLoadingModule {
 
     private bool IsPhysicsBlocked(Vector3 pos, int worldGenLayer) {
         Collider[] overlaps = Physics.OverlapSphere(pos, spawnSafetyRadius);
+        var terrainMesh = WorldServices.Has<ITerrainMeshProvider>()
+            ? WorldServices.Get<ITerrainMeshProvider>() : null;
         foreach (var col in overlaps) {
-            if (TerrainMeshLoader.instance != null &&
-                col.transform.IsChildOf(TerrainMeshLoader.instance.transform))
+            if (terrainMesh != null && terrainMesh.IsTerrainCollider(col))
                 continue;
             if (col.gameObject.layer == worldGenLayer)
                 continue;

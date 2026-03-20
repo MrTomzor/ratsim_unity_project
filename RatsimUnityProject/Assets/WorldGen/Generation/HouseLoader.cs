@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// WorldStructureLoader that configures house interiors and exteriors.
+/// WorldStructureProvider that configures house interiors and exteriors.
 ///
 /// Responds to any WorldStructure whose structureType starts with "house".
 /// Uses global config params + a per-house seed (world seed ^ position hash)
@@ -26,7 +26,10 @@ using System.Collections.Generic;
 ///   allowed_car_prefabs         — comma list of car prefab names in Resources/WorldGen/HouseModulePrefabs/
 ///   car_spawn_chance            — 0.0–1.0 per car spawn position (default 0)
 /// </summary>
-public class HouseLoader : WorldStructureLoader {
+public class HouseLoader : WorldStructureProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.StructureContent };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.StructureEvents };
 
     public bool verbose = true;
 
@@ -146,7 +149,7 @@ public class HouseLoader : WorldStructureLoader {
     }
 
     // ─────────────────────────────────────────────
-    //  WorldStructureLoader
+    //  WorldStructureProvider
     // ─────────────────────────────────────────────
 
     public override void OnWorldStructureLoaded(WorldStructure s, int lod) {

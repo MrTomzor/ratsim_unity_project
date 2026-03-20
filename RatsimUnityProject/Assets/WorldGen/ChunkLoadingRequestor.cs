@@ -80,15 +80,15 @@ public class ChunkLoadingRequestor : MonoBehaviour {
     private void NotifyLoaded(Vector2Int chunk, int lod) {
         if(verbose)
             Debug.Log($"Requesting load of chunk {chunk} at LOD{lod}");
-        foreach (var module in WorldLoadingModule.registered)
-            module.OnChunkLoadRequested(chunk.x, chunk.y, lod);
+        foreach (var provider in WorldDataProvider.registered)
+            provider.GenerateChunk(chunk.x, chunk.y, lod);
     }
 
     private void NotifyUnloaded(Vector2Int chunk, int lod) {
         if(verbose)
             Debug.Log($"Requesting unload of chunk {chunk} at LOD{lod}");
-        foreach (var module in WorldLoadingModule.registered)
-            module.OnChunkUnloadRequested(chunk.x, chunk.y, lod);
+        foreach (var provider in WorldDataProvider.registered)
+            provider.ClearChunk(chunk.x, chunk.y, lod);
     }
 
     public void Clear() {

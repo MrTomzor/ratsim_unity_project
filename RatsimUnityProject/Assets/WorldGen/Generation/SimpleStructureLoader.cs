@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Generic WorldStructureLoader that manages LOD visibility on WorldStructure instances.
+/// Generic WorldStructureProvider that manages LOD visibility on WorldStructure instances.
 ///
 /// WorldStructure prefabs contain children named LOD0, LOD1, etc.  When a structure is
 /// loaded at a given LOD, this loader enables the matching child and disables all other
@@ -10,10 +10,13 @@ using UnityEngine;
 /// Enabled LOD content is set to the Default layer so it renders in agent cameras and
 /// is excluded from WorldGen physics queries.
 /// </summary>
-public class SimpleStructureLoader : WorldStructureLoader {
+public class SimpleStructureLoader : WorldStructureProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.StructureContent };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.StructureEvents };
 
     // ─────────────────────────────────────────────
-    //  WorldStructureLoader
+    //  WorldStructureProvider
     // ─────────────────────────────────────────────
 
     public override void OnWorldStructureLoaded(WorldStructure s, int lod) {

@@ -1,9 +1,10 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class TerrainMeshLoader : WorldLoadingModule {
+public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
-    public static TerrainMeshLoader instance;
+    public override WorldDataType[] Provides => new[] { WorldDataType.TerrainMesh };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Height };
 
     [Header("Global Settings")]
     public int resolutionScale = 2;
@@ -42,16 +43,19 @@ public class TerrainMeshLoader : WorldLoadingModule {
     // ─────────────────────────────────────────────
 
     private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
         _chunkWidthInt = (int)WorldLoadingController.GetChunkWidth();
     }
 
+    protected override void OnEnable() {
+        base.OnEnable();
+        WorldServices.Register<ITerrainMeshProvider>(this);
+    }
+
     // ─────────────────────────────────────────────
-    //  WorldLoadingModule
+    //  WorldDataProvider
     // ─────────────────────────────────────────────
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) {
+    public override void GenerateChunk(int cx, int cz, int lod) {
         Vector2Int key = new Vector2Int(cx, cz);
 
         if (_chunks.TryGetValue(key, out ChunkData existing) ) {
@@ -76,7 +80,7 @@ public class TerrainMeshLoader : WorldLoadingModule {
         }
     }
 
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) {
+    public override void ClearChunk(int cx, int cz, int lod) {
         Vector2Int key = new Vector2Int(cx, cz);
         if (!_chunks.TryGetValue(key, out ChunkData data)) return;
 
@@ -132,7 +136,7 @@ public class TerrainMeshLoader : WorldLoadingModule {
         for (int x = 0; x < vertsPerSide; x++) {
             float worldX = ox + x * step;
             float worldZ = oz + z * step;
-            float h      = WorldHeightLoader.GetTerrainHeight(worldX, worldZ);
+            float h      = WorldServices.Get<IHeightProvider>().GetTerrainHeight(worldX, worldZ);
             int   idx    = z * vertsPerSide + x;
             vertices[idx] = new Vector3(x * step, h, z * step);
             uvs[idx]      = new Vector2((float)x / (vertsPerSide - 1), (float)z / (vertsPerSide - 1));
@@ -251,5 +255,9 @@ public class TerrainMeshLoader : WorldLoadingModule {
         renderer.GetPropertyBlock(block);
         block.SetTexture("_MainTex", tex);
         renderer.SetPropertyBlock(block);
+    }
+
+    public bool IsTerrainCollider(Collider col) {
+        return col.transform.IsChildOf(transform);
     }
 }

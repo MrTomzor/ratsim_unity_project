@@ -8,7 +8,7 @@ public class WorldStructure : MonoBehaviour {
     public BoxCollider footprintCollider;
 
     /// <summary>
-    /// The LOD currently loaded by WorldStructureLoader components (-1 = not loaded).
+    /// The LOD currently loaded by WorldStructureProvider components (-1 = not loaded).
     /// Managed by StructureLoadingCoordinator.
     /// </summary>
     [HideInInspector] public int currentLod = -1;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// WorldStructureLoader that responds to city structures being loaded and fills them
+/// WorldStructureProvider that responds to city structures being loaded and fills them
 /// with procedurally placed house prefabs.
 ///
 /// House prefabs are any WorldStructure prefabs in Resources/WorldGen/WorldStructurePrefabs/
@@ -12,7 +12,10 @@ using System.Linq;
 /// Houses are spawned as children of the city WorldStructure, so they are automatically
 /// destroyed when the city is destroyed at episode end.
 /// </summary>
-public class CityLoader : WorldStructureLoader {
+public class CityLoader : WorldStructureProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.StructureContent };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.StructureEvents };
 
     public bool verbose = false;
 
@@ -48,15 +51,15 @@ public class CityLoader : WorldStructureLoader {
     }
 
     // ─────────────────────────────────────────────
-    //  WorldStructureLoader
+    //  WorldStructureProvider
     // ─────────────────────────────────────────────
 
-    // Eagerly populate all cities that WorldLayoutLoader.Initialize() has already placed,
-    // so house footprints are in WorldData before AgentLoader.Initialize() needs them.
+    // Eagerly populate all cities that WorldLayoutLoader.Generate() has already placed,
+    // so house footprints are in WorldData before AgentLoader.Generate() needs them.
     // The _processedCities guard prevents double-processing via OnWorldStructureLoaded later.
-    public override void Initialize() {
+    public override void Generate() {
         if (_housePrefabs.Length == 0) return;
-        foreach (WorldStructure s in WorldData.GetStructures()) {
+        foreach (WorldStructure s in WorldData.GetStructures().ToList()) {
             if (s.structureType != "city") continue;
             if (_processedCities.Contains(s)) continue;
             _processedCities.Add(s);
@@ -212,8 +215,8 @@ public class CityLoader : WorldStructureLoader {
             Debug.Log($"CityLoader grid: {nX} N-S roads, {nZ} E-W roads in '{city.name}'");
 
         // 3c. Connect entry point stubs
-        if (WorldLayoutLoader.instance != null) {
-            List<EntryPoint> entryPoints = WorldLayoutLoader.instance.GetEntryPoints(city);
+        if (WorldServices.Has<ILayoutProvider>()) {
+            List<EntryPoint> entryPoints = WorldServices.Get<ILayoutProvider>().GetEntryPoints(city);
             float halfW = cityBounds.size.x * 0.5f;
             float halfH = cityBounds.size.y * 0.5f;
 

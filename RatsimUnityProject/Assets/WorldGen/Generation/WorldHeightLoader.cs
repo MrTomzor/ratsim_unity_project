@@ -1,9 +1,11 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class WorldHeightLoader : WorldLoadingModule {
+public class WorldHeightLoader : WorldDataProvider, IHeightProvider {
 
-    public static WorldHeightLoader instance;
+    public override WorldDataType[] Provides => new[] { WorldDataType.Height };
+    // No DependsOn — Height is a root provider.
+    // Layout calls ProcessTerrainModifications() explicitly after structure placement.
 
     [Header("General")]
     public string mode = "superflat";
@@ -39,13 +41,9 @@ public class WorldHeightLoader : WorldLoadingModule {
 
     private readonly List<HeightInfluenceZone> _zones = new List<HeightInfluenceZone>();
 
-    private void Awake() {
-        if (instance != null && instance != this) { Destroy(gameObject); return; }
-        instance = this;
-    }
-
-    private new void OnEnable() {
+    protected override void OnEnable() {
         base.OnEnable();
+        WorldServices.Register<IHeightProvider>(this);
         LoadParams();
     }
 
@@ -138,22 +136,26 @@ public class WorldHeightLoader : WorldLoadingModule {
     //  Height queries
     // ─────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────
+    //  IHeightProvider implementation
+    // ─────────────────────────────────────────────
+
     /// <summary>
     /// Returns the final terrain height at (x, z), including any terrain modifications.
     /// </summary>
-    public static float GetTerrainHeight(float x, float z) {
-        float baseH = instance.GetBaseHeight(x, z);
+    public float GetTerrainHeight(float x, float z) {
+        float baseH = GetBaseHeight(x, z);
 
-        if (instance._zones.Count == 0) return baseH;
+        if (_zones.Count == 0) return baseH;
 
-        return instance.ApplyInfluenceZones(x, z, baseH);
+        return ApplyInfluenceZones(x, z, baseH);
     }
 
     /// <summary>
     /// Returns the unmodified base terrain height (perlin/superflat) without influence zones.
     /// </summary>
-    public static float GetBaseTerrainHeight(float x, float z) {
-        return instance.GetBaseHeight(x, z);
+    public float GetBaseTerrainHeight(float x, float z) {
+        return GetBaseHeight(x, z);
     }
 
     private float GetBaseHeight(float x, float z) {
@@ -259,9 +261,6 @@ public class WorldHeightLoader : WorldLoadingModule {
         float sampleZ = (z + _perlinOffsetZ) / perlinScale;
         return Mathf.PerlinNoise(sampleX, sampleZ) * perlinAmplitude;
     }
-
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) { }
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) { }
 
     public override void Clear() {
         _zones.Clear();

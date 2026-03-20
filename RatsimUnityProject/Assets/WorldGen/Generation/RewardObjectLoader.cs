@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// WorldStructureLoader that spawns reward objects via two parallel modes:
+/// WorldStructureProvider that spawns reward objects via two parallel modes:
 ///
 /// 1. Uniform mode: spawns reward objects randomly across the world at terrain height,
 ///    per-chunk (like TreeLoader). Controlled by reward_objects/uniform_density.
@@ -21,7 +21,10 @@ using System.Collections.Generic;
 ///   {structure_type}/spawn_probability   — 0.0–1.0 per spawn position (default 1)
 ///   {structure_type}/skip_probability    — 0.0–1.0 chance to skip the entire structure (default 0)
 /// </summary>
-public class RewardObjectLoader : WorldStructureLoader {
+public class RewardObjectLoader : WorldStructureProvider {
+
+    public override WorldDataType[] Provides => new[] { WorldDataType.Rewards };
+    public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureEvents };
 
     public bool verbose = true;
 
@@ -107,7 +110,7 @@ public class RewardObjectLoader : WorldStructureLoader {
     //  Chunk events (uniform mode)
     // ─────────────────────────────────────────────
 
-    public override void OnChunkLoadRequested(int cx, int cz, int lod) {
+    public override void GenerateChunk(int cx, int cz, int lod) {
         if (lod != 0) return;
         if (!_paramsLoaded) LoadParams();
         if (_rewardPrefab == null || uniformDensity <= 0f) return;
@@ -123,7 +126,7 @@ public class RewardObjectLoader : WorldStructureLoader {
         GenerateUniformChunk(chunkID);
     }
 
-    public override void OnChunkUnloadRequested(int cx, int cz, int lod) {
+    public override void ClearChunk(int cx, int cz, int lod) {
         if (lod != 0) return;
 
         Vector2Int chunkID = new Vector2Int(cx, cz);
@@ -149,7 +152,7 @@ public class RewardObjectLoader : WorldStructureLoader {
         for (int i = 0; i < count; i++) {
             float x = originX + (float)rng.NextDouble() * _chunkWidth;
             float z = originZ + (float)rng.NextDouble() * _chunkWidth;
-            float y = WorldHeightLoader.GetTerrainHeight(x, z);
+            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
 
             Instantiate(_rewardPrefab, new Vector3(x, y, z),
                 Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), chunkObj.transform);
