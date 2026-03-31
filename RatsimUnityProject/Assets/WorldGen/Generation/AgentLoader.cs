@@ -27,6 +27,12 @@ public class AgentLoader : WorldDataProvider {
         { "absolute_pose",  typeof(AbsolutePose2DSensor) },
     };
 
+    private static readonly Dictionary<string, Type> ActuatorNameToType = new Dictionary<string, Type> {
+        { "velocity",       typeof(Twist2DActuator) },
+        { "twist2d",        typeof(Twist2DActuator) },
+        { "teleport",       typeof(PoseTeleportActuator) },
+    };
+
 
     // ─────────────────────────────────────────────
     //  WorldDataProvider
@@ -125,32 +131,39 @@ public class AgentLoader : WorldDataProvider {
             }
         }
 
-        // Override sensor params via reflection (keys like "lidar2d/maxRange")
+        // Override sensor/actuator params via reflection (keys like "lidar2d/maxRange" or "velocity/maxLinearVelocity")
         foreach (var kvp in config) {
             int slashIdx = kvp.Key.IndexOf('/');
             if (slashIdx < 0) continue;
 
-            string sensorName = kvp.Key.Substring(0, slashIdx);
+            string componentName = kvp.Key.Substring(0, slashIdx);
             string fieldName = kvp.Key.Substring(slashIdx + 1);
 
-            Type sensorType;
-            if (!SensorNameToType.TryGetValue(sensorName, out sensorType)) continue;
+            // Try sensors first, then actuators
+            Type componentType = null;
+            if (SensorNameToType.TryGetValue(componentName, out componentType)) {
+                // sensor
+            } else if (ActuatorNameToType.TryGetValue(componentName, out componentType)) {
+                // actuator
+            } else {
+                continue;
+            }
 
-            var comp = agent.GetComponentInChildren(sensorType, true);
+            var comp = agent.GetComponentInChildren(componentType, true);
             if (comp == null) continue;
 
-            FieldInfo field = sensorType.GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
+            FieldInfo field = componentType.GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
             if (field == null) {
-                Debug.LogWarning($"AgentLoader: field '{fieldName}' not found on {sensorType.Name}");
+                Debug.LogWarning($"AgentLoader: field '{fieldName}' not found on {componentType.Name}");
                 continue;
             }
 
             try {
                 object value = Convert.ChangeType(kvp.Value, field.FieldType);
                 field.SetValue(comp, value);
-                Debug.Log($"AgentLoader: set {sensorType.Name}.{fieldName} = {kvp.Value}");
+                Debug.Log($"AgentLoader: set {componentType.Name}.{fieldName} = {kvp.Value}");
             } catch (Exception e) {
-                Debug.LogWarning($"AgentLoader: failed to set {sensorType.Name}.{fieldName}: {e.Message}");
+                Debug.LogWarning($"AgentLoader: failed to set {componentType.Name}.{fieldName}: {e.Message}");
             }
         }
 

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class Twist2DActuator : MonoBehaviour
 {
@@ -16,21 +17,61 @@ public class Twist2DActuator : MonoBehaviour
     public float accelModeAngularDrag = 0.2f;
     public bool verbose = false;
 
+    // --- Human control ---
+    [Header("Human Control")]
+    public string humanControlTopic = "/enable_human_control";
+    public bool humanControlEnabled = false;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    /// <summary>
+    /// Whether human input uses velocity (direct) or acceleration mode.
+    /// </summary>
+    public enum HumanControlMode { Velocity, Acceleration }
+    public HumanControlMode humanControlMode = HumanControlMode.Velocity;
+
+    private InputSystem_Actions _inputActions;
+    private Vector2 _moveInput;
+
     void Start()
     {
         conn = RoslikeTCPServer.GetInstance();
         conn.Subscribe<TwistMessage>(velCmdTopic, OnVelTwistMessage);
         conn.Subscribe<TwistMessage>(accelCmdTopic, OnAccelTwistMessage);
+        conn.Subscribe<BoolMessage>(humanControlTopic, OnHumanControlToggle);
+        conn.RegisterTimerDiscrete(OnPhysicsTick, 1);
 
+        // Set up Input System actions
+        _inputActions = new InputSystem_Actions();
     }
+
+    void OnDestroy()
+    {
+        _inputActions?.Disable();
+    }
+
+    // --- TCP message handlers ---
 
     public void OnVelTwistMessage(TwistMessage msg)
     {
-        if(verbose)
+        if (humanControlEnabled) return; // ignore TCP commands during human control
+
+        if (verbose)
             Debug.Log($"Received TwistMessage: linear_x={msg.linear_x}, linear_y={msg.linear_y}, angular_z={msg.angular_z}");
-        // Apply the twist to the GameObject
+        ApplyVelocity(msg);
+    }
+
+    public void OnAccelTwistMessage(TwistMessage msg)
+    {
+        if (humanControlEnabled) return;
+
+        if (verbose)
+            Debug.Log($"Received AccelTwistMessage: linear_x={msg.linear_x}, linear_y={msg.linear_y}, angular_z={msg.angular_z}");
+        ApplyAcceleration(msg);
+    }
+
+    // --- Shared physics application ---
+
+    private void ApplyVelocity(TwistMessage msg)
+    {
         Vector3 forward = transform.forward * msg.linear_x;
         Vector3 left = -transform.right * msg.linear_y;
         Vector3 rotationRad = new Vector3(0, -msg.angular_z, 0);
@@ -40,11 +81,8 @@ public class Twist2DActuator : MonoBehaviour
         rb.angularVelocity = rotationRad;
     }
 
-    public void OnAccelTwistMessage(TwistMessage msg)
+    private void ApplyAcceleration(TwistMessage msg)
     {
-        if(verbose)
-            Debug.Log($"Received AccelTwistMessage: linear_x={msg.linear_x}, linear_y={msg.linear_y}, angular_z={msg.angular_z}");
-        // Apply the twist to the GameObject
         Vector3 forward = transform.forward * msg.linear_x;
         Vector3 left = -transform.right * msg.linear_y;
         Vector3 rotationRad = new Vector3(0, -msg.angular_z, 0);
@@ -60,9 +98,50 @@ public class Twist2DActuator : MonoBehaviour
         rb.angularVelocity *= (1.0f - accelModeAngularDrag);
     }
 
-    // Update is called once per frame
+    // --- Human control ---
+
+    private void OnHumanControlToggle(BoolMessage msg)
+    {
+        humanControlEnabled = msg.data;
+        if (humanControlEnabled)
+        {
+            _inputActions.Enable();
+            Debug.Log("Twist2DActuator: human control ENABLED");
+        }
+        else
+        {
+            _inputActions.Disable();
+            // Stop the agent when switching back to TCP control
+            var rb = GetComponent<Rigidbody>();
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            Debug.Log("Twist2DActuator: human control DISABLED");
+        }
+    }
+
+    private void OnPhysicsTick(TimerEvent ev)
+    {
+        if (!humanControlEnabled) return;
+
+        _moveInput = _inputActions.Player.Move.ReadValue<Vector2>();
+
+        TwistMessage msg = new TwistMessage();
+        // Move.y = forward/backward (W/S or left stick Y), Move.x = left/right (A/D or left stick X)
+        if (humanControlMode == HumanControlMode.Velocity)
+        {
+            msg.linear_x = _moveInput.y * maxLinearVelocity;
+            msg.angular_z = -_moveInput.x * maxAngularVelocity;
+            ApplyVelocity(msg);
+        }
+        else
+        {
+            msg.linear_x = _moveInput.y * maxLinearAcceleration;
+            msg.angular_z = -_moveInput.x * maxAngularAcceleration;
+            ApplyAcceleration(msg);
+        }
+    }
+
     void Update()
     {
-
     }
 }

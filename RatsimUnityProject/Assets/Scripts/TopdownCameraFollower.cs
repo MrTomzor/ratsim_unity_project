@@ -18,7 +18,7 @@ public class TopdownCameraFollower : MonoBehaviour
         if (target != null)
         {
             Vector3 targetPosition = target.transform.position;
-            transform.position = new Vector3(targetPosition.x, height, targetPosition.z);
+            transform.position = new Vector3(targetPosition.x, targetPosition.y + height, targetPosition.z);
             if (lockRotation)
             {
                 // Look down and rotate around Y axis by rotationAngle
