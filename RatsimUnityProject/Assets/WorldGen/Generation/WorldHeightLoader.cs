@@ -168,7 +168,7 @@ public class WorldHeightLoader : WorldDataProvider, IHeightProvider {
     }
 
     private float SampleMetaHeight(float x, float z) {
-        if (metaHeightMode != "valley") return 0f;
+        if (metaHeightMode != "valley" || mode == "superflat") return 0f;
 
         float dx = Mathf.Clamp01(Mathf.Abs(x) / _worldHalfW);
         float dz = Mathf.Clamp01(Mathf.Abs(z) / _worldHalfH);
