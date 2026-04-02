@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class WorldStructure : MonoBehaviour {
@@ -12,6 +13,30 @@ public class WorldStructure : MonoBehaviour {
     /// Managed by StructureLoadingCoordinator.
     /// </summary>
     [HideInInspector] public int currentLod = -1;
+
+    /// <summary>
+    /// Deterministic ID derived from structure type, position, and dimensions.
+    /// Stable across unload/reload cycles and across runs with the same seed.
+    /// </summary>
+    public int DeterministicId {
+        get {
+            if (_deterministicId == 0)
+                _deterministicId = ComputeDeterministicId();
+            return _deterministicId;
+        }
+    }
+    private int _deterministicId;
+
+    private int ComputeDeterministicId() {
+        Vector2 size = GetSize();
+        return HashCode.Combine(
+            structureType,
+            Mathf.RoundToInt(transform.position.x * 100),
+            Mathf.RoundToInt(transform.position.z * 100),
+            Mathf.RoundToInt(size.x * 100),
+            Mathf.RoundToInt(size.y * 100)
+        );
+    }
 
     private bool _registered = false;
 

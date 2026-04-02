@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 5445403467371622115}
   - component: {fileID: 6400344471855411795}
   - component: {fileID: 4137318554706787894}
+  - component: {fileID: 1301360104183335243}
   m_Layer: 0
   m_Name: Cube (4)
   m_TagString: Untagged
@@ -136,6 +137,20 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 84
   m_CollisionDetection: 0
+--- !u!114 &1301360104183335243
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 719848331374016888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa4796481bf9f6796a31a41d1eff2225, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  requiredLod: 0
+  originStructureId: 0
 --- !u!1 &1267834208745265167
 GameObject:
   m_ObjectHideFlags: 0
@@ -149,6 +164,7 @@ GameObject:
   - component: {fileID: 4264450563293657100}
   - component: {fileID: 2976967109318357858}
   - component: {fileID: 4641885974340691267}
+  - component: {fileID: 2660866675536786723}
   m_Layer: 0
   m_Name: Cube (5)
   m_TagString: Untagged
@@ -272,6 +288,20 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 84
   m_CollisionDetection: 0
+--- !u!114 &2660866675536786723
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1267834208745265167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa4796481bf9f6796a31a41d1eff2225, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  requiredLod: 0
+  originStructureId: 0
 --- !u!1 &2689035198928319005
 GameObject:
   m_ObjectHideFlags: 0
@@ -321,6 +351,7 @@ GameObject:
   - component: {fileID: 83264586461142534}
   - component: {fileID: 3320910561290996608}
   - component: {fileID: 4612976717012656507}
+  - component: {fileID: 4084175816438833862}
   m_Layer: 0
   m_Name: Cube (1)
   m_TagString: Untagged
@@ -444,6 +475,20 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 84
   m_CollisionDetection: 0
+--- !u!114 &4084175816438833862
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3628962963785918275}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa4796481bf9f6796a31a41d1eff2225, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  requiredLod: 0
+  originStructureId: 0
 --- !u!1 &7487328218244780089
 GameObject:
   m_ObjectHideFlags: 0
@@ -457,6 +502,7 @@ GameObject:
   - component: {fileID: 5625245407727678250}
   - component: {fileID: 6162881642401633208}
   - component: {fileID: 6444304283256186046}
+  - component: {fileID: 3655354151164581403}
   m_Layer: 0
   m_Name: Cube (6)
   m_TagString: Untagged
@@ -580,6 +626,20 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 84
   m_CollisionDetection: 0
+--- !u!114 &3655354151164581403
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7487328218244780089}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa4796481bf9f6796a31a41d1eff2225, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  requiredLod: 0
+  originStructureId: 0
 --- !u!1 &8437893317196949058
 GameObject:
   m_ObjectHideFlags: 0
@@ -593,6 +653,7 @@ GameObject:
   - component: {fileID: 4003027580156763650}
   - component: {fileID: 7045020227335860236}
   - component: {fileID: 4614558421989962028}
+  - component: {fileID: 7952892704385889060}
   m_Layer: 0
   m_Name: Cube (3)
   m_TagString: Untagged
@@ -716,3 +777,17 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 84
   m_CollisionDetection: 0
+--- !u!114 &7952892704385889060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8437893317196949058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa4796481bf9f6796a31a41d1eff2225, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  requiredLod: 0
+  originStructureId: 0

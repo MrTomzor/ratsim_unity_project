@@ -9,6 +9,8 @@ public static class WorldData {
     private static readonly List<WorldStructure> _structures = new List<WorldStructure>();
     private static readonly Dictionary<Vector2Int, List<WorldStructure>> _chunkToStructures
         = new Dictionary<Vector2Int, List<WorldStructure>>();
+    private static readonly Dictionary<int, WorldStructure> _idToStructure
+        = new Dictionary<int, WorldStructure>();
 
     /// <summary>
     /// Fired immediately after a WorldStructure is registered (e.g. after Instantiate).
@@ -76,12 +78,23 @@ public static class WorldData {
     public static void RegisterStructure(WorldStructure s) {
         if (_structures.Contains(s)) return; // idempotent
         _structures.Add(s);
+
+        int id = s.DeterministicId;
+        if (_idToStructure.TryGetValue(id, out var existing) && existing != s)
+            Debug.LogError($"WorldData: deterministic ID clash ({id}): " +
+                $"'{s.structureType}' at {s.transform.position} collides with " +
+                $"'{existing.structureType}' at {existing.transform.position}");
+        _idToStructure[id] = s;
+
         RegisterInChunkDict(s);
         OnNewStructureRegistered?.Invoke(s);
     }
 
     public static void UnregisterStructure(WorldStructure s) {
         _structures.Remove(s);
+        int id = s.DeterministicId;
+        if (_idToStructure.TryGetValue(id, out var existing) && existing == s)
+            _idToStructure.Remove(id);
         // remove from all chunk buckets
         foreach (var list in _chunkToStructures.Values)
             list.Remove(s);
@@ -134,6 +147,6 @@ public static class WorldData {
     public static void Clear() {
         _structures.Clear();
         _chunkToStructures.Clear();
-        // ... rest of clear
+        _idToStructure.Clear();
     }
 }

@@ -344,8 +344,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8650841795b444b1af33cc84756fc0d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  radius: 3
-  longRangeRadius: 8
+  radius: 1
+  longRangeRadius: 2
   verbose: 0
 --- !u!1 &1815150826476604271
 GameObject:

@@ -19,4 +19,5 @@ public enum WorldDataType
     TerrainMesh,
     TerrainTexture,
     Lighting,
+    DynamicObjects,
 }

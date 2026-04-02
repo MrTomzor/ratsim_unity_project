@@ -262,8 +262,14 @@ public class HouseLoader : WorldStructureProvider {
             wall.gameObject.SetActive(false);
             broken++;
 
-            if (_rubblePrefab != null)
-                Instantiate(_rubblePrefab, wall.position, wall.rotation, container);
+            if (_rubblePrefab != null) {
+                GameObject rubble = Instantiate(_rubblePrefab, wall.position, wall.rotation, container);
+                // Add persistence to each rubble child so it survives structure unload/reload.
+                // The component reparents itself out of the container on Awake.
+                foreach (Transform child in rubble.transform)
+                    if (child.GetComponent<Rigidbody>() != null && child.GetComponent<PersistentDynamicObject>() == null)
+                        child.gameObject.AddComponent<PersistentDynamicObject>();
+            }
         }
         if (verbose) Debug.Log($"  walls: {group.childCount} breakable, {broken} broken" +
             (_rubblePrefab == null && broken > 0 ? " (no rubble_prefab configured)" : ""));
