@@ -87,11 +87,15 @@ public class SemanticLidarSensor : MonoBehaviour
     {
         List<Tuple<float, float[]>> res = new List<Tuple<float, float[]>>();
 
+        // Create layermask to ignore WorldGen layer
+        int layerMask = 1 << LayerMask.NameToLayer("WorldGen");
+        layerMask = ~layerMask;
+
         foreach (var dir in worldDirections)
         {
             RaycastHit hit;
             //if (Physics.Raycast(start, dir, out hit, maxRange))
-            if (Physics.Raycast(start, dir, out hit, maxRange, ~0, QueryTriggerInteraction.Ignore))
+            if (Physics.Raycast(start, dir, out hit, maxRange, layerMask, QueryTriggerInteraction.Ignore))
             {
                 float distance = hit.distance;
                 SemanticObject semanticObject = hit.collider.GetComponent<SemanticObject>();

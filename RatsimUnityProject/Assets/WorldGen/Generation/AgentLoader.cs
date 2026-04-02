@@ -185,11 +185,13 @@ public class AgentLoader : WorldDataProvider {
     //  Spawn position routing
     //
     //  World config param "agents_spawn_pos":
-    //    "origin"        (default) – random position within world bounds
-    //    "city"          – inside a city, outside of any house footprint;
-    //                      falls back to "city_outskirts" if no open spot found
-    //    "city_outskirts"– radially outside the city OBB; clears a tree-free
-    //                      zone at the chosen position via TreeLoader
+    //    "origin"             (default) – random position within world bounds
+    //    "outside_structures" – random position within world bounds, but
+    //                           rejects any point inside a WorldStructure footprint
+    //    "city"               – inside a city, outside of any house footprint;
+    //                           falls back to "city_outskirts" if no open spot found
+    //    "city_outskirts"     – radially outside the city OBB; clears a tree-free
+    //                           zone at the chosen position via TreeLoader
     //
     //  Requires scene registration order:
     //    WorldLayoutLoader → StructureLoadingCoordinator → CityLoader → AgentLoader → TreeLoader
@@ -203,9 +205,10 @@ public class AgentLoader : WorldDataProvider {
         string mode = WorldLoadingController.GetParamString("agents_spawn_pos", "origin");
 
         switch (mode.ToLowerInvariant()) {
-            case "city":           return FindSpawnInCity(colliderRadius, rng);
-            case "city_outskirts": return FindSpawnAtCityOutskirts(colliderRadius, rng);
-            default:               return FindSpawnRandom(colliderRadius, rng);
+            case "outside_structures": return FindSpawnOutsideStructures(colliderRadius, rng);
+            case "city":               return FindSpawnInCity(colliderRadius, rng);
+            case "city_outskirts":     return FindSpawnAtCityOutskirts(colliderRadius, rng);
+            default:                   return FindSpawnRandom(colliderRadius, rng);
         }
     }
 
@@ -241,6 +244,36 @@ public class AgentLoader : WorldDataProvider {
         float fallbackY = WorldServices.Get<IHeightProvider>().GetTerrainHeight(0, 0) + colliderRadius + 0.1f;
         Debug.LogWarning("AgentLoader: could not find unblocked spawn position, using world center");
         return new Vector3(0, fallbackY, 0);
+    }
+
+    private Vector3 FindSpawnOutsideStructures(float colliderRadius, System.Random rng) {
+        float worldW = WorldLoadingController.GetParamFloat("world_bounds/width", 100f);
+        float worldH = WorldLoadingController.GetParamFloat("world_bounds/height", 100f);
+        float margin = spawnSafetyRadius * 2f;
+        int worldGenLayer = LayerMask.NameToLayer("WorldGen");
+
+        List<Bounds2D> structureBounds = WorldData.GetStructures()
+            .Select(s => s.GetBoundingBox2D())
+            .ToList();
+
+        for (int attempt = 0; attempt < maxPlacementAttempts; attempt++) {
+            float x = (float)(rng.NextDouble() * (worldW - margin * 2f) + margin) - worldW * 0.5f;
+            float z = (float)(rng.NextDouble() * (worldH - margin * 2f) + margin) - worldH * 0.5f;
+            Vector2 pos2D = new Vector2(x, z);
+
+            bool inStructure = false;
+            foreach (Bounds2D sb in structureBounds) {
+                if (sb.Contains(pos2D)) { inStructure = true; break; }
+            }
+            if (inStructure) continue;
+
+            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z) + colliderRadius + 0.1f;
+            Vector3 pos = new Vector3(x, y, z);
+            if (!IsPhysicsBlocked(pos, worldGenLayer)) return pos;
+        }
+
+        Debug.LogWarning("AgentLoader: could not find spawn outside structures, falling back to random");
+        return FindSpawnRandom(colliderRadius, rng);
     }
 
     /// <summary>

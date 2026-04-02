@@ -221,9 +221,11 @@ Lighting (no deps, runs early)
 - `meta_height_generation/valley_exponent`: curve power — 1=linear, 2=quadratic (default 2)
 - `world_bounds/boundary_type`: `none` (default, no walls) or `visible_wall` (spawn four wall structures)
 - `world_bounds/boundary_height`: Y scale of each wall (default 10)
-- `agents_spawn_pos`: `origin` (default, random within world bounds), `city` (inside city OBB
-  outside house footprints; falls back to `city_outskirts`), or `city_outskirts` (radially
-  outside city OBB, clears a tree-free zone at the spawn point)
+- `agents_spawn_pos`: `origin` (default, random within world bounds), `outside_structures`
+  (random within world bounds but rejects positions inside any WorldStructure footprint;
+  falls back to `origin` if no open spot found), `city` (inside city OBB outside house
+  footprints; falls back to `city_outskirts`), or `city_outskirts` (radially outside city
+  OBB, clears a tree-free zone at the spawn point)
 - `agents_city_spawn_attempts`: max random tries to find an open spot inside a city (default 200)
 - `agents_outskirts_margin`: extra radial distance past city half-diagonal for outskirts spawn (default 15)
 - `agents_outskirts_clear_radius`: radius of tree-suppression zone registered at outskirts spawn (default 5)

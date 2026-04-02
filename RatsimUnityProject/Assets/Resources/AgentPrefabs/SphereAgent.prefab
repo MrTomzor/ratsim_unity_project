@@ -179,6 +179,9 @@ MonoBehaviour:
   accelModeLinearDrag: 0.3
   accelModeAngularDrag: 0.3
   verbose: 1
+  humanControlTopic: /enable_human_control
+  humanControlEnabled: 0
+  humanControlMode: 0
 --- !u!114 &7081735771137792426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -195,7 +198,7 @@ MonoBehaviour:
   angleStartDeg: -90
   angleEndDeg: 90
   angleIncrementDeg: 10
-  maxRange: 10
+  maxRange: 20
   topicName: /lidar2d
   debugDrawRays: 1
   numRays: 0
