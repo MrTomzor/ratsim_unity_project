@@ -86,16 +86,16 @@ Service interfaces:
 
 #### Data: WorldStructure and Typed Data Components
 
-**`WorldData`** — static spatial index of all `WorldStructure` instances, indexed by chunk. Factory: `WorldData.SpawnStructure(type, pos, rot, parent)`. Fires `OnNewStructureRegistered` event on registration.
+**`WorldData`** — static spatial index of all `WorldStructure` instances, indexed by chunk. Factory: `WorldData.SpawnStructure(type, pos, rot, parent)`. Fires `OnNewStructureRegistered` event on registration. Also maintains a deterministic ID registry (`Dictionary<int, WorldStructure>`) that validates uniqueness on registration.
 
-**`WorldStructure`** — MonoBehaviour on structure prefabs. Defines 2D footprint via `BoxCollider footprintCollider`. Tracks `currentLod` (-1 = not loaded, managed by coordinator). Auto-registers with `WorldData` on Awake.
+**`WorldStructure`** — MonoBehaviour on structure prefabs. Defines 2D footprint via `BoxCollider footprintCollider`. Tracks `currentLod` (-1 = not loaded, managed by coordinator). Auto-registers with `WorldData` on Awake. Exposes `DeterministicId` — a stable hash of `(structureType, posX, posZ, sizeX, sizeY)` (centimeter-rounded), used by persistent dynamic objects to identify their origin structure across unload/reload cycles.
 
 **Typed data components** — MonoBehaviours attached to structure GameObjects alongside `WorldStructure`. These hold typed, domain-specific state:
 - **Data components go on the WorldStructure GO, not the LOD child** — they persist across `Reload()` cycles
 - **Prefabs define defaults** — e.g. `house_basic` prefab has `HouseData { style: "suburban", floors: 1 }`
 - **Loaders set/override fields** — CityLoader may set `data.style = cityPalette`
 - **Loaders can add components dynamically** — e.g. add `BurnState` to structures in fire-prone areas
-- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`, `TerrainModification { mode: Flatten|SetHeight|AddHeight, targetHeight, heightDelta, blendMargin }`
+- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`, `TerrainModification { mode: Flatten|SetHeight|AddHeight, targetHeight, heightDelta, blendMargin }`, `PersistentDynamicObject { requiredLod, originStructureId }`
 
 **Runtime state changes** use `WorldStructure.Reload()` — unloads then reloads at current LOD, causing loaders to regenerate content from the (now-mutated) data components.
 
@@ -134,8 +134,9 @@ Chunk-level providers (run in `GenerateChunk()`/`ClearChunk()`):
 Structure-level providers (`WorldStructureProvider`, respond to structure load/unload events):
 - `SimpleStructureLoader` (provides `StructureContent`, depends on `StructureEvents`) — manages LOD children (named `LOD0`, `LOD1`, etc.) on WorldStructure instances; enables the matching LOD child, disables others, sets Default layer.
 - `CityLoader` (provides `StructureContent`, depends on `StructureEvents`) — fills "city" structures with house WorldStructures.
-- `HouseLoader` (provides `StructureContent`, depends on `StructureEvents`) — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG.
+- `HouseLoader` (provides `StructureContent`, depends on `StructureEvents`) — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG. Rubble spawned from broken walls gets `PersistentDynamicObject` on each rigidbody child.
 - `RewardObjectLoader` (provides `Rewards`, depends on `Height`, `StructureEvents`) — spawns reward objects via two parallel modes: uniform (per-chunk density) and structure-based (at `rewardSpawnPositions` in allowed structure types).
+- `DynamicObjectLoader` (provides `DynamicObjects`, depends on `StructureContent`) — singleton that manages persistent dynamic objects (rubble, physics props). Tracks all `PersistentDynamicObject` instances and per-structure spawn steps. On chunk load/unload, enables/disables objects based on their current world position and `requiredLod`. On episode clear, destroys all tracked objects.
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
@@ -151,6 +152,7 @@ Layout → StructureEvents → StructureContent (SimpleStructureLoader, CityLoad
 Height + StructureEvents → Rewards
 Height + StructureContent → Agents
 Height + StructureContent + Agents → Vegetation
+StructureContent → DynamicObjects
 Lighting (no deps, runs early)
 ```
 
@@ -175,6 +177,12 @@ Lighting (no deps, runs early)
 2. Define an interface (e.g. `IWaterProvider`) in `WorldServices.cs`
 3. Register it in `OnEnable()`: `WorldServices.Register<IWaterProvider>(this)`
 4. Consumers query: `WorldServices.Get<IWaterProvider>().IsWater(x, z)`
+
+**Persistent dynamic object (e.g. rubble that can be pushed around):**
+1. Add `PersistentDynamicObject` component to spawned GameObjects (or their rigidbody children)
+2. On `Awake()`, the component finds its parent `WorldStructure`, checks `DynamicObjectLoader` for duplicate spawns (same structure ID, different step → `DestroyImmediate`), then reparents to `DynamicObjectLoader`'s transform
+3. The object survives structure unload/reload (it's no longer a child of the structure's content container)
+4. `DynamicObjectLoader` handles chunk-based enable/disable based on the object's current world position and `requiredLod`
 
 **Runtime state change (e.g. fire burns a house):**
 1. Mutate the structure's data component(s)
