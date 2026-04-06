@@ -13,6 +13,8 @@ public class SensorVisualizationManager : MonoBehaviour
     public Lidar2DVisualizer lidar2DVisualizer;
     public CompassVisualizer compassVisualizer;
     public HeadDirectionCellsVisualizer headDirectionCellsVisualizer;
+    public GameObject cameraBlocker;
+    public GameObject scoreVisualizer;
 
     [Header("Settings")]
     public string humanControlTopic = "/enable_human_control";
@@ -42,6 +44,8 @@ public class SensorVisualizationManager : MonoBehaviour
         if (visualizationEnabled)
         {
             EnableVisualizersForAgent();
+            cameraBlocker.SetActive(true);
+            scoreVisualizer.SetActive(true);
         }
         else
         {
@@ -105,8 +109,11 @@ public class SensorVisualizationManager : MonoBehaviour
 
     void SetAllVisualizersActive(bool active)
     {
+        Debug.Log($"SensorVisualizationManager: setting all visualizers active={active}");
         if (lidar2DVisualizer != null) lidar2DVisualizer.gameObject.SetActive(active);
         if (compassVisualizer != null) compassVisualizer.gameObject.SetActive(active);
         if (headDirectionCellsVisualizer != null) headDirectionCellsVisualizer.gameObject.SetActive(active);
+        cameraBlocker.SetActive(active);
+        scoreVisualizer.SetActive(active);
     }
 }

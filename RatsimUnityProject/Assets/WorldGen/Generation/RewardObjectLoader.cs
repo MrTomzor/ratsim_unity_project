@@ -14,14 +14,20 @@ using System.Collections.Generic;
 ///
 /// Both modes can run simultaneously. Spawned objects use a single configurable prefab.
 ///
+/// Tracks all spawned rewards and publishes a BoolMessage on /all_rewards_collected
+/// when every reward in every visitable chunk and structure has been collected.
+///
 /// Config params (all under "reward_objects/" prefix):
-///   prefab_name                          — prefab in Resources/WorldGen/RewardObjectPrefabs/ (default "reward_obj1")
-///   uniform_density                      — objects per unit² for uniform mode (default 0; 0 = disabled)
-///   allowed_structures                   — comma list of structure types for structure mode (default ""; empty = disabled)
-///   {structure_type}/spawn_probability   — 0.0–1.0 per spawn position (default 1)
-///   {structure_type}/skip_probability    — 0.0–1.0 chance to skip the entire structure (default 0)
+///   prefab_name                          -- prefab in Resources/WorldGen/RewardObjectPrefabs/ (default "reward_obj1")
+///   uniform_density                      -- objects per unit^2 for uniform mode (default 0; 0 = disabled)
+///   boundary_buffer                      -- units inset from world boundary for uniform spawning (default 5)
+///   allowed_structures                   -- comma list of structure types for structure mode (default ""; empty = disabled)
+///   {structure_type}/spawn_probability   -- 0.0-1.0 per spawn position (default 1)
+///   {structure_type}/skip_probability    -- 0.0-1.0 chance to skip the entire structure (default 0)
 /// </summary>
 public class RewardObjectLoader : WorldStructureProvider {
+
+    public static RewardObjectLoader Instance { get; private set; }
 
     public override WorldDataType[] Provides => new[] { WorldDataType.Rewards };
     public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureEvents };
@@ -30,6 +36,7 @@ public class RewardObjectLoader : WorldStructureProvider {
 
     private const string PrefabFolder = "WorldGen/RewardObjectPrefabs/";
     private const string ContainerName = "_RewardLoaderContent";
+    private const string AllCollectedTopic = "/all_rewards_collected";
 
     // ─────────────────────────────────────────────
     //  Editor-configurable defaults (overridden by episode params)
@@ -40,6 +47,7 @@ public class RewardObjectLoader : WorldStructureProvider {
 
     [Header("Uniform Mode")]
     public float uniformDensity = 0f;
+    public float boundaryBuffer = 5f;
 
     [Header("Structure Mode")]
     public string allowedStructures = "";
@@ -60,9 +68,33 @@ public class RewardObjectLoader : WorldStructureProvider {
     private bool _paramsLoaded;
     private float _chunkWidth;
 
+    // World boundary rect (for filtering spawns and determining visitable chunks)
+    private bool _hasBoundary;
+    private float _boundaryMinX, _boundaryMaxX;
+    private float _boundaryMinZ, _boundaryMaxZ;
+
     // Uniform mode: chunk-based spawning (like TreeLoader)
     private Dictionary<Vector2Int, GameObject> _chunkObjects = new Dictionary<Vector2Int, GameObject>();
     private HashSet<Vector2Int> _generatedChunks = new HashSet<Vector2Int>();
+
+    // ── Reward tracking ──
+    private int _totalSpawned;
+    private int _totalCollected;
+    private bool _allCollectedPublished;
+
+    // ─────────────────────────────────────────────
+    //  Singleton
+    // ─────────────────────────────────────────────
+
+    protected override void OnEnable() {
+        base.OnEnable();
+        Instance = this;
+    }
+
+    protected override void OnDisable() {
+        base.OnDisable();
+        if (Instance == this) Instance = null;
+    }
 
     // ─────────────────────────────────────────────
     //  Param loading
@@ -78,6 +110,19 @@ public class RewardObjectLoader : WorldStructureProvider {
             Debug.LogWarning($"RewardObjectLoader: prefab not found at Resources/{PrefabFolder}{prefabName}");
 
         uniformDensity = WorldLoadingController.GetParamFloat("reward_objects/uniform_density", uniformDensity);
+        boundaryBuffer = WorldLoadingController.GetParamFloat("reward_objects/boundary_buffer", boundaryBuffer);
+
+        // Read world boundary params
+        string boundaryType = WorldLoadingController.GetParamString("world_bounds/boundary_type", "none");
+        _hasBoundary = boundaryType.Equals("visible_wall", System.StringComparison.OrdinalIgnoreCase);
+        if (_hasBoundary) {
+            float worldW = WorldLoadingController.GetParamFloat("world_bounds/width", 100f);
+            float worldH = WorldLoadingController.GetParamFloat("world_bounds/height", 100f);
+            _boundaryMinX = -worldW * 0.5f;
+            _boundaryMaxX =  worldW * 0.5f;
+            _boundaryMinZ = -worldH * 0.5f;
+            _boundaryMaxZ =  worldH * 0.5f;
+        }
 
         // Structure entries
         _structureEntries.Clear();
@@ -99,11 +144,87 @@ public class RewardObjectLoader : WorldStructureProvider {
         Debug.Log($"RewardObjectLoader: params loaded — " +
             $"prefab={(prefabName)}, " +
             $"uniformDensity={uniformDensity:F4}, " +
+            $"boundaryBuffer={boundaryBuffer:F1}, " +
+            $"hasBoundary={_hasBoundary}, " +
             $"structureTypes={_structureEntries.Count}");
         if (verbose) {
             foreach (var e in _structureEntries)
                 Debug.Log($"  structure '{e.type}': spawnProb={e.spawnProbability:F2}, skipProb={e.skipProbability:F2}");
         }
+    }
+
+    // ─────────────────────────────────────────────
+    //  Boundary helpers
+    // ─────────────────────────────────────────────
+
+    /// <summary>Returns true if (x, z) is inside the world boundary with the buffer inset.</summary>
+    private bool IsInsideBoundaryBuffer(float x, float z) {
+        if (!_hasBoundary) return true; // no boundary → everything allowed
+        return x >= _boundaryMinX + boundaryBuffer &&
+               x <= _boundaryMaxX - boundaryBuffer &&
+               z >= _boundaryMinZ + boundaryBuffer &&
+               z <= _boundaryMaxZ - boundaryBuffer;
+    }
+
+    /// <summary>Returns true if the chunk overlaps the world boundary rect at all.</summary>
+    private bool IsChunkVisitable(Vector2Int chunkID) {
+        if (!_hasBoundary) return false; // no boundary → can't determine visitability
+        float cMinX = chunkID.x * _chunkWidth;
+        float cMaxX = cMinX + _chunkWidth;
+        float cMinZ = chunkID.y * _chunkWidth;
+        float cMaxZ = cMinZ + _chunkWidth;
+        // AABB overlap test
+        return cMaxX > _boundaryMinX && cMinX < _boundaryMaxX &&
+               cMaxZ > _boundaryMinZ && cMinZ < _boundaryMaxZ;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Pickup notification (called by Pickupable)
+    // ─────────────────────────────────────────────
+
+    /// <summary>Called by Pickupable when a reward object is collected.</summary>
+    public void NotifyRewardCollected() {
+        _totalCollected++;
+        if (verbose)
+            Debug.Log($"RewardObjectLoader: reward collected ({_totalCollected}/{_totalSpawned})");
+        CheckAllCollected();
+    }
+
+    private void CheckAllCollected() {
+        if (_allCollectedPublished) return;
+        if (!_hasBoundary) return;
+        if (_totalSpawned <= 0) return;
+
+        // Check that all visitable chunks have been generated (loaded at LOD0)
+        if (!AllVisitableChunksGenerated()) return;
+
+        if (_totalCollected >= _totalSpawned) {
+            _allCollectedPublished = true;
+            RoslikeTCPServer conn = RoslikeTCPServer.GetInstance();
+            conn.Publish(AllCollectedTopic, new BoolMessage { data = true });
+            Debug.Log($"RewardObjectLoader: ALL REWARDS COLLECTED ({_totalCollected}/{_totalSpawned}) — published on {AllCollectedTopic}");
+        }
+    }
+
+    /// <summary>
+    /// Returns true if every chunk that overlaps the world boundary has been generated at LOD0.
+    /// This ensures we know the total spawn count before declaring "all collected".
+    /// </summary>
+    private bool AllVisitableChunksGenerated() {
+        // Compute the range of chunks that could overlap the boundary
+        int minCX = Mathf.FloorToInt(_boundaryMinX / _chunkWidth);
+        int maxCX = Mathf.FloorToInt(_boundaryMaxX / _chunkWidth);
+        int minCZ = Mathf.FloorToInt(_boundaryMinZ / _chunkWidth);
+        int maxCZ = Mathf.FloorToInt(_boundaryMaxZ / _chunkWidth);
+
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                Vector2Int id = new Vector2Int(cx, cz);
+                if (IsChunkVisitable(id) && !_generatedChunks.Contains(id))
+                    return false;
+            }
+        }
+        return true;
     }
 
     // ─────────────────────────────────────────────
@@ -124,6 +245,9 @@ public class RewardObjectLoader : WorldStructureProvider {
         }
 
         GenerateUniformChunk(chunkID);
+
+        // A new chunk was generated — recheck all-collected (we now know more of the world)
+        CheckAllCollected();
     }
 
     public override void ClearChunk(int cx, int cz, int lod) {
@@ -152,6 +276,10 @@ public class RewardObjectLoader : WorldStructureProvider {
         for (int i = 0; i < count; i++) {
             float x = originX + (float)rng.NextDouble() * _chunkWidth;
             float z = originZ + (float)rng.NextDouble() * _chunkWidth;
+
+            // Skip positions outside the boundary buffer zone
+            if (!IsInsideBoundaryBuffer(x, z)) continue;
+
             float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
 
             Instantiate(_rewardPrefab, new Vector3(x, y, z),
@@ -159,8 +287,10 @@ public class RewardObjectLoader : WorldStructureProvider {
             placed++;
         }
 
+        _totalSpawned += placed;
+
         if (verbose && placed > 0)
-            Debug.Log($"RewardObjectLoader: uniform chunk ({chunkID.x},{chunkID.y}) placed {placed}");
+            Debug.Log($"RewardObjectLoader: uniform chunk ({chunkID.x},{chunkID.y}) placed {placed} (total spawned: {_totalSpawned})");
     }
 
     // ─────────────────────────────────────────────
@@ -205,9 +335,11 @@ public class RewardObjectLoader : WorldStructureProvider {
             placed++;
         }
 
+        _totalSpawned += placed;
+
         if (verbose)
             Debug.Log($"RewardObjectLoader: '{s.name}' LOD{lod} — " +
-                $"{placed}/{group.childCount} rewards placed");
+                $"{placed}/{group.childCount} rewards placed (total spawned: {_totalSpawned})");
 
         // Remove empty container
         if (placed == 0)
@@ -227,6 +359,9 @@ public class RewardObjectLoader : WorldStructureProvider {
         _generatedChunks.Clear();
         // Structure containers are children of structure GOs — destroyed with them.
         _paramsLoaded = false;
+        _totalSpawned = 0;
+        _totalCollected = 0;
+        _allCollectedPublished = false;
     }
 
     // ─────────────────────────────────────────────

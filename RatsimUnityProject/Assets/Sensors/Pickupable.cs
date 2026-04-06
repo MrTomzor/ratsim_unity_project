@@ -21,6 +21,11 @@ public class Pickupable : MonoBehaviour
         Debug.Log("Pickupable collided with " + collision.gameObject.name);
         RoslikeTCPServer conn = RoslikeTCPServer.GetInstance();
         conn.Publish(topicName, new Int32Message { data = publishedNumber });
+
+        // Notify the RewardObjectLoader that a reward was collected
+        if (RewardObjectLoader.Instance != null)
+            RewardObjectLoader.Instance.NotifyRewardCollected();
+
         Destroy(gameObject);
     }
 }
