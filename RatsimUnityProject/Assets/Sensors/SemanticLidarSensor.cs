@@ -21,6 +21,11 @@ public class SemanticLidarSensor : MonoBehaviour
 
     public bool debugDrawRays = false;
 
+    /// <summary>Latest range readings. Read by visualizer.</summary>
+    [HideInInspector] public float[] lastRanges;
+    /// <summary>Latest descriptor readings (flat array, stride = descriptorDimension). Read by visualizer.</summary>
+    [HideInInspector] public float[] lastDescriptors;
+
     public int numRays;
     RoslikeTCPServer conn;
     public bool verbose = false;
@@ -199,6 +204,9 @@ public class SemanticLidarSensor : MonoBehaviour
                 msg.descriptors[i * descriptorDimension + j] = sensed[i].Item2[j];
             }
         }
+
+        lastRanges = msg.ranges;
+        lastDescriptors = msg.descriptors;
 
         var sensedonetime = Time.realtimeSinceStartup;
 

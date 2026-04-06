@@ -241,7 +241,7 @@ Lighting (no deps, runs early)
 **Agent config params** (sent on `/sim_control/agent_config`, read by `AgentLoader`):
 - `prefab_name` — prefab loaded from `Resources/AgentPrefabs/{name}`
 - `name_prefix` — agent GameObject name
-- `sensors` — comma-separated sensor names: `lidar2d`, `rgbd`, `odom`, `collision`, `relative_pose`, `absolute_pose`
+- `sensors` — comma-separated sensor names: `lidar2d`, `rgbd`, `odom`, `collision`, `relative_pose`, `absolute_pose`, `compass`, `head_direction_cells`
 - `actuators` — actuator mode (e.g. `velocity`)
 - `{sensor_name}/{field}` — override a public field on a sensor component (e.g. `lidar2d/maxRange`)
 
@@ -249,13 +249,25 @@ Lighting (no deps, runs early)
 
 All sensors publish via `conn.Publish(topic, msg)` on a discrete timer. All actuators subscribe via `conn.Subscribe<T>(topic, callback)`.
 
-**Sensors** (`Assets/Sensors/`): `SemanticLidarSensor`, `RGBDSensor`, `AbsolutePose2DSensor`, `Odom2DSensor`, `RelativePoseSensor`, `CollisionSensor`, `VirtualVisualTrackerSensor`
+**Sensors** (`Assets/Sensors/`): `SemanticLidarSensor`, `RGBDSensor`, `AbsolutePose2DSensor`, `Odom2DSensor`, `RelativePoseSensor`, `CollisionSensor`, `VirtualVisualTrackerSensor`, `CompassSensor`, `HeadDirectionCellsSensor`
 
 **Actuators** (`Assets/Actuators/`): `Twist2DActuator` (subscribes to `TwistMessage` for velocity/acceleration control), `PoseTeleportActuator` (subscribes to `PoseMessage`)
 
 **Coordinate convention:** All data crossing TCP uses ROS standard (x=forward, y=left, z=up). Unity sensors/actuators convert internally via `CoordConversion.cs` (`Assets/TCPConnector/`). Sensors publish `PoseMessage`; actuators subscribe to `TwistMessage` or `PoseMessage`.
 
 Semantic objects implement `SemanticObject` (base class) — raycasts return descriptors from the hit object.
+
+**Sensor data for UI visualization:** Sensors store their latest readings in public fields (`lastRanges`/`lastDescriptors` on `SemanticLidarSensor`, `lastYawRad` on `CompassSensor`, `lastActivations` on `HeadDirectionCellsSensor`). UI visualizers read these directly — they cannot subscribe to sensor topics since `Subscribe` only handles incoming TCP messages, not Unity-internal publishes.
+
+### Sensor Visualization UI (`Assets/UI/`)
+
+Screen-space overlay UI for human experiments, toggled by `/enable_human_control` BoolMessage (incoming from Python).
+
+- **`SensorVisualizationManager`** — subscribes to human control toggle, discovers active sensors on the first agent, initializes matching visualizers with direct sensor component references
+- **`Lidar2DVisualizer`** — two display modes (togglable in Inspector): `Lines` (rays from center) and `Pointcloud` (dots at hit positions + grey max-range arc). Color = semantic class (10-color palette)
+- **`CompassVisualizer`** — rotating needle showing heading
+- **`HeadDirectionCellsVisualizer`** — radial lines with length/color encoding cell activation
+- **`ScoreVisualizer`** — always active (not gated by human control). Subscribes to `/step_score` (Float32Message from Python). Shows total score + fading/bumping +/- delta texts (TextMeshPro)
 
 ### Wildfire Scene (`Assets/WildfireMechanics/`)
 

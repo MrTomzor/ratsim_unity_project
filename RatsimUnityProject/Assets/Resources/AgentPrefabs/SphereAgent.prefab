@@ -106,6 +106,8 @@ GameObject:
   - component: {fileID: 8223704123116478089}
   - component: {fileID: 7339066846885824333}
   - component: {fileID: -3310873936012990706}
+  - component: {fileID: -653628547537935938}
+  - component: {fileID: 7141073898579080693}
   - component: {fileID: 5127488391532725983}
   m_Layer: 7
   m_Name: SphereAgent
@@ -332,6 +334,34 @@ MonoBehaviour:
   imageHeight: 480
   depthImageMaxRange: 100
   linearDepthShader: {fileID: 0}
+--- !u!114 &-653628547537935938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25ba24c79a92eac94a6d1f154fbe206c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  topicName: /compass
+--- !u!114 &7141073898579080693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d50d37fab774d7246abf0ed95aefc6c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  topicName: /head_direction_cells
+  numCells: 12
+  spreadMod: 0.5
 --- !u!114 &5127488391532725983
 MonoBehaviour:
   m_ObjectHideFlags: 0

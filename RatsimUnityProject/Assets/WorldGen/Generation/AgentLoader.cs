@@ -25,6 +25,8 @@ public class AgentLoader : WorldDataProvider {
         { "collision",      typeof(CollisionSensor) },
         { "relative_pose",  typeof(RelativePoseSensor) },
         { "absolute_pose",  typeof(AbsolutePose2DSensor) },
+        { "compass",         typeof(CompassSensor) },
+        { "head_direction_cells", typeof(HeadDirectionCellsSensor) },
     };
 
     private static readonly Dictionary<string, Type> ActuatorNameToType = new Dictionary<string, Type> {
