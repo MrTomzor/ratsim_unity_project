@@ -111,6 +111,7 @@ public class TreeLoader : WorldDataProvider {
         _chunkObjects.Clear();
         _generatedChunks.Clear();
         _clearZones.Clear();
+        paramsInitialized = false;
     }
 
     // --- Generation ---

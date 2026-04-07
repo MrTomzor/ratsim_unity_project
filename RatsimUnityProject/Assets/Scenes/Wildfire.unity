@@ -1969,7 +1969,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugStartEpisodeOnAwake: 0
-  debugRandomizeSeedOnStart: 1
+  debugRandomizeSeedOnStart: 0
   agentObject: {fileID: 0}
   masterSeed: 42
   chunkWidth: 128
@@ -2643,6 +2643,7 @@ MonoBehaviour:
   verbose: 1
   prefabName: reward_obj1
   uniformDensity: 0
+  boundaryBuffer: 5
   allowedStructures: 
 --- !u!1001 &5560483459733379799
 PrefabInstance:
