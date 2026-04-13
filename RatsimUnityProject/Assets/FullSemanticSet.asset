@@ -13,8 +13,7 @@ MonoBehaviour:
   m_Name: FullSemanticSet
   m_EditorClassIdentifier: 
   prefabs:
-  - {fileID: 2462568519800153458, guid: 013d944ba76dc920d83d83b920691f1f, type: 3}
   - {fileID: 7644313187523702680, guid: a6f19caa8a2903f0ea49a60d61fa4b06, type: 3}
-  - {fileID: 5480551613726581464, guid: 8b76eac9ab4a132229e1b75bec0f2977, type: 3}
+  - {fileID: 4033839345860823829, guid: af08466c59ab65257af96fd3a3ed5831, type: 3}
   - {fileID: 173513022965263453, guid: f0df63735e2cccd05a0668dfbb1da063, type: 3}
   - {fileID: 8758201418001311561, guid: c30064ee3219646239cd352670edf423, type: 3}

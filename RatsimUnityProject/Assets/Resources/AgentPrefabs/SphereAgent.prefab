@@ -208,6 +208,7 @@ MonoBehaviour:
   lastDescriptors: []
   numRays: 0
   verbose: 0
+  enableSmokeCorruption: 1
 --- !u!135 &3783130376408787828
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -397,7 +398,7 @@ MonoBehaviour:
   showRays: 0
   hitColor: {r: 1, g: 0, b: 0, a: 1}
   missColor: {r: 1, g: 0, b: 0, a: 1}
-  toggleKey: 103
+  toggleKey: 104
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0

@@ -21,6 +21,7 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
     private bool _paramsLoaded;
 
     public bool spawnGlobalSmoke = false;
+    private GameObject _globalSmokeInstance;
 
     private readonly Dictionary<SmokeOrigin, GameObject> _spawnedByOrigin = new Dictionary<SmokeOrigin, GameObject>();
 
@@ -46,11 +47,12 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
         {
             // instantiate the smoke prefab at origin and scale it up based on the world bounds size
             GameObject globalSmoke = Instantiate(smoke2dPrefab, Vector3.zero, Quaternion.identity);
+            _globalSmokeInstance = globalSmoke;
             float worldW = WorldLoadingController.GetParamFloat("world_bounds/width");
             float worldH = WorldLoadingController.GetParamFloat("world_bounds/height");
             float worldSize = Mathf.Max(worldW, worldH);
             var smoke2d = globalSmoke.GetComponent<SmokeObject2D>();
-            smoke2d.radius = worldSize * 0.5f;
+            smoke2d.radius = worldSize;
             smoke2d.density = _density;
             smoke2d.corruptionMode = _corruptionMode;
             smoke2d.effectiveRange = _effectiveRange;
@@ -144,6 +146,12 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
             if (kvp.Value != null) DestroyImmediate(kvp.Value);
         _spawnedByOrigin.Clear();
         _paramsLoaded = false;
+
+        if(spawnGlobalSmoke)
+        {
+            if (_globalSmokeInstance != null)
+                DestroyImmediate(_globalSmokeInstance);
+        }
     }
 
     public List<SmokeObject2D> GetActiveSmokeObjects()
