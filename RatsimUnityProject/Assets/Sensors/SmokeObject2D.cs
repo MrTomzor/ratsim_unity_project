@@ -1,12 +1,21 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum SmokeCorruptionMode
+{
+    RandomHits,
+    EffectiveRange
+}
+
 public class SmokeObject2D : MonoBehaviour
 {
     public static List<SmokeObject2D> allActive = new List<SmokeObject2D>();
 
     [SerializeField] private float _radius = 10f;
     public float density = 0.1f;
+    public SmokeCorruptionMode corruptionMode = SmokeCorruptionMode.RandomHits;
+    public float effectiveRange = 5f;
+    public float effectiveRangeVariance = 1f;
 
     public float radius
     {

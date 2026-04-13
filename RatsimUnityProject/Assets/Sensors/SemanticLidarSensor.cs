@@ -216,7 +216,7 @@ public class SemanticLidarSensor : MonoBehaviour
                 Vector2 dir2D = new Vector2(worldDirections[i].x, worldDirections[i].z).normalized;
                 float hitDist = sensed[i].Item1 > 0 ? sensed[i].Item1 : maxRange;
 
-                double survivalProb = 1.0;
+                // Compute intersections with all smoke objects
                 int hitCount = 0;
 
                 for (int s = 0; s < smokeCount; s++)
@@ -226,31 +226,101 @@ public class SemanticLidarSensor : MonoBehaviour
                                              out float tEnter, out float tExit))
                     {
                         float length = tExit - tEnter;
-                        float prob = smoke.density * length;
-                        survivalProb *= (1.0 - Mathf.Clamp01(prob));
                         enters[hitCount]  = tEnter;
                         exits[hitCount]   = tExit;
-                        weights[hitCount] = prob;
+                        weights[hitCount] = smoke.density * length;
                         hitCount++;
                     }
                 }
 
-                if (hitCount > 0 && rng.NextDouble() > survivalProb)
+                if (hitCount == 0) continue;
+
+                // Read corruption mode from the first intersecting smoke object
+                var firstSmoke = SmokeObject2D.allActive[0];
+
+                if (firstSmoke.corruptionMode == SmokeCorruptionMode.RandomHits)
                 {
-                    // Pick which smoke segment corrupted the ray (weighted)
-                    float totalWeight = 0f;
-                    for (int k = 0; k < hitCount; k++) totalWeight += weights[k];
-                    float roll = (float)rng.NextDouble() * totalWeight;
-                    int chosen = 0;
-                    float acc = 0f;
+                    // Survival probability: product of (1 - density*length) per smoke
+                    double survivalProb = 1.0;
                     for (int k = 0; k < hitCount; k++)
+                        survivalProb *= (1.0 - Mathf.Clamp01(weights[k]));
+
+                    if (rng.NextDouble() > survivalProb)
                     {
-                        acc += weights[k];
-                        if (roll <= acc) { chosen = k; break; }
+                        // Pick which smoke segment corrupted the ray (weighted)
+                        float totalWeight = 0f;
+                        for (int k = 0; k < hitCount; k++) totalWeight += weights[k];
+                        float roll = (float)rng.NextDouble() * totalWeight;
+                        int chosen = 0;
+                        float acc = 0f;
+                        for (int k = 0; k < hitCount; k++)
+                        {
+                            acc += weights[k];
+                            if (roll <= acc) { chosen = k; break; }
+                        }
+
+                        // Exponential sampling: denser smoke stops the ray sooner
+                        float segLen = exits[chosen] - enters[chosen];
+                        float chosenDensity = weights[chosen] / segLen;
+                        float dIntoSmoke = Mathf.Min((float)(-System.Math.Log(1.0 - rng.NextDouble()) / chosenDensity), segLen);
+                        float t = enters[chosen] + dIntoSmoke;
+                        sensed[i] = new Tuple<float, float[]>(t, smokeDescriptor);
+                    }
+                }
+                else // EffectiveRange
+                {
+                    // Per-ray threshold sampled from N(effectiveRange, effectiveRangeVariance)
+                    double u1 = 1.0 - rng.NextDouble();
+                    double u2 = rng.NextDouble();
+                    double normal = System.Math.Sqrt(-2.0 * System.Math.Log(u1)) * System.Math.Cos(2.0 * System.Math.PI * u2);
+                    float rayThreshold = Mathf.Max(0f, firstSmoke.effectiveRange + firstSmoke.effectiveRangeVariance * (float)normal);
+
+                    // Sort segments by entry distance (insertion sort, hitCount is small)
+                    for (int a = 1; a < hitCount; a++)
+                    {
+                        float eA = enters[a], xA = exits[a];
+                        int b = a - 1;
+                        while (b >= 0 && enters[b] > eA)
+                        {
+                            enters[b + 1] = enters[b];
+                            exits[b + 1] = exits[b];
+                            b--;
+                        }
+                        enters[b + 1] = eA;
+                        exits[b + 1] = xA;
                     }
 
-                    float t = enters[chosen] + (float)rng.NextDouble() * (exits[chosen] - enters[chosen]);
-                    sensed[i] = new Tuple<float, float[]>(t, smokeDescriptor);
+                    // Merge overlapping segments in-place
+                    int mergedCount = 1;
+                    for (int k = 1; k < hitCount; k++)
+                    {
+                        if (enters[k] <= exits[mergedCount - 1])
+                        {
+                            // Overlaps — extend the current merged segment
+                            exits[mergedCount - 1] = Mathf.Max(exits[mergedCount - 1], exits[k]);
+                        }
+                        else
+                        {
+                            enters[mergedCount] = enters[k];
+                            exits[mergedCount] = exits[k];
+                            mergedCount++;
+                        }
+                    }
+
+                    // Walk merged segments, accumulate travel through smoke
+                    float accumulated = 0f;
+                    for (int k = 0; k < mergedCount; k++)
+                    {
+                        float segLen = exits[k] - enters[k];
+                        if (accumulated + segLen >= rayThreshold)
+                        {
+                            float remaining = rayThreshold - accumulated;
+                            float t = enters[k] + remaining;
+                            sensed[i] = new Tuple<float, float[]>(t, smokeDescriptor);
+                            break;
+                        }
+                        accumulated += segLen;
+                    }
                 }
             }
         }

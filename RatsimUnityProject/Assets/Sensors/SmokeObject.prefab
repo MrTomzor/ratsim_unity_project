@@ -106,7 +106,7 @@ CapsuleCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 1
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_Radius: 0.5000001
   m_Height: 20
@@ -126,6 +126,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _radius: 10
   density: 0.1
+  corruptionMode: 0
+  effectiveRange: 5
+  effectiveRangeVariance: 1
 --- !u!114 &3779572456265126391
 MonoBehaviour:
   m_ObjectHideFlags: 0

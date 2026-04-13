@@ -49,11 +49,19 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
             float worldW = WorldLoadingController.GetParamFloat("world_bounds/width");
             float worldH = WorldLoadingController.GetParamFloat("world_bounds/height");
             float worldSize = Mathf.Max(worldW, worldH);
-            globalSmoke.GetComponent<SmokeObject2D>().radius = worldSize * 0.5f;
-            globalSmoke.GetComponent<SmokeObject2D>().density = _density;
+            var smoke2d = globalSmoke.GetComponent<SmokeObject2D>();
+            smoke2d.radius = worldSize * 0.5f;
+            smoke2d.density = _density;
+            smoke2d.corruptionMode = _corruptionMode;
+            smoke2d.effectiveRange = _effectiveRange;
+            smoke2d.effectiveRangeVariance = _effectiveRangeVariance;
             globalSmoke.name = "GlobalSmoke";
         }
     }
+
+    private SmokeCorruptionMode _corruptionMode = SmokeCorruptionMode.RandomHits;
+    private float _effectiveRange = 5f;
+    private float _effectiveRangeVariance = 1f;
 
     private void LoadParams()
     {
@@ -62,9 +70,17 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
         spawnGlobalSmoke  = WorldLoadingController.GetParamInt("smoke/global_smoke_enabled", 0) != 0;
         _radius  = WorldLoadingController.GetParamFloat("smoke/default_radius", defaultRadius);
         _density = WorldLoadingController.GetParamFloat("smoke/default_density", defaultDensity);
+
+        string modeStr = WorldLoadingController.GetParamString("smoke/corruption_mode", "random_hits");
+        _corruptionMode = modeStr == "effective_range"
+            ? SmokeCorruptionMode.EffectiveRange
+            : SmokeCorruptionMode.RandomHits;
+        _effectiveRange = WorldLoadingController.GetParamFloat("smoke/effective_range", 5f);
+        _effectiveRangeVariance = WorldLoadingController.GetParamFloat("smoke/effective_range_variance", 1f);
+
         _paramsLoaded = true;
 
-        Debug.Log($"SmokeLoader: params loaded — 2d={_mode2d}, 3d={_mode3d}, radius={_radius}, density={_density}");
+        Debug.Log($"SmokeLoader: params loaded — 2d={_mode2d}, 3d={_mode3d}, radius={_radius}, density={_density}, corruptionMode={modeStr}, effectiveRange={_effectiveRange}, effectiveRangeVariance={_effectiveRangeVariance}");
     }
 
     private void HandleOriginEnabled(SmokeOrigin origin)
@@ -96,6 +112,9 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
                 smoke2d = go.AddComponent<SmokeObject2D>();
             smoke2d.radius = _radius;
             smoke2d.density = _density;
+            smoke2d.corruptionMode = _corruptionMode;
+            smoke2d.effectiveRange = _effectiveRange;
+            smoke2d.effectiveRangeVariance = _effectiveRangeVariance;
 
             var nso = go.GetComponent<NamedSemanticObject>();
             if (nso == null)
