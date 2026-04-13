@@ -86,3 +86,12 @@ public interface ILayoutProvider
 {
     System.Collections.Generic.List<EntryPoint> GetEntryPoints(WorldStructure structure);
 }
+
+/// <summary>
+/// Provides access to active 2D smoke objects. Implemented by SmokeLoader.
+/// Used by: SemanticLidarSensor (to corrupt rays passing through smoke).
+/// </summary>
+public interface ISmokeProvider
+{
+    System.Collections.Generic.List<SmokeObject2D> GetActiveSmokeObjects();
+}

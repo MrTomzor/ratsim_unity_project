@@ -11,6 +11,7 @@ public class TopdownCameraFollower : MonoBehaviour
     {
         
     }
+    
 
     // Update is called once per frame
     void Update()

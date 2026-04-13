@@ -82,9 +82,10 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
         float worldW = WorldLoadingController.GetParamFloat("world_bounds/width");
         float worldH = WorldLoadingController.GetParamFloat("world_bounds/height");
         float margin = WorldLoadingController.GetParamFloat("world_bounds/structures_margin", 100f);
+        string roadGenerationMode = WorldLoadingController.GetParamString("layout/roads/mode", "highway");
 
         List<WorldStructure> structures = PlaceStructures(rng, worldW, worldH, margin);
-        List<RoadEdge>       edges      = BuildRoadNetwork(structures);
+        List<RoadEdge>       edges = roadGenerationMode == "highway" ? BuildRoadNetwork(structures) : new List<RoadEdge>();
 
         // assemble road nodes
         var nodeByPos = new Dictionary<Vector2, RoadNode>();

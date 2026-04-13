@@ -109,6 +109,7 @@ GameObject:
   - component: {fileID: -653628547537935938}
   - component: {fileID: 7141073898579080693}
   - component: {fileID: 5127488391532725983}
+  - component: {fileID: -8653734782038556784}
   m_Layer: 7
   m_Name: SphereAgent
   m_TagString: Untagged
@@ -203,6 +204,8 @@ MonoBehaviour:
   maxRange: 20
   topicName: /lidar2d
   debugDrawRays: 1
+  lastRanges: []
+  lastDescriptors: []
   numRays: 0
   verbose: 0
 --- !u!135 &3783130376408787828
@@ -347,6 +350,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topicName: /compass
+  lastYawRad: 0
 --- !u!114 &7141073898579080693
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -362,6 +366,7 @@ MonoBehaviour:
   topicName: /head_direction_cells
   numCells: 12
   spreadMod: 0.5
+  lastActivations: []
 --- !u!114 &5127488391532725983
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -377,6 +382,22 @@ MonoBehaviour:
   radius: 1
   longRangeRadius: 2
   verbose: 0
+--- !u!114 &-8653734782038556784
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95abdbd500dab6686b79648f75ecd2af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  showRays: 0
+  hitColor: {r: 1, g: 0, b: 0, a: 1}
+  missColor: {r: 1, g: 0, b: 0, a: 1}
+  toggleKey: 103
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0

@@ -20,4 +20,5 @@ public enum WorldDataType
     TerrainTexture,
     Lighting,
     DynamicObjects,
+    Smoke,
 }

@@ -23,6 +23,8 @@ public class SensorVisualizationManager : MonoBehaviour
 
     private Dictionary<string, System.Action<GameObject>> sensorToVisualizer;
 
+    public string UIToggleKey = "g";
+
     void Start()
     {
         sensorToVisualizer = new Dictionary<string, System.Action<GameObject>>
@@ -35,6 +37,27 @@ public class SensorVisualizationManager : MonoBehaviour
         SetAllVisualizersActive(false);
 
         RoslikeTCPServer.GetInstance().Subscribe<BoolMessage>(humanControlTopic, OnHumanControlToggle);
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(UIToggleKey))
+        {
+            // Simply disable all children objects
+            visualizationEnabled = !visualizationEnabled;
+            if (visualizationEnabled)
+            {
+                EnableVisualizersForAgent();
+                cameraBlocker.SetActive(true);
+                scoreVisualizer.SetActive(true);
+            }
+            else
+            {
+                SetAllVisualizersActive(false);
+                cameraBlocker.SetActive(false);
+                scoreVisualizer.SetActive(false);
+            }
+        }
     }
 
     void OnHumanControlToggle(BoolMessage msg)

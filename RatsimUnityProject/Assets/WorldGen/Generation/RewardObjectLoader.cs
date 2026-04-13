@@ -33,6 +33,7 @@ public class RewardObjectLoader : WorldStructureProvider {
     public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureEvents };
 
     public bool verbose = true;
+    public bool checkSpawnCollisions = true;
 
     private const string PrefabFolder = "WorldGen/RewardObjectPrefabs/";
     private const string ContainerName = "_RewardLoaderContent";
@@ -272,6 +273,15 @@ public class RewardObjectLoader : WorldStructureProvider {
         _chunkObjects[chunkID] = chunkObj;
         _generatedChunks.Add(chunkID);
 
+        // Get reward prefab size (assume it has box collider) to avoid spawning intersecting the ground
+        float prefabWidth = 1f;
+        float prefabHeight = 1f;
+        if (_rewardPrefab.TryGetComponent<BoxCollider>(out BoxCollider col)) {
+            prefabWidth = Mathf.Max(col.size.x, col.size.z);
+            prefabHeight = col.size.y;
+        }
+        float spawnHeightOffset = prefabHeight * 0.6f;
+
         int placed = 0;
         for (int i = 0; i < count; i++) {
             float x = originX + (float)rng.NextDouble() * _chunkWidth;
@@ -282,8 +292,16 @@ public class RewardObjectLoader : WorldStructureProvider {
 
             float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
 
+            Quaternion rot = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
+
+            // Check if position is occupied (slightly above ground height to avoid checking against terrain colliders)
+            if(checkSpawnCollisions){
+                if (Physics.CheckBox(new Vector3(x, y + spawnHeightOffset, z), Vector3.one * prefabWidth * 0.5f, rot, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore))
+                    continue;
+            }
+
             Instantiate(_rewardPrefab, new Vector3(x, y, z),
-                Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), chunkObj.transform);
+                rot, chunkObj.transform);
             placed++;
         }
 

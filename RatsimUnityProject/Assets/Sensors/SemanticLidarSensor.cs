@@ -29,6 +29,7 @@ public class SemanticLidarSensor : MonoBehaviour
     public int numRays;
     RoslikeTCPServer conn;
     public bool verbose = false;
+    public bool enableSmokeCorruption = true;
 
     public static float[] GetNamedSemanticObjectDescriptor(string semanticName)
     {
@@ -196,6 +197,64 @@ public class SemanticLidarSensor : MonoBehaviour
         }
         
         var sensed = GetRangesAndDescriptorsByCasting(transform.position, worldDirections, maxRange, debugDrawRays);
+
+        // ── Smoke corruption ──
+        if (enableSmokeCorruption && SmokeObject2D.allActive.Count > 0)
+        {
+            int stepSeed = Time.frameCount * 31;
+            System.Random rng = new System.Random(stepSeed);
+            float[] smokeDescriptor = GetNamedSemanticObjectDescriptor("smoke");
+            Vector2 origin2D = new Vector2(transform.position.x, transform.position.z);
+
+            int smokeCount = SmokeObject2D.allActive.Count;
+            float[] enters  = new float[smokeCount];
+            float[] exits   = new float[smokeCount];
+            float[] weights = new float[smokeCount];
+
+            for (int i = 0; i < numRays; i++)
+            {
+                Vector2 dir2D = new Vector2(worldDirections[i].x, worldDirections[i].z).normalized;
+                float hitDist = sensed[i].Item1 > 0 ? sensed[i].Item1 : maxRange;
+
+                double survivalProb = 1.0;
+                int hitCount = 0;
+
+                for (int s = 0; s < smokeCount; s++)
+                {
+                    var smoke = SmokeObject2D.allActive[s];
+                    if (smoke.RayIntersect2D(origin2D, dir2D, hitDist,
+                                             out float tEnter, out float tExit))
+                    {
+                        float length = tExit - tEnter;
+                        float prob = smoke.density * length;
+                        survivalProb *= (1.0 - Mathf.Clamp01(prob));
+                        enters[hitCount]  = tEnter;
+                        exits[hitCount]   = tExit;
+                        weights[hitCount] = prob;
+                        hitCount++;
+                    }
+                }
+
+                if (hitCount > 0 && rng.NextDouble() > survivalProb)
+                {
+                    // Pick which smoke segment corrupted the ray (weighted)
+                    float totalWeight = 0f;
+                    for (int k = 0; k < hitCount; k++) totalWeight += weights[k];
+                    float roll = (float)rng.NextDouble() * totalWeight;
+                    int chosen = 0;
+                    float acc = 0f;
+                    for (int k = 0; k < hitCount; k++)
+                    {
+                        acc += weights[k];
+                        if (roll <= acc) { chosen = k; break; }
+                    }
+
+                    float t = enters[chosen] + (float)rng.NextDouble() * (exits[chosen] - enters[chosen]);
+                    sensed[i] = new Tuple<float, float[]>(t, smokeDescriptor);
+                }
+            }
+        }
+
         for (int i = 0; i < numRays; i++)
         {
             msg.ranges[i] = sensed[i].Item1;
