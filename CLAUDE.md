@@ -95,7 +95,7 @@ Service interfaces:
 - **Prefabs define defaults** — e.g. `house_basic` prefab has `HouseData { style: "suburban", floors: 1 }`
 - **Loaders set/override fields** — CityLoader may set `data.style = cityPalette`
 - **Loaders can add components dynamically** — e.g. add `BurnState` to structures in fire-prone areas
-- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`, `TerrainModification { mode: Flatten|SetHeight|AddHeight, targetHeight, heightDelta, blendMargin }`, `PersistentDynamicObject { requiredLod, originStructureId }`
+- Examples: `HouseData`, `BurnState`, `TreeModificationData { mode, densityReductionFactor }`, `RewardObjectData { type, ripe, rotten, collected }`, `TerrainModification { mode: Flatten|SetHeight|AddHeight, targetHeight, heightDelta, blendMargin }`, `PersistentDynamicObject { requiredLod, originStructureId }`, `SmokeOrigin { mode: StaticDefaultSize }`
 
 **Runtime state changes** use `WorldStructure.Reload()` — unloads then reloads at current LOD, causing loaders to regenerate content from the (now-mutated) data components.
 
@@ -113,6 +113,7 @@ Flow: JSON params influence **loaders** → loaders produce **structures with ty
 - `WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z)`
 - `WorldServices.Get<ITerrainMeshProvider>().IsTerrainCollider(col)`
 - `WorldServices.Get<ILayoutProvider>().GetEntryPoints(structure)`
+- `WorldServices.Get<ISmokeProvider>().GetActiveSmokeObjects()`
 - Each provider owns its domain data and registers a typed interface
 - WorldData stays purely as the structure spatial index
 
@@ -122,6 +123,7 @@ Global providers (run in `Generate()`, dependency-ordered):
 - `WorldHeightLoader` (provides `Height`) — `IHeightProvider`: terrain height via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
 - `WorldLayoutLoader` (provides `Layout`, depends on `Height`) — `ILayoutProvider`: places structures and road network (MST + extra edges). Runs eagerly in `Generate()`.
 - `WorldBoundaryLoader` (provides `Boundaries`, depends on `Height`, `Layout`) — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
+- `SmokeLoader` (provides `Smoke`) — `ISmokeProvider`: event-driven loader that reacts to `SmokeOrigin` components appearing/disappearing anywhere in the scene. Subscribes to `SmokeOrigin.OnOriginEnabled`/`OnOriginDisabled` static events. For each origin, spawns smoke objects (2D mode: `SmokeObject2D` + `NamedSemanticObject`; 3D mode: stub for future particles). Supports both modes simultaneously. Smoke objects are parented to the origin and auto-destroyed when it is.
 - `LightingAndFogLoader` (provides `Lighting`) — applies lighting/fog settings each episode, optionally advances time-of-day.
 - `AgentLoader` (provides `Agents`, depends on `Height`, `StructureContent`) — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
 
@@ -153,6 +155,7 @@ Height + StructureEvents → Rewards
 Height + StructureContent → Agents
 Height + StructureContent + Agents → Vegetation
 StructureContent → DynamicObjects
+Smoke (no deps, event-driven via SmokeOrigin)
 Lighting (no deps, runs early)
 ```
 
@@ -183,6 +186,13 @@ Lighting (no deps, runs early)
 2. On `Awake()`, the component finds its parent `WorldStructure`, checks `DynamicObjectLoader` for duplicate spawns (same structure ID, different step → `DestroyImmediate`), then reparents to `DynamicObjectLoader`'s transform
 3. The object survives structure unload/reload (it's no longer a child of the structure's content container)
 4. `DynamicObjectLoader` handles chunk-based enable/disable based on the object's current world position and `requiredLod`
+
+**Event-driven loader (e.g. smoke from any source):**
+1. Create a data component with static `OnEnabled`/`OnDisabled` events (see `SmokeOrigin`)
+2. Create a `WorldDataProvider` that subscribes to those events in `OnEnable()`
+3. In event handlers, spawn/destroy child objects parented to the source
+4. Children auto-destroy when the source is destroyed (structure unload, robot death, etc.)
+5. This pattern decouples the loader from how/when sources are created
 
 **Runtime state change (e.g. fire burns a house):**
 1. Mutate the structure's data component(s)
@@ -237,6 +247,10 @@ Lighting (no deps, runs early)
 - `agents_city_spawn_attempts`: max random tries to find an open spot inside a city (default 200)
 - `agents_outskirts_margin`: extra radial distance past city half-diagonal for outskirts spawn (default 15)
 - `agents_outskirts_clear_radius`: radius of tree-suppression zone registered at outskirts spawn (default 5)
+- `smoke/2dmode_enabled`: 0 or 1 (default 1) — spawn `SmokeObject2D` for lidar corruption
+- `smoke/3dmode_enabled`: 0 or 1 (default 0) — spawn particle-based smoke for RGB (stub, future)
+- `smoke/default_radius`: radius of each smoke circle in world units (default 10)
+- `smoke/default_density`: probability of a random lidar hit per meter of ray travel through smoke (default 0.1)
 
 **Agent config params** (sent on `/sim_control/agent_config`, read by `AgentLoader`):
 - `prefab_name` — prefab loaded from `Resources/AgentPrefabs/{name}`
@@ -256,6 +270,8 @@ All sensors publish via `conn.Publish(topic, msg)` on a discrete timer. All actu
 **Coordinate convention:** All data crossing TCP uses ROS standard (x=forward, y=left, z=up). Unity sensors/actuators convert internally via `CoordConversion.cs` (`Assets/TCPConnector/`). Sensors publish `PoseMessage`; actuators subscribe to `TwistMessage` or `PoseMessage`.
 
 Semantic objects implement `SemanticObject` (base class) — raycasts return descriptors from the hit object.
+
+**Smoke corruption (2D lidar):** After computing clean raycast results, `SemanticLidarSensor` checks all active `SmokeObject2D` instances (self-registered static list) for 2D ray-circle intersections on the XZ plane. For each ray, survival probability is accumulated across all intersecting smoke objects: `survivalProb *= (1 - clamp01(density * intersectionLength))`. If the ray is corrupted, a random hit distance is picked within a weighted-random smoke segment, and the descriptor is set to the "smoke" semantic class. Gated by `enableSmokeCorruption` field on the sensor. `SmokeObject2D` uses pure math intersection — no Unity physics colliders.
 
 **Sensor data for UI visualization:** Sensors store their latest readings in public fields (`lastRanges`/`lastDescriptors` on `SemanticLidarSensor`, `lastYawRad` on `CompassSensor`, `lastActivations` on `HeadDirectionCellsSensor`). UI visualizers read these directly — they cannot subscribe to sensor topics since `Subscribe` only handles incoming TCP messages, not Unity-internal publishes.
 

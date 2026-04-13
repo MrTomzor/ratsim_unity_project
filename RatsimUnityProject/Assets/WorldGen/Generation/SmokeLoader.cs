@@ -20,6 +20,8 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
     private float _density;
     private bool _paramsLoaded;
 
+    public bool spawnGlobalSmoke = false;
+
     private readonly Dictionary<SmokeOrigin, GameObject> _spawnedByOrigin = new Dictionary<SmokeOrigin, GameObject>();
 
     protected override void OnEnable()
@@ -40,12 +42,24 @@ public class SmokeLoader : WorldDataProvider, ISmokeProvider
     public override void Generate()
     {
         LoadParams();
+        if (spawnGlobalSmoke)
+        {
+            // instantiate the smoke prefab at origin and scale it up based on the world bounds size
+            GameObject globalSmoke = Instantiate(smoke2dPrefab, Vector3.zero, Quaternion.identity);
+            float worldW = WorldLoadingController.GetParamFloat("world_bounds/width");
+            float worldH = WorldLoadingController.GetParamFloat("world_bounds/height");
+            float worldSize = Mathf.Max(worldW, worldH);
+            globalSmoke.GetComponent<SmokeObject2D>().radius = worldSize * 0.5f;
+            globalSmoke.GetComponent<SmokeObject2D>().density = _density;
+            globalSmoke.name = "GlobalSmoke";
+        }
     }
 
     private void LoadParams()
     {
         _mode2d  = WorldLoadingController.GetParamInt("smoke/2dmode_enabled", default2dModeEnabled) != 0;
         _mode3d  = WorldLoadingController.GetParamInt("smoke/3dmode_enabled", default3dModeEnabled) != 0;
+        spawnGlobalSmoke  = WorldLoadingController.GetParamInt("smoke/global_smoke_enabled", 0) != 0;
         _radius  = WorldLoadingController.GetParamFloat("smoke/default_radius", defaultRadius);
         _density = WorldLoadingController.GetParamFloat("smoke/default_density", defaultDensity);
         _paramsLoaded = true;
