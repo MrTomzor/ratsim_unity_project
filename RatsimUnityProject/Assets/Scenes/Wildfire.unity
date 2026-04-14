@@ -2681,8 +2681,10 @@ MonoBehaviour:
   walkersEnabled: 0
   prefabName: chaotic_walker_abstract
   density: 0.01
-  avoidanceProbability: 0.5
-  avoidanceDistance: 5
+  avoidanceProbability: 1
+  aggressionProbability: 0
+  reactionRadius: 5
+  reactionVelocity: 2
   minVelocity: 0.5
   maxVelocity: 1.5
   walkDurationMinSec: 1
