@@ -139,6 +139,7 @@ Structure-level providers (`WorldStructureProvider`, respond to structure load/u
 - `HouseLoader` (provides `StructureContent`, depends on `StructureEvents`) — configures house interiors/exteriors (doors, cars, roofs, breakable walls, clutter, layout variants) using global params + per-house seeded RNG. Rubble spawned from broken walls gets `PersistentDynamicObject` on each rigidbody child.
 - `RewardObjectLoader` (provides `Rewards`, depends on `Height`, `StructureEvents`) — spawns reward objects via two parallel modes: uniform (per-chunk density) and structure-based (at `rewardSpawnPositions` in allowed structure types).
 - `DynamicObjectLoader` (provides `DynamicObjects`, depends on `StructureContent`) — singleton that manages persistent dynamic objects (rubble, physics props). Tracks all `PersistentDynamicObject` instances and per-structure spawn steps. On chunk load/unload, enables/disables objects based on their current world position and `requiredLod`. On episode clear, destroys all tracked objects.
+- `ChaoticWalkersLoader` (provides `DynamicObjects`, depends on `Height`, `StructureContent`) — spawns capsule NPC "walkers" at uniform density across each loaded chunk. Walkers are NOT persistent: they are destroyed when their spawn chunk unloads and deterministically respawned when it reloads (seed derived from chunk coords). Each walker has a fixed per-lifetime speed, a reaction mode (`Default` / `Avoidant` / `Aggressive` — avoidant flees the agent within `reaction_radius`, aggressive chases), and an optional spawn-centered bound radius with inward-biased direction sampling. See `ChaoticWalker.cs` for the per-instance state machine.
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
 
@@ -251,6 +252,19 @@ Lighting (no deps, runs early)
 - `smoke/3dmode_enabled`: 0 or 1 (default 0) — spawn particle-based smoke for RGB (stub, future)
 - `smoke/default_radius`: radius of each smoke circle in world units (default 10)
 - `smoke/default_density`: probability of a random lidar hit per meter of ray travel through smoke (default 0.1)
+- `chaotic_walkers/enabled`: 0 or 1 (default 0) — enable capsule NPC walkers
+- `chaotic_walkers/prefab_name`: prefab in `Resources/WorldGen/WalkerPrefabs/` (default `"walker_capsule"`)
+- `chaotic_walkers/density`: walkers per unit² (default 0)
+- `chaotic_walkers/avoidance_probability`: weight for "avoidant" mode (default 0.5)
+- `chaotic_walkers/aggression_probability`: weight for "aggressive" mode (default 0). Remainder after avoidance+aggression is "default" (dumb wandering); if the two weights sum above 1 they are renormalised.
+- `chaotic_walkers/reaction_radius`: radius at which avoidant walkers flee and aggressive walkers chase the agent (default 5)
+- `chaotic_walkers/reaction_velocity`: m/s used while fleeing/chasing; overrides the walker's wander speed during reactions (default 2)
+- `chaotic_walkers/min_velocity`, `chaotic_walkers/max_velocity`: m/s range; each walker gets one value fixed at spawn (default 0.5 / 1.5)
+- `chaotic_walkers/walk_duration_min_sec`, `chaotic_walkers/walk_duration_max_sec`: per-leg walk duration range (default 1.0 / 3.0)
+- `chaotic_walkers/pause_duration_min_sec`, `chaotic_walkers/pause_duration_max_sec`: per-leg pause duration range (default 0.5 / 2.0)
+- `chaotic_walkers/bounded`: 0 or 1 (default 0) — confine walker to a circle around its spawn point
+- `chaotic_walkers/bound_radius`: radius of the confinement disk (default 15)
+- `chaotic_walkers/inward_bias_strength`: weight of the inward pull when sampling directions near the bound edge (default 2)
 
 **Agent config params** (sent on `/sim_control/agent_config`, read by `AgentLoader`):
 - `prefab_name` — prefab loaded from `Resources/AgentPrefabs/{name}`

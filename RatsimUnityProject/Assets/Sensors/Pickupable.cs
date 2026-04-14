@@ -17,6 +17,12 @@ public class Pickupable : MonoBehaviour
             Debug.LogError("Pickupable is already depleted, but collided with " + collision.gameObject.name);
             return;
         }
+        // check if collider has collector
+        if(collision.gameObject.GetComponent<PickupableCollector>() == null)
+        {
+            return;
+        }
+
         depleted = true;
         Debug.Log("Pickupable collided with " + collision.gameObject.name);
         RoslikeTCPServer conn = RoslikeTCPServer.GetInstance();

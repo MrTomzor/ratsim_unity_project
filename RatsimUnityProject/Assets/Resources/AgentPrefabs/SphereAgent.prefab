@@ -110,6 +110,7 @@ GameObject:
   - component: {fileID: 7141073898579080693}
   - component: {fileID: 5127488391532725983}
   - component: {fileID: -8653734782038556784}
+  - component: {fileID: -3201670612083729221}
   m_Layer: 7
   m_Name: SphereAgent
   m_TagString: Untagged
@@ -182,6 +183,9 @@ MonoBehaviour:
   accelModeLinearDrag: 0.3
   accelModeAngularDrag: 0.3
   verbose: 1
+  steeringBias: 0
+  blockLeftTurn: 0
+  blockRightTurn: 0
   humanControlTopic: /enable_human_control
   humanControlEnabled: 0
   humanControlMode: 0
@@ -209,6 +213,8 @@ MonoBehaviour:
   numRays: 0
   verbose: 0
   enableSmokeCorruption: 1
+  occlusionRegion: none
+  occlusionDistance: 0.1
 --- !u!135 &3783130376408787828
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -351,6 +357,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topicName: /compass
+  biasRad: 0
   lastYawRad: 0
 --- !u!114 &7141073898579080693
 MonoBehaviour:
@@ -399,6 +406,18 @@ MonoBehaviour:
   hitColor: {r: 1, g: 0, b: 0, a: 1}
   missColor: {r: 1, g: 0, b: 0, a: 1}
   toggleKey: 104
+--- !u!114 &-3201670612083729221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49682224123d69e71aefc3d6e2433144, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0
