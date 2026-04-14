@@ -233,6 +233,11 @@ Lighting (no deps, runs early)
 - `reward_objects/allowed_structures`: comma list of structure types for structure-based spawning (default `""` = disabled)
 - `reward_objects/{type}/spawn_probability`: 0.0–1.0 per spawn position within a structure (default 1)
 - `reward_objects/{type}/skip_probability`: 0.0–1.0 chance to skip an entire structure (default 0)
+- `reward_objects/signal_source/enable_probability`: 0.0–1.0 chance each spawned reward gets an enabled `SignalSource` (default 0 = off)
+- `reward_objects/signal_source/channel`: channel name for attached sources (default `"reward"`)
+- `reward_objects/signal_source/strength`: peak signal value at distance 0 (default 1)
+- `reward_objects/signal_source/range`: distance at which the signal decays to ~0 (default 20)
+- `reward_objects/signal_source/falloff`: `"linear"` or `"exponential"` (default `"linear"`)
 - `tree_generation/density`
 - `height_generation/mode` (`superflat` or `perlin`)
 - `meta_height_generation/mode`: `"disabled"` (default) or `"valley"` (terrain rises towards world edges)
@@ -269,7 +274,11 @@ Lighting (no deps, runs early)
 **Agent config params** (sent on `/sim_control/agent_config`, read by `AgentLoader`):
 - `prefab_name` — prefab loaded from `Resources/AgentPrefabs/{name}`
 - `name_prefix` — agent GameObject name
-- `sensors` — comma-separated sensor names: `lidar2d`, `rgbd`, `odom`, `collision`, `relative_pose`, `absolute_pose`, `compass`, `head_direction_cells`
+- `sensors` — comma-separated sensor names: `lidar2d`, `rgbd`, `odom`, `collision`, `relative_pose`, `absolute_pose`, `compass`, `head_direction_cells`, `sector_signal`
+- `sector_signal/channels` — comma-separated channel names the sensor listens on (e.g. `"food,predator"`)
+- `sector_signal/nSectors` — number of egocentric angular bins (default 8)
+- `sector_signal/sigmaBins` — gaussian σ across sectors, in bin widths (default 1.0)
+- `sector_signal/topicPrefix` — topic prefix; each channel publishes on `<prefix>/<channel>` (default `/sector_signal`)
 - `actuators` — actuator mode (e.g. `velocity`)
 - `{sensor_name}/{field}` — override a public field on a sensor component (e.g. `lidar2d/maxRange`)
 
@@ -277,7 +286,9 @@ Lighting (no deps, runs early)
 
 All sensors publish via `conn.Publish(topic, msg)` on a discrete timer. All actuators subscribe via `conn.Subscribe<T>(topic, callback)`.
 
-**Sensors** (`Assets/Sensors/`): `SemanticLidarSensor`, `RGBDSensor`, `AbsolutePose2DSensor`, `Odom2DSensor`, `RelativePoseSensor`, `CollisionSensor`, `VirtualVisualTrackerSensor`, `CompassSensor`, `HeadDirectionCellsSensor`
+**Sensors** (`Assets/Sensors/`): `SemanticLidarSensor`, `RGBDSensor`, `AbsolutePose2DSensor`, `Odom2DSensor`, `RelativePoseSensor`, `CollisionSensor`, `VirtualVisualTrackerSensor`, `CompassSensor`, `HeadDirectionCellsSensor`, `SectorSignalSensor`
+
+**`SectorSignalSensor`** reads from the global `SignalSource` registry (`Assets/WorldGen/Data/SignalSource.cs`). Each source broadcasts a scalar on a named channel with linear or exponential distance falloff and a range cutoff; sources self-register on OnEnable. The sensor bins active sources into egocentric forward-centered sectors per channel (gaussian falloff across neighbors, σ in bin widths), max-aggregates per (channel, sector), clamps to [0,1], and publishes a `FloatArrayMessage` per channel on `<topic_prefix>/<channel>` (default prefix `/sector_signal`). No occlusion — sources contribute within their range regardless of walls. Loaders attach/remove/configure `SignalSource` conditionally (e.g. `RewardObjectLoader` exposes `reward_objects/signal_source/*` to turn a random fraction of spawned rewards into sources).
 
 **Actuators** (`Assets/Actuators/`): `Twist2DActuator` (subscribes to `TwistMessage` for velocity/acceleration control), `PoseTeleportActuator` (subscribes to `PoseMessage`)
 

@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 1526308842664186955}
   - component: {fileID: 8110354932568913844}
   - component: {fileID: 1265710530312027631}
+  - component: {fileID: 3997231141111657784}
   m_Layer: 0
   m_Name: reward_obj1
   m_TagString: reward
@@ -124,6 +125,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   topicName: /reward_pickup
   publishedNumber: 1
+  depleted: 0
 --- !u!114 &1265710530312027631
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -137,3 +139,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   semanticName: reward_pickup
+--- !u!114 &3997231141111657784
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7644313187523702680}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e31d4741acfc4d76484790dcf52f0c2b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  channel: reward
+  strength: 1
+  range: 30
+  falloff: 0

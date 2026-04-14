@@ -24,6 +24,12 @@ using System.Collections.Generic;
 ///   allowed_structures                   -- comma list of structure types for structure mode (default ""; empty = disabled)
 ///   {structure_type}/spawn_probability   -- 0.0-1.0 per spawn position (default 1)
 ///   {structure_type}/skip_probability    -- 0.0-1.0 chance to skip the entire structure (default 0)
+///   signal_source/enable_probability     -- 0.0-1.0 chance a spawned reward gets an enabled
+///                                           SignalSource component (default 0 = never)
+///   signal_source/channel                -- channel name for attached sources (default "reward")
+///   signal_source/strength               -- peak signal strength (default 1)
+///   signal_source/range                  -- signal range in world units (default 20)
+///   signal_source/falloff                -- "linear" or "exponential" (default "linear")
 /// </summary>
 public class RewardObjectLoader : WorldStructureProvider {
 
@@ -52,6 +58,13 @@ public class RewardObjectLoader : WorldStructureProvider {
 
     [Header("Structure Mode")]
     public string allowedStructures = "";
+
+    [Header("Signal Source")]
+    public float signalEnableProbability = 0f;
+    public string signalChannel = "reward";
+    public float signalStrength = 1f;
+    public float signalRange = 20f;
+    public string signalFalloff = "linear";
 
     // ─────────────────────────────────────────────
     //  Runtime state
@@ -124,6 +137,13 @@ public class RewardObjectLoader : WorldStructureProvider {
             _boundaryMinZ = -worldH * 0.5f;
             _boundaryMaxZ =  worldH * 0.5f;
         }
+
+        // Signal source overrides
+        signalEnableProbability = WorldLoadingController.GetParamFloat("reward_objects/signal_source/enable_probability", signalEnableProbability);
+        signalChannel            = WorldLoadingController.GetParamString("reward_objects/signal_source/channel", signalChannel);
+        signalStrength           = WorldLoadingController.GetParamFloat("reward_objects/signal_source/strength", signalStrength);
+        signalRange              = WorldLoadingController.GetParamFloat("reward_objects/signal_source/range", signalRange);
+        signalFalloff            = WorldLoadingController.GetParamString("reward_objects/signal_source/falloff", signalFalloff);
 
         // Structure entries
         _structureEntries.Clear();
@@ -300,8 +320,9 @@ public class RewardObjectLoader : WorldStructureProvider {
                     continue;
             }
 
-            Instantiate(_rewardPrefab, new Vector3(x, y, z),
+            GameObject go = Instantiate(_rewardPrefab, new Vector3(x, y, z),
                 rot, chunkObj.transform);
+            MaybeAttachSignalSource(go, rng);
             placed++;
         }
 
@@ -349,7 +370,8 @@ public class RewardObjectLoader : WorldStructureProvider {
         int placed = 0;
         foreach (Transform spawnPoint in group) {
             if ((float)rng.NextDouble() > entry.Value.spawnProbability) continue;
-            Instantiate(_rewardPrefab, spawnPoint.position, spawnPoint.rotation, container.transform);
+            GameObject go = Instantiate(_rewardPrefab, spawnPoint.position, spawnPoint.rotation, container.transform);
+            MaybeAttachSignalSource(go, rng);
             placed++;
         }
 
@@ -400,6 +422,27 @@ public class RewardObjectLoader : WorldStructureProvider {
             ^ (Mathf.RoundToInt(center.x * 100f) * 1000003)
             ^ (Mathf.RoundToInt(center.y * 100f) * 999983);
         return new System.Random(seed);
+    }
+
+    /// <summary>
+    /// With probability <see cref="signalEnableProbability"/>, attach an enabled
+    /// <see cref="SignalSource"/> to the spawned reward GameObject using the current
+    /// signal_source/* params. Skipped if probability is 0.
+    /// </summary>
+    private void MaybeAttachSignalSource(GameObject go, System.Random rng) {
+        if (signalEnableProbability <= 0f) return;
+        if ((float)rng.NextDouble() >= signalEnableProbability) return;
+
+        SignalSource src = go.GetComponent<SignalSource>();
+        if (src == null) src = go.AddComponent<SignalSource>();
+
+        src.channel  = signalChannel;
+        src.strength = signalStrength;
+        src.range    = signalRange;
+        src.falloff  = signalFalloff.Equals("exponential", System.StringComparison.OrdinalIgnoreCase)
+            ? SignalSource.FalloffMode.Exponential
+            : SignalSource.FalloffMode.Linear;
+        src.enabled  = true;
     }
 
     private static void DestroyContainer(WorldStructure s) {

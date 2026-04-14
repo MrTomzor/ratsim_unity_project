@@ -13,6 +13,7 @@ public class SensorVisualizationManager : MonoBehaviour
     public Lidar2DVisualizer lidar2DVisualizer;
     public CompassVisualizer compassVisualizer;
     public HeadDirectionCellsVisualizer headDirectionCellsVisualizer;
+    public SectorSignalVisualizer sectorSignalVisualizer;
     public GameObject cameraBlocker;
     public GameObject scoreVisualizer;
 
@@ -32,6 +33,7 @@ public class SensorVisualizationManager : MonoBehaviour
             { "lidar2d", SetupLidar2D },
             { "compass", SetupCompass },
             { "head_direction_cells", SetupHeadDirectionCells },
+            { "sector_signal", SetupSectorSignal },
         };
 
         SetAllVisualizersActive(false);
@@ -102,6 +104,7 @@ public class SensorVisualizationManager : MonoBehaviour
             case "lidar2d": return agent.GetComponentInChildren<SemanticLidarSensor>(true);
             case "compass": return agent.GetComponentInChildren<CompassSensor>(true);
             case "head_direction_cells": return agent.GetComponentInChildren<HeadDirectionCellsSensor>(true);
+            case "sector_signal": return agent.GetComponentInChildren<SectorSignalSensor>(true);
             default: return null;
         }
     }
@@ -130,12 +133,21 @@ public class SensorVisualizationManager : MonoBehaviour
         headDirectionCellsVisualizer.Initialize(sensor);
     }
 
+    void SetupSectorSignal(GameObject agent)
+    {
+        if (sectorSignalVisualizer == null) return;
+        var sensor = agent.GetComponentInChildren<SectorSignalSensor>(true);
+        sectorSignalVisualizer.gameObject.SetActive(true);
+        sectorSignalVisualizer.Initialize(sensor);
+    }
+
     void SetAllVisualizersActive(bool active)
     {
         Debug.Log($"SensorVisualizationManager: setting all visualizers active={active}");
         if (lidar2DVisualizer != null) lidar2DVisualizer.gameObject.SetActive(active);
         if (compassVisualizer != null) compassVisualizer.gameObject.SetActive(active);
         if (headDirectionCellsVisualizer != null) headDirectionCellsVisualizer.gameObject.SetActive(active);
+        if (sectorSignalVisualizer != null) sectorSignalVisualizer.gameObject.SetActive(active);
         cameraBlocker.SetActive(active);
         scoreVisualizer.SetActive(active);
     }

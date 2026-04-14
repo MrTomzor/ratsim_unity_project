@@ -111,6 +111,7 @@ GameObject:
   - component: {fileID: 5127488391532725983}
   - component: {fileID: -8653734782038556784}
   - component: {fileID: -3201670612083729221}
+  - component: {fileID: 8636935748284226829}
   m_Layer: 7
   m_Name: SphereAgent
   m_TagString: Untagged
@@ -418,6 +419,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49682224123d69e71aefc3d6e2433144, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &8636935748284226829
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28f2692f25fb66d7a9651339009039b0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  channels: default
+  nSectors: 5
+  sigmaBins: 1
+  topicPrefix: /sector_signal
+  channelNames: []
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0
