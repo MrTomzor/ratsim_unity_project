@@ -17,6 +17,15 @@ public class Twist2DActuator : MonoBehaviour
     public float accelModeAngularDrag = 0.2f;
     public bool verbose = false;
 
+    // --- Faults ---
+    // Added to the commanded angular velocity (ROS frame: +z = CCW = left turn)
+    // whenever |linear_x| > 0. Units: rad/s.
+    [Header("Faults")]
+    public float steeringBias = 0f;
+    // If true, clamps away commanded turns in that direction (ROS frame: +angular_z = left).
+    public bool blockLeftTurn = false;
+    public bool blockRightTurn = false;
+
     // --- Human control ---
     [Header("Human Control")]
     public string humanControlTopic = "/enable_human_control";
@@ -70,11 +79,20 @@ public class Twist2DActuator : MonoBehaviour
 
     // --- Shared physics application ---
 
+    private float ApplyAngularFaults(float angularZ, float linearX)
+    {
+        if (Mathf.Abs(linearX) > 1e-6f) angularZ += steeringBias;
+        if (blockLeftTurn && angularZ > 0f) angularZ = 0f;
+        if (blockRightTurn && angularZ < 0f) angularZ = 0f;
+        return angularZ;
+    }
+
     private void ApplyVelocity(TwistMessage msg)
     {
+        float angularZ = ApplyAngularFaults(msg.angular_z, msg.linear_x);
         Vector3 forward = transform.forward * msg.linear_x;
         Vector3 left = -transform.right * msg.linear_y;
-        Vector3 rotationRad = new Vector3(0, -msg.angular_z, 0);
+        Vector3 rotationRad = new Vector3(0, -angularZ, 0);
 
         var rb = GetComponent<Rigidbody>();
         rb.linearVelocity = forward + left;
@@ -83,9 +101,10 @@ public class Twist2DActuator : MonoBehaviour
 
     private void ApplyAcceleration(TwistMessage msg)
     {
+        float angularZ = ApplyAngularFaults(msg.angular_z, msg.linear_x);
         Vector3 forward = transform.forward * msg.linear_x;
         Vector3 left = -transform.right * msg.linear_y;
-        Vector3 rotationRad = new Vector3(0, -msg.angular_z, 0);
+        Vector3 rotationRad = new Vector3(0, -angularZ, 0);
 
         var rb = GetComponent<Rigidbody>();
 

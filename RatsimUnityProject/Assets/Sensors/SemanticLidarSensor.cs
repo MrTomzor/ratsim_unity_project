@@ -31,6 +31,15 @@ public class SemanticLidarSensor : MonoBehaviour
     public bool verbose = false;
     public bool enableSmokeCorruption = true;
 
+    // --- Faults ---
+    // Simulates an object stuck to the sensor: the selected third of the FOV
+    // (by ray index, so "left" is the first third, "front" the middle, "right" the last)
+    // reports a fixed distance with a zero / "default" descriptor.
+    // Valid values: "none", "left", "front", "right".
+    [Header("Faults")]
+    public string occlusionRegion = "none";
+    public float occlusionDistance = 0.1f;
+
     public static float[] GetNamedSemanticObjectDescriptor(string semanticName)
     {
         // One hot encoding based on the semantic name
@@ -126,6 +135,27 @@ public class SemanticLidarSensor : MonoBehaviour
         }
 
         return res;
+    }
+
+    private void ApplyOcclusionFault(List<Tuple<float, float[]>> sensed)
+    {
+        if (string.IsNullOrEmpty(occlusionRegion) || occlusionRegion == "none") return;
+
+        int third = numRays / 3;
+        int startIdx, endIdx;
+        switch (occlusionRegion.ToLowerInvariant())
+        {
+            case "left":  startIdx = 0;           endIdx = third;          break;
+            case "front": startIdx = third;       endIdx = 2 * third;      break;
+            case "right": startIdx = 2 * third;   endIdx = numRays;        break;
+            default:
+                Debug.LogWarning($"SemanticLidarSensor: unknown occlusionRegion '{occlusionRegion}'");
+                return;
+        }
+
+        float[] defaultDescriptor = new float[descriptorDimension];
+        for (int i = startIdx; i < endIdx; i++)
+            sensed[i] = new Tuple<float, float[]>(occlusionDistance, defaultDescriptor);
     }
 
     public void SenseAndPublish(TimerEvent ev)
@@ -324,6 +354,9 @@ public class SemanticLidarSensor : MonoBehaviour
                 }
             }
         }
+
+        // ── Occlusion fault (object stuck to sensor) ──
+        ApplyOcclusionFault(sensed);
 
         for (int i = 0; i < numRays; i++)
         {

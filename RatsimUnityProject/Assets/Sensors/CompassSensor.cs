@@ -4,6 +4,9 @@ public class CompassSensor : MonoBehaviour
 {
     public string topicName = "/compass";
 
+    // Static additive bias in radians (ROS frame). Simulates a mis-calibrated compass.
+    public float biasRad = 0f;
+
     /// <summary>Latest heading in radians [-pi, pi], ROS frame. Read by visualizer.</summary>
     [HideInInspector] public float lastYawRad;
 
@@ -18,7 +21,7 @@ public class CompassSensor : MonoBehaviour
     public void SenseAndPublish(TimerEvent ev)
     {
         float eulerYDeg = transform.rotation.eulerAngles.y;
-        float yawRad = -eulerYDeg * Mathf.Deg2Rad;
+        float yawRad = -eulerYDeg * Mathf.Deg2Rad + biasRad;
 
         while (yawRad > Mathf.PI) yawRad -= 2f * Mathf.PI;
         while (yawRad < -Mathf.PI) yawRad += 2f * Mathf.PI;
