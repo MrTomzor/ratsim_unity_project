@@ -54,6 +54,7 @@ public class HouseLoader : WorldStructureProvider {
     [Range(0f, 1f)]
     public float chanceWallBroken = 0f;
     public string rubblePrefabName = "";
+    public float rubbleMass = 0.2f;
 
     [Header("Clutter")]
     [Range(0f, 1f)]
@@ -133,6 +134,7 @@ public class HouseLoader : WorldStructureProvider {
 
         // Rubble
         rubblePrefabName = WorldLoadingController.GetParamString("house/rubble_prefab", rubblePrefabName);
+        rubbleMass = WorldLoadingController.GetParamFloat("house/rubble_mass", rubbleMass);
         _rubblePrefab = string.IsNullOrEmpty(rubblePrefabName)
             ? null
             : Resources.Load<GameObject>(PrefabFolder + rubblePrefabName);
@@ -263,12 +265,21 @@ public class HouseLoader : WorldStructureProvider {
             broken++;
 
             if (_rubblePrefab != null) {
-                GameObject rubble = Instantiate(_rubblePrefab, wall.position, wall.rotation, container);
-                // Add persistence to each rubble child so it survives structure unload/reload.
-                // The component reparents itself out of the container on Awake.
-                foreach (Transform child in rubble.transform)
-                    if (child.GetComponent<Rigidbody>() != null && child.GetComponent<PersistentDynamicObject>() == null)
-                        child.gameObject.AddComponent<PersistentDynamicObject>();
+                // Instantiate into an inactive scratch root so PersistentDynamicObject.Awake
+                // doesn't fire (and reparent children out) before we can configure them.
+                GameObject scratch = new GameObject("_rubbleScratch");
+                scratch.SetActive(false);
+                GameObject rubble = Instantiate(_rubblePrefab, scratch.transform);
+                rubble.transform.SetPositionAndRotation(wall.position, wall.rotation);
+
+                foreach (Rigidbody rb in rubble.GetComponentsInChildren<Rigidbody>(true)) {
+                    rb.mass = rubbleMass;
+                    if (rb.GetComponent<PersistentDynamicObject>() == null)
+                        rb.gameObject.AddComponent<PersistentDynamicObject>();
+                }
+
+                rubble.transform.SetParent(container, worldPositionStays: true);
+                Destroy(scratch);
             }
         }
         if (verbose) Debug.Log($"  walls: {group.childCount} breakable, {broken} broken" +

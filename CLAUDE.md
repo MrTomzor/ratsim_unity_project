@@ -225,6 +225,7 @@ Lighting (no deps, runs early)
 - `house/enable_roofs`: 0 or 1 (default 1)
 - `house/chance_wall_broken`: 0.0–1.0 per breakable wall (default 0)
 - `house/rubble_prefab`: prefab name for wall rubble replacement
+- `house/rubble_mass`: mass applied to every Rigidbody in a spawned rubble prefab (default 0.2)
 - `house/clutter_density`: 0.0–1.0, fraction of clutter objects enabled (default 1)
 - `house/allowed_car_prefabs`: comma list of car prefab names in `Resources/WorldGen/HouseModulePrefabs/`
 - `house/car_spawn_chance`: 0.0–1.0 per car spawn position (default 0)

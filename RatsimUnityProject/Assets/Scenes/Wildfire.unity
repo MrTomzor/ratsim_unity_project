@@ -780,6 +780,7 @@ MonoBehaviour:
   enableRoofs: 0
   chanceWallBroken: 0
   rubblePrefabName: 
+  rubbleMass: 0.2
   clutterDensity: 0.5
 --- !u!4 &351336020
 Transform:
@@ -1511,6 +1512,7 @@ MonoBehaviour:
   lidar2DVisualizer: {fileID: 790964576}
   compassVisualizer: {fileID: 322358336}
   headDirectionCellsVisualizer: {fileID: 1405812298}
+  sectorSignalVisualizer: {fileID: 999517736}
   cameraBlocker: {fileID: 820140837}
   scoreVisualizer: {fileID: 1731951418}
   humanControlTopic: /enable_human_control
@@ -1595,6 +1597,7 @@ RectTransform:
   - {fileID: 322358337}
   - {fileID: 1405812299}
   - {fileID: 1731951419}
+  - {fileID: 999517737}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1755,6 +1758,63 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &999517735
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 999517737}
+  - component: {fileID: 999517736}
+  m_Layer: 5
+  m_Name: SectorSignal
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &999517736
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 999517735}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fcdda3845b76ee004b066791311be3a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  outerRadius: 80
+  innerRadius: 25
+  ringSpacing: 4
+  lowColor: {r: 0.2, g: 0.4, b: 0.8, a: 0.1}
+  highColors:
+  - {r: 1, g: 0.3, b: 0.3, a: 1}
+  - {r: 0.3, g: 1, b: 0.3, a: 1}
+  - {r: 0.3, g: 0.6, b: 1, a: 1}
+  - {r: 1, g: 0.9, b: 0.2, a: 1}
+--- !u!224 &999517737
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 999517735}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 945644411}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 1, y: 0}
+  m_AnchorMax: {x: 1, y: 0}
+  m_AnchoredPosition: {x: -284, y: 154}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1289060171
 GameObject:
   m_ObjectHideFlags: 0
@@ -2174,9 +2234,9 @@ RectTransform:
   - {fileID: 1733726348}
   m_Father: {fileID: 945644411}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -311.18964, y: -107.06697}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 152, y: 190.93303}
   m_SizeDelta: {x: 287.6207, y: 147.8661}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1731951420
@@ -2759,6 +2819,11 @@ MonoBehaviour:
   uniformDensity: 0
   boundaryBuffer: 5
   allowedStructures: 
+  signalEnableProbability: 1
+  signalChannel: reward
+  signalStrength: 1
+  signalRange: 20
+  signalFalloff: linear
 --- !u!1001 &5560483459733379799
 PrefabInstance:
   m_ObjectHideFlags: 0
