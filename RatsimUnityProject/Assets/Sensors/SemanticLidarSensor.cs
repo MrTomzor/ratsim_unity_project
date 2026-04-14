@@ -8,12 +8,16 @@ public class SemanticLidarSensor : MonoBehaviour
 
     public static Hashtable semanticNamesToIndices = null;
     public SemanticSet activeSemanticSet;
+    // Name of a SemanticSet asset in Resources/SemanticSets/. If set and the asset is found,
+    // it overrides `activeSemanticSet` at Start. Allows switching semantic sets via agent config.
+    public string semanticSet = "full_semantic_set";
 
 
     public int angleStartDeg = 45; // Start angle in degrees
     public int angleEndDeg = 45;
     public int angleIncrementDeg = 5;
     public float maxRange = 100f; // Maximum range of the lidar sensor
+
 
     public static uint descriptorDimension = 3;
 
@@ -84,7 +88,22 @@ public class SemanticLidarSensor : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        if(activeSemanticSet != null && semanticNamesToIndices == null)
+        // Resolve semantic set: prefer Resources/SemanticSets/{semanticSet} if set, else Inspector asset.
+        if (!string.IsNullOrEmpty(semanticSet))
+        {
+            SemanticSet loaded = Resources.Load<SemanticSet>("SemanticSets/" + semanticSet);
+            if (loaded != null)
+            {
+                activeSemanticSet = loaded;
+                Debug.Log($"SemanticLidarSensor: loaded semantic set '{semanticSet}' from Resources/SemanticSets/");
+            }
+            else
+            {
+                Debug.LogWarning($"SemanticLidarSensor: Resources/SemanticSets/{semanticSet} not found, falling back to Inspector-assigned set");
+            }
+        }
+
+        if (activeSemanticSet != null)
         {
             Debug.Log("Initializing Semantic Set Data...");
             InitializeSemanticSetData();

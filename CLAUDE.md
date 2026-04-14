@@ -282,6 +282,7 @@ Lighting (no deps, runs early)
 - `sector_signal/topicPrefix` — topic prefix; each channel publishes on `<prefix>/<channel>` (default `/sector_signal`)
 - `actuators` — actuator mode (e.g. `velocity`)
 - `{sensor_name}/{field}` — override a public field on a sensor component (e.g. `lidar2d/maxRange`)
+- `lidar2d/semanticSet` — name of a `SemanticSet` asset in `Resources/SemanticSets/` (default `"full_semantic_set"`). Overrides the Inspector-assigned set at Start.
 
 ### Sensors and Actuators
 
