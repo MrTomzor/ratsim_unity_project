@@ -175,7 +175,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f723204076dfa8b46ae18beefb5939cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxLinearVelocity: 5
+  maxLinearVelocity: 10
   maxAngularVelocity: 2.5
   maxLinearAcceleration: 5
   maxAngularAcceleration: 2
@@ -203,6 +203,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   activeSemanticSet: {fileID: 11400000, guid: 129d887123c3c58369f3e0b00618fc5d, type: 2}
+  semanticSet: full_semantic_set
   angleStartDeg: -90
   angleEndDeg: 90
   angleIncrementDeg: 10
@@ -212,8 +213,10 @@ MonoBehaviour:
   lastRanges: []
   lastDescriptors: []
   numRays: 0
-  verbose: 0
+  verbose: 1
   enableSmokeCorruption: 1
+  checkIfInCollider: 1
+  inColliderCheckOffset: 0.02
   occlusionRegion: none
   occlusionDistance: 0.1
 --- !u!135 &3783130376408787828

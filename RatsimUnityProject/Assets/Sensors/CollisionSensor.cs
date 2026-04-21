@@ -34,7 +34,7 @@ public class CollisionSensor : MonoBehaviour
             }
 
             Float32Message msg = new Float32Message();
-            msg.data = internalStep;;
+            msg.data = collisionVel;;
             conn.Publish(outTopic, msg);
             hasCollided = false;
             collisionVel = 0;

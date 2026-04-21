@@ -1086,7 +1086,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   smoke2dPrefab: {fileID: 4033839345860823829, guid: af08466c59ab65257af96fd3a3ed5831, type: 3}
-  default2dModeEnabled: 1
+  default2dModeEnabled: 0
   default3dModeEnabled: 0
   defaultRadius: 10
   defaultDensity: 0.1

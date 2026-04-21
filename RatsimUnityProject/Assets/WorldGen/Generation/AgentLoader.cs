@@ -173,6 +173,23 @@ public class AgentLoader : WorldDataProvider {
         // Set agent reference on controller
         WorldLoadingController.instance.agentObject = agent;
 
+        // Ground-truth absolute pose sensor is ALWAYS enabled, regardless of
+        // the user's `sensors` config. It is intended for debugging and reward
+        // computation (e.g. volumetric exploration tracking) — NOT as an RL
+        // observation input. Topic follows the per-agent convention so that
+        // multi-agent setups stay disambiguated.
+        string gtNamePrefix = string.IsNullOrEmpty(namePrefix) ? "agent" : namePrefix;
+        var gtPoseSensor = agent.GetComponentInChildren<AbsolutePose2DSensor>(true);
+        if (gtPoseSensor != null) {
+            gtPoseSensor.enabled = true;
+            gtPoseSensor.topic = $"/{gtNamePrefix}/gt_pose";
+            Debug.Log($"AgentLoader: ground-truth pose sensor always-on, topic='{gtPoseSensor.topic}'");
+        } else {
+            Debug.LogWarning(
+                "AgentLoader: no AbsolutePose2DSensor on prefab — GT-pose-dependent " +
+                "systems (volumetric exploration, etc.) will be unavailable");
+        }
+
         // Reset relative pose origin if enabled
         if (enabledSensorNames.Contains("relative_pose")) {
             var relPose = agent.GetComponentInChildren<RelativePoseSensor>(true);

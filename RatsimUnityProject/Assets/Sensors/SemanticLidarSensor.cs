@@ -34,6 +34,8 @@ public class SemanticLidarSensor : MonoBehaviour
     RoslikeTCPServer conn;
     public bool verbose = false;
     public bool enableSmokeCorruption = true;
+    public bool checkIfInCollider = true;
+    public float inColliderCheckOffset = 0.02f;
 
     // --- Faults ---
     // Simulates an object stuck to the sensor: the selected third of the FOV
@@ -244,8 +246,71 @@ public class SemanticLidarSensor : MonoBehaviour
 
             }*/
         }
-        
-        var sensed = GetRangesAndDescriptorsByCasting(transform.position, worldDirections, maxRange, debugDrawRays);
+
+        // If enabled, check if sensor is inside collider. If yes, return default-material semantics and OcclusionDistance range for all rays.
+        bool isInCollider = false;
+        var sensed = new List<Tuple<float, float[]>>();
+        if(checkIfInCollider)
+        {
+            // also ignore layer WorldGen
+            int ignoreLayer = LayerMask.NameToLayer("WorldGen");
+            float originalSphereColliderRadius = GetComponentInChildren<SphereCollider>().radius;
+
+            // THIS CODE STILL DETECTS WORLDGEN LAYER!!!!
+            //Collider[] colliders = Physics.OverlapSphere(transform.position, originalSphereColliderRadius - inColliderCheckOffset, ~ignoreLayer, QueryTriggerInteraction.Ignore);
+            
+            // fixed check:
+            Collider[] colliders = Physics.OverlapSphere(transform.position, originalSphereColliderRadius - inColliderCheckOffset, ~ (1 << ignoreLayer), QueryTriggerInteraction.Ignore);
+            
+            if (colliders.Length > 0)
+            {
+                // check also if not overlaping SELF
+                bool onlySelf = true;
+                foreach(var col in colliders)
+                {
+                    if (col.gameObject != this.gameObject)
+                    {
+                        onlySelf = false;
+                        break;
+                    }
+                }
+                if(onlySelf)
+                {
+                    isInCollider = false;
+                }
+                else{
+                    Debug.LogWarning($"SemanticLidarSensor: detected {colliders.Length} colliders overlapping sensor position. Assuming sensor is inside a collider and returning occlusion readings. Colliders: {string.Join(", ", (IEnumerable)colliders)}");
+                    Debug.LogWarning("First collider: " + colliders[0].name + ", tag: " + colliders[0].tag);
+                    // go up the hierarchy of the collider and print all names until you reach the root
+                    Transform t = colliders[0].transform;
+                    while (t != null)
+                    {
+                        Debug.LogWarning("Collider parent: " + t.name);
+                        t = t.parent;
+                    }
+                    // log the collider layer
+                    Debug.LogWarning("Collider layer: " + LayerMask.LayerToName(colliders[0].gameObject.layer));
+                    
+                    float[] defaultDescriptor = new float[descriptorDimension];
+                    for (int i = 0; i < worldDirections.Count; i++)
+                        sensed.Add(new Tuple<float, float[]>(occlusionDistance, defaultDescriptor));
+
+                    if (debugDrawRays)
+                    {
+                        foreach (var dir in worldDirections)
+                        {
+                            Debug.DrawLine(transform.position, transform.position + dir * occlusionDistance, Color.red, 0);
+                        }
+                    }
+
+                    isInCollider = true;
+                }
+            }
+        }
+
+        if(!isInCollider){
+            sensed = GetRangesAndDescriptorsByCasting(transform.position, worldDirections, maxRange, debugDrawRays);
+        }
 
         // ── Smoke corruption ──
         if (enableSmokeCorruption && SmokeObject2D.allActive.Count > 0)
