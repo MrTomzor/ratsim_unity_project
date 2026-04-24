@@ -13,6 +13,7 @@ public class RGBDSensor : MonoBehaviour
     public int imageWidth = 640;
     public int imageHeight = 480;
     public float depthImageMaxRange = 100.0f; // Maximum range for depth sensor
+    public bool captureDepth = true; // If false, skip depth capture/encode and publish RGB only
     RoslikeTCPServer conn;
 
 
@@ -43,61 +44,45 @@ public class RGBDSensor : MonoBehaviour
         // Capture RGB
         Texture2D rgbTex = CaptureCamera(cam);
         string rgbBase64 = Convert.ToBase64String(rgbTex.EncodeToPNG());
-
-        // Capture Depth
-        //Texture2D depthTex = CaptureDepth(cam);
-        Texture2D depthTex = CaptureDepthLinear(cam);
-        //string depthBase64 = Convert.ToBase64String(depthTex.EncodeToPNG());
-        //string depthBase64 = Convert.ToBase64String(depthTex.EncodeToEXR(Texture2D.EXRFlags.OutputAsFloat));
-
-
-        float[] depthValues = GetFloatValuesFromTexture(depthTex);
-
-        // Compute min/max
-        float minDepth = float.MaxValue;
-        float maxDepth = float.MinValue;
-        if(maxDepth > depthImageMaxRange){
-            maxDepth = depthImageMaxRange; // Clamp to max range
-        }
-
-
-        foreach (float d in depthValues)
-        {
-            if (d > 0.0001f) // avoid zero or garbage values
-            {
-                if (d < minDepth) minDepth = d;
-                if (d > maxDepth) maxDepth = d;
-            }
-        }
-
-        Debug.Log("Min depth: " + minDepth + ", Max depth: " + maxDepth);
-        // TODO normalize depth values to send as PNG
-        // Create a normalized depth texture
-        Texture2D depthTexNormalized = CreateNormalizedDepthPNG(depthValues, minDepth, maxDepth);
-        string depthBase64 = Convert.ToBase64String(depthTexNormalized.EncodeToPNG());
-
-        float[] depthValuesNormalized = GetFloatValuesFromTexture(depthTexNormalized);
-
-        // Compute min/max
-        float minDepthNormalized = float.MaxValue;
-        float maxDepthNormalized = float.MinValue;
-
-        foreach (float d in depthValuesNormalized)
-        {
-            if (d > 0.0001f) // avoid zero or garbage values
-            {
-                if (d < minDepthNormalized) minDepthNormalized = d;
-                if (d > maxDepthNormalized) maxDepthNormalized = d;
-            }
-        }
-        Debug.Log("Normalized Min depth: " + minDepthNormalized + ", Max depth: " + maxDepthNormalized);
-
-        // Clean up
         UnityEngine.Object.Destroy(rgbTex);
-        UnityEngine.Object.Destroy(depthTex);
-        UnityEngine.Object.Destroy(depthTexNormalized);
 
-        // Create and return message
+        string depthBase64 = "";
+        float minDepth = 0f;
+        float maxDepth = 0f;
+
+        if (captureDepth)
+        {
+            // Capture Depth
+            Texture2D depthTex = CaptureDepthLinear(cam);
+            float[] depthValues = GetFloatValuesFromTexture(depthTex);
+
+            // Compute min/max
+            minDepth = float.MaxValue;
+            maxDepth = float.MinValue;
+            if(maxDepth > depthImageMaxRange){
+                maxDepth = depthImageMaxRange; // Clamp to max range
+            }
+
+            foreach (float d in depthValues)
+            {
+                if (d > 0.0001f) // avoid zero or garbage values
+                {
+                    if (d < minDepth) minDepth = d;
+                    if (d > maxDepth) maxDepth = d;
+                }
+            }
+
+            Debug.Log("Min depth: " + minDepth + ", Max depth: " + maxDepth);
+            // Create a normalized depth texture
+            Texture2D depthTexNormalized = CreateNormalizedDepthPNG(depthValues, minDepth, maxDepth);
+            depthBase64 = Convert.ToBase64String(depthTexNormalized.EncodeToPNG());
+
+            UnityEngine.Object.Destroy(depthTex);
+            UnityEngine.Object.Destroy(depthTexNormalized);
+        }
+
+        // Create and return message. When captureDepth is false, depthImageBase64
+        // is empty and min/maxDepth are 0 — consumers should treat this as "no depth".
         var msg = new RGBDMessage
         {
             rgbImageBase64 = rgbBase64,
