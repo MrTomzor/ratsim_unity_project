@@ -95,3 +95,15 @@ public interface ISmokeProvider
 {
     System.Collections.Generic.List<SmokeObject2D> GetActiveSmokeObjects();
 }
+
+/// <summary>
+/// Provides room queries for layout modes that expose a distinct "room" concept
+/// (e.g. maze rooms connected by corridors). Implemented by MazeLayoutLoader.
+/// Used by spawners (e.g. RewardObjectLoader) that want to constrain placement
+/// to the interior of rooms, excluding corridors and walls.
+/// </summary>
+public interface IRoomProvider
+{
+    bool IsInRoom(float x, float z);
+    System.Collections.Generic.List<Bounds2D> GetRooms();
+}

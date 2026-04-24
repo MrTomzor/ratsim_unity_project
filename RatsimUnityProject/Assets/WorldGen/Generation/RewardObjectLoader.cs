@@ -21,6 +21,8 @@ using System.Collections.Generic;
 ///   prefab_name                          -- prefab in Resources/WorldGen/RewardObjectPrefabs/ (default "reward_obj1")
 ///   uniform_density                      -- objects per unit^2 for uniform mode (default 0; 0 = disabled)
 ///   boundary_buffer                      -- units inset from world boundary for uniform spawning (default 5)
+///   uniform_constrain_to_rooms           -- 0/1; when 1 and an IRoomProvider is registered, uniform
+///                                            spawns are rejected outside room footprints (default 0)
 ///   allowed_structures                   -- comma list of structure types for structure mode (default ""; empty = disabled)
 ///   {structure_type}/spawn_probability   -- 0.0-1.0 per spawn position (default 1)
 ///   {structure_type}/skip_probability    -- 0.0-1.0 chance to skip the entire structure (default 0)
@@ -55,6 +57,7 @@ public class RewardObjectLoader : WorldStructureProvider {
     [Header("Uniform Mode")]
     public float uniformDensity = 0f;
     public float boundaryBuffer = 5f;
+    public bool uniformConstrainToRooms = false;
 
     [Header("Structure Mode")]
     public string allowedStructures = "";
@@ -125,6 +128,7 @@ public class RewardObjectLoader : WorldStructureProvider {
 
         uniformDensity = WorldLoadingController.GetParamFloat("reward_objects/uniform_density", uniformDensity);
         boundaryBuffer = WorldLoadingController.GetParamFloat("reward_objects/boundary_buffer", boundaryBuffer);
+        uniformConstrainToRooms = WorldLoadingController.GetParamInt("reward_objects/uniform_constrain_to_rooms", uniformConstrainToRooms ? 1 : 0) != 0;
 
         // Read world boundary params
         string boundaryType = WorldLoadingController.GetParamString("world_bounds/boundary_type", "none");
@@ -309,6 +313,14 @@ public class RewardObjectLoader : WorldStructureProvider {
 
             // Skip positions outside the boundary buffer zone
             if (!IsInsideBoundaryBuffer(x, z)) continue;
+
+            // Optional: constrain uniform spawns to rooms when a room provider is available.
+            // Rejection-sampled, so density inside rooms matches `uniformDensity`; outside-room
+            // space just produces skips (effective density drops by room coverage fraction).
+            if (uniformConstrainToRooms
+                    && WorldServices.Has<IRoomProvider>()
+                    && !WorldServices.Get<IRoomProvider>().IsInRoom(x, z))
+                continue;
 
             float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
 

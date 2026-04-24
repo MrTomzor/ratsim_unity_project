@@ -32,8 +32,21 @@ public class CityLoader : WorldStructureProvider {
     public float  gridMargin      = 15f;
     public float  gridRoadWidth   = 6f;
 
+    [Header("House Selection")]
+    // Comma list of house prefab names to use (must exist in Resources/WorldGen/WorldStructurePrefabs/
+    // and start with "house"). Empty = use all discovered "house*" prefabs.
+    public string allowedHousePrefabs = "";
+
     private WorldStructure[]                 _housePrefabs;
     private readonly HashSet<WorldStructure> _processedCities = new HashSet<WorldStructure>();
+
+    private struct WeightedHouse {
+        public WorldStructure prefab;
+        public float          weight;
+    }
+    private readonly List<WeightedHouse> _activeHouseEntries = new List<WeightedHouse>();
+    private float _houseWeightSum;
+    private bool  _paramsLoaded;
 
     private const string HousePrefabPath   = "WorldGen/WorldStructurePrefabs/";
     private const string HousePrefabPrefix = "house";
@@ -59,6 +72,8 @@ public class CityLoader : WorldStructureProvider {
     // The _processedCities guard prevents double-processing via OnWorldStructureLoaded later.
     public override void Generate() {
         if (_housePrefabs.Length == 0) return;
+        if (!_paramsLoaded) LoadParams();
+        if (_activeHouseEntries.Count == 0) return;
         foreach (WorldStructure s in WorldData.GetStructures().ToList()) {
             if (s.structureType != "city") continue;
             if (_processedCities.Contains(s)) continue;
@@ -71,6 +86,8 @@ public class CityLoader : WorldStructureProvider {
         if (s.structureType != "city") return;
         if (_housePrefabs.Length == 0) return;
         if (_processedCities.Contains(s)) return;
+        if (!_paramsLoaded) LoadParams();
+        if (_activeHouseEntries.Count == 0) return;
 
         _processedCities.Add(s);
         GenerateCityHouses(s);
@@ -86,6 +103,65 @@ public class CityLoader : WorldStructureProvider {
     public override void Clear() {
         // Houses are children of city GOs — destroyed when WorldLayoutLoader destroys cities.
         _processedCities.Clear();
+        _activeHouseEntries.Clear();
+        _houseWeightSum = 0f;
+        _paramsLoaded   = false;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Param loading (weighted house selection)
+    // ─────────────────────────────────────────────
+
+    private void LoadParams() {
+        _activeHouseEntries.Clear();
+        _houseWeightSum = 0f;
+
+        string allowed = WorldLoadingController.GetParamString("city/allowed_houses", allowedHousePrefabs);
+
+        IEnumerable<WorldStructure> candidates;
+        if (string.IsNullOrWhiteSpace(allowed)) {
+            candidates = _housePrefabs;
+        } else {
+            List<WorldStructure> list = new List<WorldStructure>();
+            foreach (string raw in allowed.Split(',')) {
+                string name = raw.Trim();
+                if (string.IsNullOrEmpty(name)) continue;
+                WorldStructure prefab = _housePrefabs.FirstOrDefault(p => p.name == name);
+                if (prefab == null) {
+                    Debug.LogWarning($"CityLoader: house prefab '{name}' not found in Resources/{HousePrefabPath} (must start with '{HousePrefabPrefix}')");
+                    continue;
+                }
+                list.Add(prefab);
+            }
+            candidates = list;
+        }
+
+        foreach (WorldStructure prefab in candidates) {
+            float weight = WorldLoadingController.GetParamFloat($"city/{prefab.name}/probability", 1f);
+            if (weight <= 0f) continue;
+            _activeHouseEntries.Add(new WeightedHouse { prefab = prefab, weight = weight });
+            _houseWeightSum += weight;
+        }
+
+        _paramsLoaded = true;
+
+        if (_activeHouseEntries.Count == 0) {
+            Debug.LogWarning("CityLoader: no active house prefabs after applying 'city/allowed_houses' / 'city/*/probability' filters — cities will be empty");
+        } else if (verbose) {
+            Debug.Log($"CityLoader: active house prefabs — " +
+                string.Join(", ", _activeHouseEntries.Select(e => $"{e.prefab.name}(w={e.weight:F2})")) +
+                $" (totalWeight={_houseWeightSum:F2})");
+        }
+    }
+
+    private WorldStructure PickHouse(System.Random rng) {
+        float r   = (float)(rng.NextDouble() * _houseWeightSum);
+        float acc = 0f;
+        for (int i = 0; i < _activeHouseEntries.Count; i++) {
+            acc += _activeHouseEntries[i].weight;
+            if (r <= acc) return _activeHouseEntries[i].prefab;
+        }
+        return _activeHouseEntries[_activeHouseEntries.Count - 1].prefab;
     }
 
     // ─────────────────────────────────────────────
@@ -121,7 +197,7 @@ public class CityLoader : WorldStructureProvider {
         int placed = 0;
 
         for (int attempt = 0; attempt < maxCount * maxTries && placed < maxCount; attempt++) {
-            WorldStructure prefab = _housePrefabs[rng.Next(_housePrefabs.Length)];
+            WorldStructure prefab = PickHouse(rng);
             Vector2        hSize  = GetPrefabSize(prefab);
             if (hSize.sqrMagnitude < 0.01f) continue;
 
@@ -325,7 +401,7 @@ public class CityLoader : WorldStructureProvider {
         float houseRotCCW = cityRotCCW + rotOffset;
 
         while (cursor < lineMax) {
-            WorldStructure prefab = _housePrefabs[rng.Next(_housePrefabs.Length)];
+            WorldStructure prefab = PickHouse(rng);
             Vector2 hSize = GetPrefabSize(prefab);
             if (hSize.sqrMagnitude < 0.01f) continue;
 
@@ -370,7 +446,10 @@ public class CityLoader : WorldStructureProvider {
 
     private float GetSmallestHouseDepth() {
         float minDepth = float.MaxValue;
-        foreach (var prefab in _housePrefabs) {
+        IEnumerable<WorldStructure> source = _activeHouseEntries.Count > 0
+            ? _activeHouseEntries.Select(e => e.prefab)
+            : (IEnumerable<WorldStructure>)_housePrefabs;
+        foreach (var prefab in source) {
             Vector2 size = GetPrefabSize(prefab);
             if (size.sqrMagnitude > 0.01f)
                 minDepth = Mathf.Min(minDepth, Mathf.Min(size.x, size.y));

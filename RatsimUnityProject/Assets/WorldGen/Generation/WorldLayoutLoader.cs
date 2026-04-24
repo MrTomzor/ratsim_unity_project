@@ -22,6 +22,9 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
     
     protected override void OnEnable() {
         base.OnEnable();
+        // Always register at enable so CityLoader etc. find us in default mode even
+        // before an episode has started. Generate() re-registers when this loader
+        // is the active layout provider, overwriting any previously active loader.
         WorldServices.Register<ILayoutProvider>(this);
     }
 
@@ -61,6 +64,16 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
 
     public override void Generate() {
         if (_generated) return;
+        string mode = WorldLoadingController.GetParamString("layout/mode", "default");
+        if (!mode.Equals("default", System.StringComparison.OrdinalIgnoreCase)) {
+            // A different layout provider is active (e.g. MazeLayoutLoader). Stand down so
+            // we don't double-register entry points or compete on structure placement.
+            if (verbose) Debug.Log($"WorldLayoutLoader: layout/mode='{mode}', skipping default layout");
+            return;
+        }
+        // This loader is the active one — make sure ILayoutProvider points here
+        // (prior episodes may have been in maze mode and left it pointing elsewhere).
+        WorldServices.Register<ILayoutProvider>(this);
         _generated = true;
         DoGenerate();
     }
@@ -171,6 +184,7 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
                 );
 
                 Bounds2D candidate = new Bounds2D(center, size, rot);
+                if (!CandidateFitsInWorld(candidate, worldW, worldH, margin)) continue;
                 if (placed.Any(s => candidate.Overlaps(s.GetBoundingBox2D()))) continue;
 
                 /*WorldStructure instance = Instantiate(
@@ -194,6 +208,16 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
         }
 
         return placed;
+    }
+
+    private static bool CandidateFitsInWorld(Bounds2D candidate, float worldW, float worldH, float margin) {
+        float halfW = worldW * 0.5f - margin;
+        float halfH = worldH * 0.5f - margin;
+        foreach (Vector2 v in candidate.GetVertices()) {
+            if (v.x < -halfW || v.x > halfW || v.y < -halfH || v.y > halfH)
+                return false;
+        }
+        return true;
     }
 
     // reads all structure type names that have a max > 0 in config

@@ -121,7 +121,8 @@ Flow: JSON params influence **loaders** → loaders produce **structures with ty
 
 Global providers (run in `Generate()`, dependency-ordered):
 - `WorldHeightLoader` (provides `Height`) — `IHeightProvider`: terrain height via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
-- `WorldLayoutLoader` (provides `Layout`, depends on `Height`) — `ILayoutProvider`: places structures and road network (MST + extra edges). Runs eagerly in `Generate()`.
+- `WorldLayoutLoader` (provides `Layout`, depends on `Height`) — `ILayoutProvider`: places structures and road network (MST + extra edges). Runs eagerly in `Generate()`. No-ops when `layout/mode` ≠ `"default"`.
+- `MazeLayoutLoader` (provides `Layout`, depends on `Height`) — alternate `ILayoutProvider` + `IRoomProvider`. Active when `layout/mode = "maze"`. Generates a 2D binary wall/floor mask by rejection-sampling rectangular rooms and carving L-shaped corridors between them (MST + extras for loops), spawns one `maze_room` WorldStructure per room (empty footprint, queryable), and materializes wall cells as `maze_block` WorldStructures lazily per chunk at LOD0 (one scaled cube per wall cell, destroyed on chunk unload).
 - `WorldBoundaryLoader` (provides `Boundaries`, depends on `Height`, `Layout`) — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
 - `SmokeLoader` (provides `Smoke`) — `ISmokeProvider`: event-driven loader that reacts to `SmokeOrigin` components appearing/disappearing anywhere in the scene. Subscribes to `SmokeOrigin.OnOriginEnabled`/`OnOriginDisabled` static events. For each origin, spawns smoke objects (2D mode: `SmokeObject2D` + `NamedSemanticObject`; 3D mode: stub for future particles). Supports both modes simultaneously. Smoke objects are parented to the origin and auto-destroyed when it is.
 - `LightingAndFogLoader` (provides `Lighting`) — applies lighting/fog settings each episode, optionally advances time-of-day.
@@ -142,6 +143,8 @@ Structure-level providers (`WorldStructureProvider`, respond to structure load/u
 - `ChaoticWalkersLoader` (provides `DynamicObjects`, depends on `Height`, `StructureContent`) — spawns capsule NPC "walkers" at uniform density across each loaded chunk. Walkers are NOT persistent: they are destroyed when their spawn chunk unloads and deterministically respawned when it reloads (seed derived from chunk coords). Each walker has a fixed per-lifetime speed, a reaction mode (`Default` / `Avoidant` / `Aggressive` — avoidant flees the agent within `reaction_radius`, aggressive chases), and an optional spawn-centered bound radius with inward-biased direction sampling. See `ChaoticWalker.cs` for the per-instance state machine.
 
 **Structure prefabs** live in `Resources/WorldGen/WorldStructurePrefabs/`. Named `{type}`. Each prefab has the `WorldStructure` component and children named `LOD0`, `LOD1`, etc. for each detail level. `SimpleStructureLoader` enables/disables these children based on the requested LOD. Current types: `city`, `village`, `farm`, `orchard`, `road`, `house_basic`.
+
+`maze_block` and `maze_room` are constructed at runtime by `MazeLayoutLoader` (no `.prefab` files) — blocks are scaled unit cubes with a `NamedSemanticObject("maze_wall")` and a single BoxCollider that serves as both physics collider and WorldStructure footprint; rooms have only a disabled footprint BoxCollider (queryable via `IRoomProvider` / `GetBoundingBox2D()` but invisible to physics).
 
 #### Provider Ordering (automatic via dependency graph)
 
@@ -202,8 +205,11 @@ Lighting (no deps, runs early)
 
 **Key world config params:**
 - `seed`, `world_bounds/width`, `world_bounds/height`, `world_bounds/structures_margin`
+- `layout/mode`: `"default"` (WorldLayoutLoader runs, `MazeLayoutLoader` stands down) or `"maze"` (vice versa). Default `"default"`.
 - `layout/structures/types` (comma list), `layout/structures/{type}/min`, `/max`
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
+- `city/allowed_houses`: comma list of house prefab names to use (must exist in `Resources/WorldGen/WorldStructurePrefabs/` and start with `house`). Empty = use all discovered `house*` prefabs.
+- `city/{house_name}/probability`: relative spawn weight for a house prefab (default 1, 0 disables it)
 - `city/layout_mode`: `"random"` (default, scatter) or `"grid"` (US-style street grid)
 - `city/grid_road_spacing`: default target distance between grid lines (default 30); overridden per-axis by `_x`/`_z` variants
 - `city/grid_road_spacing_x`: N-S road separation (block width); defaults to `city/grid_road_spacing`
@@ -231,6 +237,7 @@ Lighting (no deps, runs early)
 - `house/car_spawn_chance`: 0.0–1.0 per car spawn position (default 0)
 - `reward_objects/prefab_name`: reward prefab in `Resources/WorldGen/RewardObjectPrefabs/` (default `"reward_obj1"`)
 - `reward_objects/uniform_density`: objects per unit² for uniform world spawning (default 0 = disabled)
+- `reward_objects/uniform_constrain_to_rooms`: 0 or 1 (default 0) — when 1 and an `IRoomProvider` is registered (e.g. in maze mode), uniform spawns are rejected outside room footprints. Effective density inside rooms remains `uniform_density`; outside-room positions just don't place.
 - `reward_objects/allowed_structures`: comma list of structure types for structure-based spawning (default `""` = disabled)
 - `reward_objects/{type}/spawn_probability`: 0.0–1.0 per spawn position within a structure (default 1)
 - `reward_objects/{type}/skip_probability`: 0.0–1.0 chance to skip an entire structure (default 0)
@@ -258,6 +265,36 @@ Lighting (no deps, runs early)
 - `smoke/3dmode_enabled`: 0 or 1 (default 0) — spawn particle-based smoke for RGB (stub, future)
 - `smoke/default_radius`: radius of each smoke circle in world units (default 10)
 - `smoke/default_density`: probability of a random lidar hit per meter of ray travel through smoke (default 0.1)
+- `maze/mode`: maze generator variant (default `"rooms_and_corridors"`)
+- `maze/cell_size`: world units per mask cell (default 1)
+- `maze/wall_height`: Y scale of each block (default 3)
+- `maze/n_rooms`: target number of rooms (default 8)
+- `maze/room_min_size_cells`, `maze/room_max_size_cells`: room side range in cells (defaults 6 / 12)
+- `maze/room_min_separation_cells`: min gap between room rects, in cells (default 2)
+- `maze/room_max_attempts`: rejection-sampling budget per room (default 200)
+- `maze/corridor_width_cells`: corridor width in cells (default 3)
+- `maze/extra_corridor_fraction`: [0,1]; extras beyond MST as fraction of non-tree room pairs (default 0.3). Higher = more loops.
+- `maze/border_walls`: 0 or 1 (default 1) — keep a 1-cell wall ring at the mask edge
+- `maze/semantic_name`: semantic class name for maze blocks (default `"maze_wall"`)
+- `maze/corridor_structures/types`: comma list of `WorldStructure` prefab names (in `Resources/WorldGen/WorldStructurePrefabs/`) to attempt per corridor segment. Empty = feature off.
+- `maze/corridor_structures/max_per_corridor`: global attempt budget per corridor segment (default 0 = off). An "attempt" picks one random slot and tries each type in list order; the first that fits without overlapping already-placed structures wins.
+- `maze/corridor_structures/{type}/chance`: per-attempt spawn probability for this type (default 1.0). Types are tried in list order, so earlier entries win ties — use this to prioritise.
+- `maze/corridor_structures/{type}/scale_width_with_corridor`: 0 or 1 (default 0) — override the prefab's perpendicular footprint (`sizeOverride.y`) to `corridor_width_cells × cell_size`. Useful for structures meant to fill the passage (e.g. rubble piles that should block the whole corridor).
+- `maze/corridor_structures/{type}/scale_length_with_corridor`: 0 or 1 (default 0) — override the prefab's along-corridor footprint (`sizeOverride.x`) to the segment's full length, centered on the segment. When on, the structure claims the entire segment — no other corridor structure will be placed in the same segment this episode. Good for things like "one long bridge / gate / tunnel" per corridor leg. Pair with `scale_width_with_corridor=1` to make it fill the corridor cross-section.
+- `maze/corridor_structures/{type}/align_with_corridor`: 0 or 1 (default 1) — rotate the structure so its local forward (`sizeOverride.x`) runs along the corridor.
+- `maze/corridor_structures/{type}/randomize_direction`: 0 or 1 (default 0) — 50% chance to flip 180° along the corridor axis (reverses the prefab's "front" but does not change its footprint).
+
+**Example — RockfallV1 rubble piles blocking corridors:**
+Create a `WorldStructure` prefab `RockfallV1` under `Resources/WorldGen/WorldStructurePrefabs/` with footprint size X = desired wall thickness along the corridor and Z = reference width (will be overridden). Then:
+```
+maze/corridor_structures/types = RockfallV1
+maze/corridor_structures/max_per_corridor = 2
+maze/corridor_structures/RockfallV1/chance = 0.4
+maze/corridor_structures/RockfallV1/scale_width_with_corridor = 1
+maze/corridor_structures/RockfallV1/align_with_corridor = 1
+maze/corridor_structures/RockfallV1/randomize_direction = 1
+```
+The prefab's LOD0 child (or a custom runtime behaviour on it) is responsible for actually spawning rubble on load — `MazeLayoutLoader` only places the `WorldStructure` with the correct transform/size.
 - `chaotic_walkers/enabled`: 0 or 1 (default 0) — enable capsule NPC walkers
 - `chaotic_walkers/prefab_name`: prefab in `Resources/WorldGen/WalkerPrefabs/` (default `"walker_capsule"`)
 - `chaotic_walkers/density`: walkers per unit² (default 0)

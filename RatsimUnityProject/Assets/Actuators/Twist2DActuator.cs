@@ -150,6 +150,7 @@ public class Twist2DActuator : MonoBehaviour
         {
             msg.linear_x = _moveInput.y * maxLinearVelocity;
             msg.angular_z = -_moveInput.x * maxAngularVelocity;
+            Debug.Log("Human control raw input: " + _moveInput + " -> velocity cmd: linear_x=" + msg.linear_x + ", angular_z=" + msg.angular_z);
             ApplyVelocity(msg);
         }
         else
