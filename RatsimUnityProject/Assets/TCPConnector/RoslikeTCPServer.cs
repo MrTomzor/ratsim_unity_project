@@ -438,11 +438,26 @@ public class RoslikeTCPServer : MonoBehaviour
     }
 
 
+    static int ResolveListenPort()
+    {
+        // Allow overriding port via CLI (`-port 9001`) or env var (RATSIM_UNITY_PORT),
+        // so multiple Unity instances can coexist on the same host. CLI wins.
+        var args = Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-port" && int.TryParse(args[i + 1], out int p)) return p;
+        }
+        var envPort = Environment.GetEnvironmentVariable("RATSIM_UNITY_PORT");
+        if (!string.IsNullOrEmpty(envPort) && int.TryParse(envPort, out int ep)) return ep;
+        return 9000;
+    }
+
     void MainLoop()
     {
-        listener = new TcpListener(IPAddress.Any, 9000);
+        int port = ResolveListenPort();
+        listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
-        Debug.Log("TCP server started on port 9000");
+        Debug.Log($"TCP server started on port {port}");
 
         while (true)
         {

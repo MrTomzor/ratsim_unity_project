@@ -12,7 +12,10 @@ This is a Unity project (Unity 2022+). Building is done through the Unity Editor
 
 The main scene is `RatsimUnityProject/Assets/Scenes/Wildfire.unity`.
 
-The simulation listens on **TCP port 9000**. External clients connect and drive the simulation step-by-step.
+The simulation listens on **TCP port 9000** by default. The port can be
+overridden via the `-port` CLI arg (e.g. `./Build.x86_64 -port 9101`) or the
+`RATSIM_UNITY_PORT` env var, allowing multiple Unity instances to coexist on
+one host. CLI > env var > default. See `RoslikeTCPServer.ResolveListenPort`.
 
 ## Architecture Overview
 
