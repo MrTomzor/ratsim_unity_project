@@ -204,14 +204,36 @@ public class AgentLoader : WorldDataProvider {
     // ─────────────────────────────────────────────
     //  Spawn position routing
     //
-    //  World config param "agents_spawn_pos":
-    //    "origin"             (default) – random position within world bounds
-    //    "outside_structures" – random position within world bounds, but
-    //                           rejects any point inside a WorldStructure footprint
-    //    "city"               – inside a city, outside of any house footprint;
-    //                           falls back to "city_outskirts" if no open spot found
-    //    "city_outskirts"     – radially outside the city OBB; clears a tree-free
-    //                           zone at the chosen position via TreeLoader
+    //  Two ways to configure spawning:
+    //
+    //  1. NEW (preferred): orthogonal params under "agents_spawn_pos/":
+    //       agents_spawn_pos/mode                 -- "uniform" | "in_structures" | "city_outskirts"
+    //       agents_spawn_pos/allowed_structures   -- CSV of structureType prefixes ("*" = any).
+    //                                                In "in_structures" mode this is the pool to
+    //                                                pick from (required, non-empty). In "uniform"
+    //                                                mode it's an extra constraint: the candidate
+    //                                                must land inside one of these.
+    //       agents_spawn_pos/denied_structures    -- CSV of structureType prefixes ("*" = any).
+    //                                                Reject any candidate inside a denied structure.
+    //                                                Deny wins over allow if a type is in both.
+    //       agents_spawn_pos/skip_collider_checks -- 0/1; when 1, skip the physics OverlapSphere
+    //                                                check and the surrounding chunk pre-load.
+    //                                                Faster and works when colliders aren't loaded
+    //                                                yet, but doesn't catch overlaps with rewards
+    //                                                / props / chunk-streamed walls.
+    //
+    //  2. LEGACY (still supported): single-string "agents_spawn_pos":
+    //       "origin"/"random"     → mode=uniform
+    //       "outside_structures"  → mode=uniform, denied="*"
+    //       "in_room"             → mode=in_structures, allowed="maze_room,reward_room,empty_room"
+    //       "city"                → FindSpawnInCity (separate code path)
+    //       "city_outskirts"      → FindSpawnAtCityOutskirts (separate code path)
+    //
+    //  The new generic path (uniform / in_structures) does:
+    //    sample candidate → cheap structure-filter rejection → force-load chunks within the
+    //    safety sphere → Physics.SyncTransforms → physics check → accept/reject → retry.
+    //  Pre-loaded chunks stay loaded (the agent's ChunkLoadingRequestor would request them
+    //  on its first tick anyway).
     //
     //  Requires scene registration order:
     //    WorldLayoutLoader → StructureLoadingCoordinator → CityLoader → AgentLoader → TreeLoader
@@ -219,17 +241,70 @@ public class AgentLoader : WorldDataProvider {
     //  city + house footprints are available in WorldData when this runs.
     // ─────────────────────────────────────────────
 
+    private struct SpawnConfig {
+        public string mode;                 // "uniform" | "in_structures"
+        public List<string> allowed;        // structureType prefixes; empty = no constraint
+        public List<string> denied;         // structureType prefixes; empty = no exclusion
+        public bool skipColliderChecks;
+    }
+
     private Vector3 FindSafeSpawnPosition(GameObject prefab) {
         float colliderRadius = GetPrefabColliderRadius(prefab);
         System.Random rng = new System.Random(WorldLoadingController.GetDerivedSeed("agents"));
-        string mode = WorldLoadingController.GetParamString("agents_spawn_pos", "origin");
 
-        switch (mode.ToLowerInvariant()) {
-            case "outside_structures": return FindSpawnOutsideStructures(colliderRadius, rng);
-            case "city":               return FindSpawnInCity(colliderRadius, rng);
-            case "city_outskirts":     return FindSpawnAtCityOutskirts(colliderRadius, rng);
-            default:                   return FindSpawnRandom(colliderRadius, rng);
+        SpawnConfig cfg;
+        string newMode = WorldLoadingController.GetParamString("agents_spawn_pos/mode", "");
+        if (!string.IsNullOrWhiteSpace(newMode)) {
+            // New API path.
+            cfg = new SpawnConfig {
+                mode               = newMode.ToLowerInvariant(),
+                allowed            = ParseTypeList(WorldLoadingController.GetParamString("agents_spawn_pos/allowed_structures", "")),
+                denied             = ParseTypeList(WorldLoadingController.GetParamString("agents_spawn_pos/denied_structures",  "")),
+                skipColliderChecks = WorldLoadingController.GetParamInt("agents_spawn_pos/skip_collider_checks", 0) != 0,
+            };
+        } else {
+            // Translate legacy single-string mode.
+            string legacy = WorldLoadingController.GetParamString("agents_spawn_pos", "origin").ToLowerInvariant();
+            cfg = new SpawnConfig {
+                allowed            = new List<string>(),
+                denied             = new List<string>(),
+                skipColliderChecks = WorldLoadingController.GetParamInt("agents_spawn_pos/skip_collider_checks", 0) != 0,
+            };
+            switch (legacy) {
+                case "city":              return FindSpawnInCity(colliderRadius, rng);
+                case "city_outskirts":    cfg.mode = "city_outskirts"; break;
+                case "outside_structures": cfg.mode = "uniform"; cfg.denied.Add("*"); break;
+                case "in_room":
+                    cfg.mode = "in_structures";
+                    cfg.allowed.AddRange(new[] { "maze_room", "reward_room", "empty_room" });
+                    break;
+                case "origin":
+                case "random":
+                default:                  cfg.mode = "uniform"; break;
+            }
         }
+
+        if (cfg.mode == "city_outskirts") return FindSpawnAtCityOutskirts(colliderRadius, rng);
+        return FindSpawnGeneric(cfg, colliderRadius, rng);
+    }
+
+    private static List<string> ParseTypeList(string csv) {
+        List<string> list = new List<string>();
+        if (string.IsNullOrWhiteSpace(csv)) return list;
+        foreach (string raw in csv.Split(',')) {
+            string t = raw.Trim();
+            if (!string.IsNullOrEmpty(t)) list.Add(t);
+        }
+        return list;
+    }
+
+    private static bool MatchesAny(string structureType, List<string> patterns) {
+        for (int i = 0; i < patterns.Count; i++) {
+            string p = patterns[i];
+            if (p == "*") return true;
+            if (structureType.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
     }
 
     private float GetPrefabColliderRadius(GameObject prefab) {
@@ -247,53 +322,162 @@ public class AgentLoader : WorldDataProvider {
     //  Spawn strategies
     // ─────────────────────────────────────────────
 
+    /// <summary>
+    /// Thin legacy wrapper for unconstrained random spawning. Used as a fallback in
+    /// FindSpawnInCity / FindSpawnAtCityOutskirts. New callers should go through
+    /// FindSpawnGeneric directly.
+    /// </summary>
     private Vector3 FindSpawnRandom(float colliderRadius, System.Random rng) {
-        float worldW = WorldLoadingController.GetParamFloat("world_bounds/width", 100f);
-        float worldH = WorldLoadingController.GetParamFloat("world_bounds/height", 100f);
-        float margin = spawnSafetyRadius * 2f;
-        int worldGenLayer = LayerMask.NameToLayer("WorldGen");
-
-        for (int attempt = 0; attempt < maxPlacementAttempts; attempt++) {
-            float x = (float)(rng.NextDouble() * (worldW - margin * 2f) + margin) - worldW * 0.5f;
-            float z = (float)(rng.NextDouble() * (worldH - margin * 2f) + margin) - worldH * 0.5f;
-            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z) + colliderRadius + 0.1f;
-            Vector3 pos = new Vector3(x, y, z);
-            if (!IsPhysicsBlocked(pos, worldGenLayer)) return pos;
-        }
-
-        float fallbackY = WorldServices.Get<IHeightProvider>().GetTerrainHeight(0, 0) + colliderRadius + 0.1f;
-        Debug.LogWarning("AgentLoader: could not find unblocked spawn position, using world center");
-        return new Vector3(0, fallbackY, 0);
+        SpawnConfig cfg = new SpawnConfig {
+            mode               = "uniform",
+            allowed            = new List<string>(),
+            denied             = new List<string>(),
+            skipColliderChecks = WorldLoadingController.GetParamInt("agents_spawn_pos/skip_collider_checks", 0) != 0,
+        };
+        return FindSpawnGeneric(cfg, colliderRadius, rng);
     }
 
-    private Vector3 FindSpawnOutsideStructures(float colliderRadius, System.Random rng) {
-        float worldW = WorldLoadingController.GetParamFloat("world_bounds/width", 100f);
-        float worldH = WorldLoadingController.GetParamFloat("world_bounds/height", 100f);
-        float margin = spawnSafetyRadius * 2f;
+    private Vector3 FindSpawnGeneric(SpawnConfig cfg, float colliderRadius, System.Random rng) {
+        float margin = Mathf.Max(spawnSafetyRadius, colliderRadius);
         int worldGenLayer = LayerMask.NameToLayer("WorldGen");
 
-        List<Bounds2D> structureBounds = WorldData.GetStructures()
-            .Select(s => s.GetBoundingBox2D())
-            .ToList();
+        float worldW = WorldLoadingController.GetParamFloat("world_bounds/width",  100f);
+        float worldH = WorldLoadingController.GetParamFloat("world_bounds/height", 100f);
+        float worldMinX = -worldW * 0.5f, worldMaxX = worldW * 0.5f;
+        float worldMinZ = -worldH * 0.5f, worldMaxZ = worldH * 0.5f;
+        float xRange = (worldMaxX - worldMinX) - 2f * margin;
+        float zRange = (worldMaxZ - worldMinZ) - 2f * margin;
 
-        for (int attempt = 0; attempt < maxPlacementAttempts; attempt++) {
-            float x = (float)(rng.NextDouble() * (worldW - margin * 2f) + margin) - worldW * 0.5f;
-            float z = (float)(rng.NextDouble() * (worldH - margin * 2f) + margin) - worldH * 0.5f;
-            Vector2 pos2D = new Vector2(x, z);
-
-            bool inStructure = false;
-            foreach (Bounds2D sb in structureBounds) {
-                if (sb.Contains(pos2D)) { inStructure = true; break; }
+        // For "in_structures": build the candidate pool once.
+        List<WorldStructure> pool = null;
+        if (cfg.mode == "in_structures") {
+            if (cfg.allowed.Count == 0) {
+                Debug.LogError("AgentLoader: 'in_structures' mode requires a non-empty allowed_structures list; using world center fallback");
+                return WorldCenterFallback(colliderRadius);
             }
-            if (inStructure) continue;
-
-            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z) + colliderRadius + 0.1f;
-            Vector3 pos = new Vector3(x, y, z);
-            if (!IsPhysicsBlocked(pos, worldGenLayer)) return pos;
+            pool = WorldData.GetStructures()
+                .Where(s => MatchesAny(s.structureType, cfg.allowed))
+                .ToList();
+            if (pool.Count == 0) {
+                Debug.LogError($"AgentLoader: 'in_structures' mode but no structures match allowed=[{string.Join(",", cfg.allowed)}]; using world center fallback");
+                return WorldCenterFallback(colliderRadius);
+            }
+        } else if (cfg.mode != "uniform") {
+            Debug.LogError($"AgentLoader: unknown mode '{cfg.mode}'; falling back to uniform");
+            cfg.mode = "uniform";
         }
 
-        Debug.LogWarning("AgentLoader: could not find spawn outside structures, falling back to random");
-        return FindSpawnRandom(colliderRadius, rng);
+        int rejectedFilter   = 0;
+        int rejectedPhysics  = 0;
+        int rejectedTooSmall = 0;
+        Vector2 lastCandidate = Vector2.zero;
+
+        for (int attempt = 0; attempt < maxPlacementAttempts; attempt++) {
+            float x, z;
+
+            if (cfg.mode == "uniform") {
+                if (xRange <= 0f || zRange <= 0f) {
+                    Debug.LogError("AgentLoader: world is smaller than the safety margin; using world center fallback");
+                    return WorldCenterFallback(colliderRadius);
+                }
+                x = worldMinX + margin + (float)rng.NextDouble() * xRange;
+                z = worldMinZ + margin + (float)rng.NextDouble() * zRange;
+            } else {
+                // in_structures: sample uniformly inside one of the allowed structures' OBBs.
+                WorldStructure s = pool[rng.Next(pool.Count)];
+                Bounds2D bb = s.GetBoundingBox2D();
+                float halfW = bb.size.x * 0.5f - margin;
+                float halfH = bb.size.y * 0.5f - margin;
+                if (halfW < 0f || halfH < 0f) { rejectedTooSmall++; continue; }
+
+                float lx = (float)(rng.NextDouble() * 2.0 - 1.0) * halfW;
+                float lz = (float)(rng.NextDouble() * 2.0 - 1.0) * halfH;
+                float rotRad = bb.rotation * Mathf.Deg2Rad;
+                float c = Mathf.Cos(rotRad), sn = Mathf.Sin(rotRad);
+                x = bb.center.x + lx * c - lz * sn;
+                z = bb.center.y + lx * sn + lz * c;
+            }
+            lastCandidate = new Vector2(x, z);
+
+            // Cheap structure-based rejection BEFORE the chunk pre-load / physics check.
+            if (!PassesStructureFilter(new Vector2(x, z), cfg)) { rejectedFilter++; continue; }
+
+            float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z) + colliderRadius + 0.1f;
+            Vector3 pos3D = new Vector3(x, y, z);
+
+            if (cfg.skipColliderChecks) {
+                Debug.Log($"AgentLoader: spawned at ({x:F1},{z:F1}) after {attempt + 1} attempt(s) " +
+                          $"[mode={cfg.mode}, skip_collider_checks=true, " +
+                          $"filter_rejects={rejectedFilter}, too_small={rejectedTooSmall}]");
+                return pos3D;
+            }
+
+            // Force-load chunks overlapping the safety sphere so chunk-streamed colliders
+            // (e.g. maze walls) are present for the OverlapSphere check.
+            ForceLoadChunksAround(x, z, margin);
+            Physics.SyncTransforms();
+
+            if (!IsPhysicsBlocked(pos3D, worldGenLayer)) {
+                Debug.Log($"AgentLoader: spawned at ({x:F1},{z:F1}) after {attempt + 1} attempt(s) " +
+                          $"[mode={cfg.mode}, filter_rejects={rejectedFilter}, " +
+                          $"physics_rejects={rejectedPhysics}, too_small={rejectedTooSmall}]");
+                return pos3D;
+            }
+            rejectedPhysics++;
+        }
+
+        Debug.LogError(
+            $"AgentLoader: no valid spawn in {maxPlacementAttempts} attempts. " +
+            $"mode={cfg.mode}, allowed=[{string.Join(",", cfg.allowed)}], denied=[{string.Join(",", cfg.denied)}], " +
+            $"filter_rejects={rejectedFilter}, physics_rejects={rejectedPhysics}, too_small={rejectedTooSmall}, " +
+            $"last_candidate=({lastCandidate.x:F1},{lastCandidate.y:F1}). " +
+            "Likely causes: allow/deny constraints leave no free space; all allowed structures too small for the agent; world densely occupied. " +
+            "Using world center fallback so the episode can continue.");
+        return WorldCenterFallback(colliderRadius);
+    }
+
+    private bool PassesStructureFilter(Vector2 pos2D, SpawnConfig cfg) {
+        if (cfg.denied.Count == 0 && (cfg.mode != "uniform" || cfg.allowed.Count == 0)) return true;
+
+        bool sawAllowed = false;
+        foreach (WorldStructure s in WorldData.GetStructures()) {
+            // Deny wins over allow if the same type matches both lists.
+            if (cfg.denied.Count > 0 && MatchesAny(s.structureType, cfg.denied)
+                && s.GetBoundingBox2D().Contains(pos2D)) return false;
+
+            if (cfg.mode == "uniform" && cfg.allowed.Count > 0 && !sawAllowed
+                && MatchesAny(s.structureType, cfg.allowed) && s.GetBoundingBox2D().Contains(pos2D)) {
+                sawAllowed = true;
+            }
+        }
+        if (cfg.mode == "uniform" && cfg.allowed.Count > 0 && !sawAllowed) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Synchronously asks every WorldDataProvider to load the LOD0 chunks overlapping a
+    /// `radius`-square around (x, z). Idempotent — providers that have already generated
+    /// a given chunk no-op. The chunks stay loaded; the agent's ChunkLoadingRequestor
+    /// would request them on its first tick anyway, so we're paying that cost a few ms
+    /// earlier rather than extra.
+    /// </summary>
+    private static void ForceLoadChunksAround(float x, float z, float radius) {
+        float chunkWidth = WorldLoadingController.GetChunkWidth();
+        int minCX = Mathf.FloorToInt((x - radius) / chunkWidth);
+        int maxCX = Mathf.FloorToInt((x + radius) / chunkWidth);
+        int minCZ = Mathf.FloorToInt((z - radius) / chunkWidth);
+        int maxCZ = Mathf.FloorToInt((z + radius) / chunkWidth);
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                foreach (WorldDataProvider p in WorldDataProvider.registered)
+                    p.GenerateChunk(cx, cz, 0);
+            }
+        }
+    }
+
+    private Vector3 WorldCenterFallback(float colliderRadius) {
+        float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(0f, 0f) + colliderRadius + 0.1f;
+        return new Vector3(0f, y, 0f);
     }
 
     /// <summary>

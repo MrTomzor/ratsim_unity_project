@@ -15,8 +15,15 @@ using UnityEngine;
 ///   3. Build a complete graph over room centers, connect via MST + a fraction
 ///      of extra edges (for loopy mazes). Each edge is an L-shaped corridor
 ///      (one bend) of a fixed cell-width carved through the mask.
-///   4. Spawn a "maze_room" WorldStructure per room (no physics, footprint-only,
-///      exposed for spawn-constraint queries via IRoomProvider).
+///   4. Spawn one WorldStructure per room (no physics, footprint-only, exposed
+///      for spawn-constraint queries via IRoomProvider). Default structureType
+///      is "maze_room"; configure maze/rooms/types with per-type min/max counts
+///      (see below) to label rooms differently (e.g. "reward_room", "empty_room")
+///      so other loaders can target them. Each room carries a
+///      LOD0/rewardSpawnPositions/cell_i_j hierarchy with one Transform per cell
+///      at that cell's world center, so RewardObjectLoader can use the standard
+///      structure-mode pipeline (allowed_structures=<room_type>,
+///      min/max_per_structure) to drop a deterministic reward count per room.
 ///
 /// Chunk loading (GenerateChunk / ClearChunk at LOD0):
 ///   - For each wall cell whose center falls inside the requested chunk, spawn
@@ -44,6 +51,20 @@ using UnityEngine;
 ///   maze/extra_connection_probability -- (memory_maze only) [0,1] per-candidate-wall extra-loop prob beyond mandatory (default 0.0)
 ///   maze/border_walls            -- 0/1; stamp a 1-cell-thick wall ring along the mask edge (default 1)
 ///   maze/semantic_name           -- semantic name used for blocks (default "maze_wall")
+///
+/// Room labeling (optional — empty list → all rooms get structureType="maze_room"):
+///   maze/rooms/types         -- comma list of structure types to apply to generated rooms.
+///                                Geometry is unaffected; this just sets each room's
+///                                WorldStructure.structureType so RewardObjectLoader (or any
+///                                other structure-aware loader) can target specific rooms.
+///   maze/rooms/{type}/min    -- minimum rooms of this type (default 0)
+///   maze/rooms/{type}/max    -- maximum rooms of this type (-1 = unlimited; default -1)
+/// Validation: sum(min) <= rooms_generated, max >= min, and either some type has max=-1
+/// or sum(max) >= rooms_generated. Failures emit WorldGenStatus.Error and the loader
+/// falls back to all-rooms = "maze_room".
+/// Assignment: seeded RNG fills mins first, then distributes remainder uniformly among
+/// types still under their max, then shuffles so types are mixed across room indices.
+/// Deterministic for a given seed.
 ///
 /// Corridor structure spawning (optional — empty list disables the whole feature):
 ///   maze/corridor_structures/types               -- comma list of prefab names to attempt per corridor segment
@@ -95,6 +116,8 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
     // room footprints in world coords (for IRoomProvider)
     private readonly List<Bounds2D> _rooms = new List<Bounds2D>();
+    // parallel to _rooms; cell-space rects, used to lay out per-cell rewardSpawnPositions
+    private readonly List<RoomRect> _roomRects = new List<RoomRect>();
     private readonly List<WorldStructure> _roomStructures = new List<WorldStructure>();
 
     // corridor segments, filled by CarveLCorridor → RecordSegment
@@ -195,6 +218,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         _chunkBlocks.Clear();
         _generatedChunks.Clear();
         _rooms.Clear();
+        _roomRects.Clear();
         _roomStructures.Clear();
         _corridors.Clear();
         _mask = null;
@@ -307,6 +331,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         // 3. store room bounds in world coords for IRoomProvider
         _rooms.Clear();
+        _roomRects.Clear();
         foreach (RoomRect r in rooms) {
             Vector2 center = new Vector2(
                 _originX + (r.x0 + r.w * 0.5f) * _cellSize,
@@ -314,6 +339,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
             );
             Vector2 size = new Vector2(r.w * _cellSize, r.h * _cellSize);
             _rooms.Add(new Bounds2D(center, size, 0f));
+            _roomRects.Add(r);
         }
     }
 
@@ -590,6 +616,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         // Store room bounds for IRoomProvider.
         _rooms.Clear();
+        _roomRects.Clear();
         foreach (RoomRect r in rooms) {
             Vector2 center = new Vector2(
                 _originX + (r.x0 + r.w * 0.5f) * _cellSize,
@@ -597,6 +624,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
             );
             Vector2 size = new Vector2(r.w * _cellSize, r.h * _cellSize);
             _rooms.Add(new Bounds2D(center, size, 0f));
+            _roomRects.Add(r);
         }
 
         if (verbose)
@@ -679,17 +707,135 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     //  Room structures (empty footprints for queries)
     // ─────────────────────────────────────────────
 
+    private struct RoomTypeSpec {
+        public string type;
+        public int min;
+        public int max; // -1 = unlimited
+    }
+
+    private List<RoomTypeSpec> LoadRoomTypeSpecs() {
+        List<RoomTypeSpec> specs = new List<RoomTypeSpec>();
+        string csv = WorldLoadingController.GetParamString("maze/rooms/types", "");
+        if (string.IsNullOrWhiteSpace(csv)) return specs;
+        foreach (string raw in csv.Split(',')) {
+            string type = raw.Trim();
+            if (string.IsNullOrEmpty(type)) continue;
+            specs.Add(new RoomTypeSpec {
+                type = type,
+                min  = WorldLoadingController.GetParamInt($"maze/rooms/{type}/min",  0),
+                max  = WorldLoadingController.GetParamInt($"maze/rooms/{type}/max", -1),
+            });
+        }
+        return specs;
+    }
+
+    /// <summary>
+    /// Returns one structureType string per generated room, satisfying the per-type min/max
+    /// constraints. Returns null on overconstrained input (caller falls back to "maze_room").
+    /// </summary>
+    private string[] AssignRoomTypes(List<RoomTypeSpec> specs, int n, System.Random rng) {
+        if (specs.Count == 0) return null;
+
+        // Validate per-type bounds.
+        for (int i = 0; i < specs.Count; i++) {
+            RoomTypeSpec s = specs[i];
+            if (s.min < 0) {
+                WorldGenStatus.Error("MazeLayoutLoader",
+                    $"room type '{s.type}': min ({s.min}) must be >= 0");
+                return null;
+            }
+            if (s.max >= 0 && s.max < s.min) {
+                WorldGenStatus.Error("MazeLayoutLoader",
+                    $"room type '{s.type}': max ({s.max}) < min ({s.min})");
+                return null;
+            }
+        }
+
+        // Validate aggregate feasibility against actual room count.
+        int sumMin = 0;
+        bool hasUnlimited = false;
+        int sumMaxFinite = 0;
+        foreach (RoomTypeSpec s in specs) {
+            sumMin += s.min;
+            if (s.max < 0) hasUnlimited = true;
+            else           sumMaxFinite += s.max;
+        }
+        if (sumMin > n) {
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"room types overconstrained: sum of mins ({sumMin}) > rooms generated ({n}). " +
+                $"Increase maze/n_rooms or relax mins.");
+            return null;
+        }
+        if (!hasUnlimited && sumMaxFinite < n) {
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"room types underconstrained: sum of maxes ({sumMaxFinite}) < rooms generated ({n}). " +
+                $"Raise a max, leave one unset (-1 = unlimited), or reduce maze/n_rooms.");
+            return null;
+        }
+
+        // Phase 1: required mins.
+        List<string> assignments = new List<string>(n);
+        int[] counts = new int[specs.Count];
+        for (int i = 0; i < specs.Count; i++) {
+            for (int k = 0; k < specs[i].min; k++) {
+                assignments.Add(specs[i].type);
+                counts[i]++;
+            }
+        }
+
+        // Phase 2: distribute remaining slots uniformly among eligible types.
+        List<int> eligible = new List<int>();
+        for (int i = 0; i < specs.Count; i++) {
+            if (specs[i].max < 0 || counts[i] < specs[i].max) eligible.Add(i);
+        }
+        int remaining = n - assignments.Count;
+        for (int k = 0; k < remaining; k++) {
+            if (eligible.Count == 0) {
+                // Shouldn't happen given the aggregate check above, but guard anyway.
+                WorldGenStatus.Error("MazeLayoutLoader", "no eligible room type for remaining slots");
+                return null;
+            }
+            int pickIdx = rng.Next(eligible.Count);
+            int specIdx = eligible[pickIdx];
+            assignments.Add(specs[specIdx].type);
+            counts[specIdx]++;
+            if (specs[specIdx].max >= 0 && counts[specIdx] >= specs[specIdx].max) {
+                eligible.RemoveAt(pickIdx);
+            }
+        }
+
+        // Phase 3: shuffle so types are mixed across room indices.
+        for (int i = n - 1; i > 0; i--) {
+            int j = rng.Next(i + 1);
+            (assignments[i], assignments[j]) = (assignments[j], assignments[i]);
+        }
+
+        if (verbose) {
+            string summary = string.Join(", ", System.Linq.Enumerable.Range(0, specs.Count)
+                .Select(i => $"{specs[i].type}={counts[i]}"));
+            Debug.Log($"MazeLayoutLoader: room type assignment ({n} rooms): {summary}");
+        }
+
+        return assignments.ToArray();
+    }
+
     private void SpawnRoomStructures() {
-        foreach (Bounds2D b in _rooms) {
-            WorldStructure ws = SpawnRoomStructure(b.center, b.size);
+        List<RoomTypeSpec> specs = LoadRoomTypeSpecs();
+        System.Random rng = new System.Random(WorldLoadingController.GetDerivedSeed("maze_room_types"));
+        string[] types = AssignRoomTypes(specs, _rooms.Count, rng);
+
+        for (int i = 0; i < _rooms.Count; i++) {
+            string type = (types != null) ? types[i] : "maze_room";
+            WorldStructure ws = SpawnRoomStructure(_rooms[i].center, _rooms[i].size, _roomRects[i], type);
             if (ws != null) _roomStructures.Add(ws);
         }
     }
 
-    private WorldStructure SpawnRoomStructure(Vector2 center, Vector2 size) {
-        float terrainY = WorldServices.Get<IHeightProvider>().GetTerrainHeight(center.x, center.y);
+    private WorldStructure SpawnRoomStructure(Vector2 center, Vector2 size, RoomRect rect, string structureType) {
+        IHeightProvider heights = WorldServices.Get<IHeightProvider>();
+        float terrainY = heights.GetTerrainHeight(center.x, center.y);
 
-        GameObject root = new GameObject("maze_room");
+        GameObject root = new GameObject(structureType);
         root.SetActive(false);
 
         // Footprint-only child: disabled BoxCollider on WorldGen layer. Disabled
@@ -707,13 +853,34 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         col.enabled = false;
 
         WorldStructure ws = root.AddComponent<WorldStructure>();
-        ws.structureType = "maze_room";
+        ws.structureType = structureType;
         ws.footprintCollider = col;
 
         root.transform.SetParent(transform);
         root.transform.position = new Vector3(center.x, terrainY, center.y);
         // Scale only the footprint child so WorldStructure.GetSize() (size × lossyScale) returns `size`.
         footprint.transform.localScale = new Vector3(size.x, 1f, size.y);
+
+        // LOD0/rewardSpawnPositions/cell_i_j — one Transform at the center of every cell in the
+        // room. Built for every room regardless of label so any structure-aware loader can use
+        // them; RewardObjectLoader picks from these when reward_objects/allowed_structures
+        // includes this room's type, with min/max_per_structure controlling reward count.
+        // Must be in place BEFORE SetActive(true), which fires WorldStructure.Awake and the
+        // OnWorldStructureLoaded callback that reads this hierarchy.
+        GameObject lod0 = new GameObject("LOD0");
+        lod0.transform.SetParent(root.transform, false);
+        GameObject group = new GameObject("rewardSpawnPositions");
+        group.transform.SetParent(lod0.transform, false);
+        for (int i = 0; i < rect.w; i++) {
+            for (int j = 0; j < rect.h; j++) {
+                float wx = _originX + (rect.x0 + i + 0.5f) * _cellSize;
+                float wz = _originZ + (rect.z0 + j + 0.5f) * _cellSize;
+                float wy = heights.GetTerrainHeight(wx, wz);
+                GameObject sp = new GameObject($"cell_{i}_{j}");
+                sp.transform.SetParent(group.transform, false);
+                sp.transform.position = new Vector3(wx, wy, wz);
+            }
+        }
 
         root.SetActive(true);
         return ws;

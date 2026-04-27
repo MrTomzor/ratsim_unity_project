@@ -126,11 +126,11 @@ Flow: JSON params influence **loaders** → loaders produce **structures with ty
 Global providers (run in `Generate()`, dependency-ordered):
 - `WorldHeightLoader` (provides `Height`) — `IHeightProvider`: terrain height via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
 - `WorldLayoutLoader` (provides `Layout`, depends on `Height`) — `ILayoutProvider`: places structures and road network (MST + extra edges). Runs eagerly in `Generate()`. No-ops when `layout/mode` ≠ `"default"`.
-- `MazeLayoutLoader` (provides `Layout`, depends on `Height`) — alternate `ILayoutProvider` + `IRoomProvider`. Active when `layout/mode = "maze"`. Generates a 2D binary wall/floor mask via one of two algorithms (`maze/mode`): `"rooms_and_corridors"` rejection-samples rectangular rooms and carves L-shaped wide corridors between them (MST + extras for loops); `"memory_maze"` mimics DeepMind labmaze (odd-aligned rooms + iterative DFS-backtracker 1-cell corridors filling the rest + one mandatory connector per region pair + probabilistic extras). Spawns one `maze_room` WorldStructure per room (empty footprint, queryable), and materializes wall cells as `maze_block` WorldStructures lazily per chunk at LOD0 (one scaled cube per wall cell, destroyed on chunk unload).
+- `MazeLayoutLoader` (provides `Layout`, depends on `Height`) — alternate `ILayoutProvider` + `IRoomProvider`. Active when `layout/mode = "maze"`. Generates a 2D binary wall/floor mask via one of two algorithms (`maze/mode`): `"rooms_and_corridors"` rejection-samples rectangular rooms and carves L-shaped wide corridors between them (MST + extras for loops); `"memory_maze"` mimics DeepMind labmaze (odd-aligned rooms + iterative DFS-backtracker 1-cell corridors filling the rest + one mandatory connector per region pair + probabilistic extras). Spawns one WorldStructure per room (empty footprint, queryable). The structureType is configurable via `maze/rooms/types` + per-type `min`/`max` counts (default: all rooms get type `maze_room`); the loader assigns labels deterministically via seeded shuffle so other loaders can target specific subsets (e.g. RewardObjectLoader → `reward_room`). Each room also carries a `LOD0/rewardSpawnPositions/cell_i_j` child Transform per cell, so structure-mode reward spawning works out of the box. Wall cells are materialized as `maze_block` WorldStructures lazily per chunk at LOD0 (one scaled cube per wall cell, destroyed on chunk unload).
 - `WorldBoundaryLoader` (provides `Boundaries`, depends on `Height`, `Layout`) — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
 - `SmokeLoader` (provides `Smoke`) — `ISmokeProvider`: event-driven loader that reacts to `SmokeOrigin` components appearing/disappearing anywhere in the scene. Subscribes to `SmokeOrigin.OnOriginEnabled`/`OnOriginDisabled` static events. For each origin, spawns smoke objects (2D mode: `SmokeObject2D` + `NamedSemanticObject`; 3D mode: stub for future particles). Supports both modes simultaneously. Smoke objects are parented to the origin and auto-destroyed when it is.
 - `LightingAndFogLoader` (provides `Lighting`) — applies lighting/fog settings each episode, optionally advances time-of-day.
-- `AgentLoader` (provides `Agents`, depends on `Height`, `StructureContent`) — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks.
+- `AgentLoader` (provides `Agents`, depends on `Height`, `StructureContent`) — spawns agent prefabs from `Resources/AgentPrefabs/` based on agent config JSON. Manages sensor enable/disable and param overrides via reflection. Calls `RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers()` on `Clear()` to purge stale sensor callbacks. Spawn-position pipeline (`FindSpawnGeneric`): sample candidate (uniform in world or uniform in OBB of an allowed structure) → cheap structure-filter rejection → force-load LOD0 chunks within the safety sphere via `WorldDataProvider.registered → GenerateChunk(cx, cz, 0)` + `Physics.SyncTransforms()` → `OverlapSphere` check → accept or retry. Force-loading is what makes maze spawns safe even though wall blocks are chunk-streamed (without it, `OverlapSphere` finds nothing because walls aren't in the scene yet at agent-spawn time).
 
 Chunk-level providers (run in `GenerateChunk()`/`ClearChunk()`):
 - `TerrainMeshLoader` (provides `TerrainMesh`, depends on `Height`) — `ITerrainMeshProvider`: generates mesh terrain per-chunk with LOD and normal stitching.
@@ -261,14 +261,21 @@ Lighting (no deps, runs early)
 - `meta_height_generation/valley_exponent`: curve power — 1=linear, 2=quadratic (default 2)
 - `world_bounds/boundary_type`: `none` (default, no walls) or `visible_wall` (spawn four wall structures)
 - `world_bounds/boundary_height`: Y scale of each wall (default 10)
-- `agents_spawn_pos`: `origin` (default, random within world bounds), `outside_structures`
-  (random within world bounds but rejects positions inside any WorldStructure footprint;
-  falls back to `origin` if no open spot found), `city` (inside city OBB outside house
-  footprints; falls back to `city_outskirts`), or `city_outskirts` (radially outside city
-  OBB, clears a tree-free zone at the spawn point)
-- `agents_city_spawn_attempts`: max random tries to find an open spot inside a city (default 200)
-- `agents_outskirts_margin`: extra radial distance past city half-diagonal for outskirts spawn (default 15)
-- `agents_outskirts_clear_radius`: radius of tree-suppression zone registered at outskirts spawn (default 5)
+- **Agent spawning (new orthogonal API).** Preferred over the legacy single-string mode:
+  - `agents_spawn_pos/mode`: `uniform` (sample anywhere in world bounds) | `in_structures` (sample uniformly inside the OBB of one of the allowed structures) | `city_outskirts` (legacy radial path).
+  - `agents_spawn_pos/allowed_structures`: CSV of structureType prefixes (`*` = wildcard). For `in_structures` this is the pool to pick from (required, non-empty). For `uniform` it's an extra constraint — the candidate must land inside one of these.
+  - `agents_spawn_pos/denied_structures`: CSV of structureType prefixes. Reject any candidate inside a denied structure footprint. Deny wins over allow if a type matches both lists. StartsWith matching, same convention as RewardObjectLoader.
+  - `agents_spawn_pos/skip_collider_checks`: 0/1 (default 0). When 1, skip the chunk pre-load and the `OverlapSphere` check — fast but can land the agent on top of chunk-streamed walls or in-room props.
+- **Legacy single-string `agents_spawn_pos`** (still works; auto-translated):
+  - `origin` / `random` → `mode=uniform`
+  - `outside_structures` → `mode=uniform`, `denied="*"`
+  - `in_room` → `mode=in_structures`, `allowed="maze_room,reward_room,empty_room"`
+  - `city` → separate `FindSpawnInCity` path (inside city OBB outside house footprints; falls back to `city_outskirts`)
+  - `city_outskirts` → separate `FindSpawnAtCityOutskirts` path (radially outside city OBB, clears a tree-free zone at the spawn point)
+- `agents_city_spawn_attempts`: max random tries to find an open spot inside a city (default 200, `city` mode only)
+- `agents_outskirts_margin`: extra radial distance past city half-diagonal for outskirts spawn (default 15, `city_outskirts` mode only)
+- `agents_outskirts_clear_radius`: radius of tree-suppression zone registered at outskirts spawn (default 5, `city_outskirts` mode only)
+- On failure (all `maxPlacementAttempts` rejected) the loader logs an error with per-reason counters (filter rejects vs. physics rejects vs. too-small structures) plus the last candidate, and falls back to world center so the episode still runs.
 - `smoke/2dmode_enabled`: 0 or 1 (default 1) — spawn `SmokeObject2D` for lidar corruption
 - `smoke/3dmode_enabled`: 0 or 1 (default 0) — spawn particle-based smoke for RGB (stub, future)
 - `smoke/default_radius`: radius of each smoke circle in world units (default 10)
@@ -285,6 +292,13 @@ Lighting (no deps, runs early)
 - `maze/extra_connection_probability`: (`memory_maze` only) [0,1]; per-candidate-wall probability of opening an extra connection beyond the mandatory one per region pair (default 0.0 = pure tree, matching labmaze default).
 - `maze/border_walls`: 0 or 1 (default 1) — keep a 1-cell wall ring at the mask edge
 - `maze/semantic_name`: semantic class name for maze blocks (default `"maze_wall"`)
+- **Room labeling (optional).** Splits the generated rooms into multiple structureTypes so different loaders can target different subsets (e.g. RewardObjectLoader populates only `reward_room`, a future loader fills only `puzzle_room`). Geometry is unaffected; the labels just set each room's `WorldStructure.structureType`. If left empty, every room gets `structureType="maze_room"` (legacy behavior).
+  - `maze/rooms/types`: CSV of structureType labels. Empty = all rooms get `maze_room`.
+  - `maze/rooms/{type}/min`: required minimum count for this type (default 0).
+  - `maze/rooms/{type}/max`: maximum count for this type (default -1 = unlimited; needed on at least one type to absorb leftovers).
+  - **Validation.** `sum(min) <= rooms_generated` and (some type has `max=-1`) OR `sum(max) >= rooms_generated`. Failure → `WorldGenStatus.Error` and fallback to "all rooms = `maze_room`".
+  - **Assignment.** Seeded RNG (derived seed `"maze_room_types"`): fill mins first, distribute remainder among types still under their max, shuffle so types are mixed across room indices. Deterministic for a given world seed.
+  - **Per-cell reward slots.** Every room (regardless of label) carries a `LOD0/rewardSpawnPositions/cell_i_j` child Transform per cell, so configuring `reward_objects/allowed_structures: "<room_type>"` with `min/max_per_structure` gives a deterministic reward count per labeled room. `cell_size`-spaced placement means rewards sit at cell centers, never overlapping walls.
 - `maze/corridor_structures/*` — `rooms_and_corridors` only. The `memory_maze` algorithm carves 1-cell DFS corridors that don't have well-defined "segments" for elongated structures, so this feature is skipped there.
 - `maze/corridor_structures/types`: comma list of `WorldStructure` prefab names (in `Resources/WorldGen/WorldStructurePrefabs/`) to attempt per corridor segment. Empty = feature off.
 - `maze/corridor_structures/max_per_corridor`: global attempt budget per corridor segment (default 0 = off). An "attempt" picks one random slot and tries each type in list order; the first that fits without overlapping already-placed structures wins.
