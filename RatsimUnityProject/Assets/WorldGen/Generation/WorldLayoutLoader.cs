@@ -11,6 +11,9 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
     private bool _generated = false;
     private readonly Dictionary<WorldStructure, List<EntryPoint>> _structureEntryPoints
         = new Dictionary<WorldStructure, List<EntryPoint>>();
+    
+    public int maxAttempts = 50;
+    public int baseSeed = 0;
 
     [Header("Road Generation")]
     public int   perimeterSamples = 20;
@@ -90,14 +93,60 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
     // ─────────────────────────────────────────────
 
     private void DoGenerate() {
-        System.Random rng = new System.Random(WorldLoadingController.GetDerivedSeed("layout"));
-
         float worldW = WorldLoadingController.GetParamFloat("world_bounds/width");
         float worldH = WorldLoadingController.GetParamFloat("world_bounds/height");
         float margin = WorldLoadingController.GetParamFloat("world_bounds/structures_margin", 100f);
         string roadGenerationMode = WorldLoadingController.GetParamString("layout/roads/mode", "highway");
+        maxAttempts = Mathf.Max(1, WorldLoadingController.GetParamInt("layout/max_layout_attempts", 10));
+        baseSeed = WorldLoadingController.GetDerivedSeed("layout");
 
-        List<WorldStructure> structures = PlaceStructures(rng, worldW, worldH, margin);
+        // Snapshot type requirements once — used to validate each attempt and to report unmet constraints.
+        var requirements = GetTypeRequirements();
+
+        List<WorldStructure> structures = null;
+        Dictionary<string, int> placedByType = null;
+        int attemptsUsed = 0;
+        bool satisfied = false;
+
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+            attemptsUsed = attempt + 1;
+            // Wipe anything spawned by a previous failed attempt.
+            ClearSpawnedStructures();
+
+            // Deterministic per-attempt seed: fixed master seed → identical retry sequence.
+            // HashCode.Combine instead of XOR — XOR(baseSeed, attempt) has overlapping
+            // cosets across adjacent base seeds (e.g. seed=43,attempt=0 produces the same
+            // rng seed as seed=42,attempt=1), causing seed bumps to converge to the same
+            // world after retries.
+            System.Random rng = new System.Random(System.HashCode.Combine(baseSeed, attempt));
+            structures = PlaceStructures(rng, worldW, worldH, margin, out placedByType);
+
+            satisfied = true;
+            foreach (var kvp in requirements) {
+                int got = placedByType.TryGetValue(kvp.Key, out int g) ? g : 0;
+                if (got < kvp.Value.min) { satisfied = false; break; }
+            }
+            if (satisfied) break;
+        }
+
+        if (!satisfied) {
+            var unmet = new List<string>();
+            foreach (var kvp in requirements) {
+                int got = placedByType != null && placedByType.TryGetValue(kvp.Key, out int g) ? g : 0;
+                if (got < kvp.Value.min)
+                    unmet.Add($"{kvp.Key} (placed {got}, required min {kvp.Value.min})");
+            }
+            WorldGenStatus.Error("WorldLayoutLoader",
+                $"Failed to satisfy structure layout constraints after {attemptsUsed} attempts " +
+                $"(layout/max_layout_attempts={maxAttempts}, seed={WorldLoadingController.GetSeed()}). " +
+                $"Unmet: {string.Join("; ", unmet)}. " +
+                $"Consider increasing layout/max_layout_attempts, layout/per_type_placement_attempts, " +
+                $"world_bounds/width|height, or relaxing min counts.");
+        } else if (attemptsUsed > 1) {
+            WorldGenStatus.Info("WorldLayoutLoader",
+                $"Layout constraints satisfied on attempt {attemptsUsed}/{maxAttempts} (seed={WorldLoadingController.GetSeed()}).");
+        }
+
         List<RoadEdge>       edges = roadGenerationMode == "highway" ? BuildRoadNetwork(structures) : new List<RoadEdge>();
 
         // assemble road nodes
@@ -142,16 +191,47 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
     //  Structure placement
     // ─────────────────────────────────────────────
 
-    private List<WorldStructure> PlaceStructures(System.Random rng, float worldW, float worldH, float margin) {
+    /// <summary>
+     /// Destroys all structures previously spawned by this loader (its children).
+     /// Used to wipe a failed placement attempt before retrying.
+     /// Manually-placed structures (not children of this loader) are preserved.
+     /// </summary>
+    private void ClearSpawnedStructures() {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+            DestroyImmediate(transform.GetChild(i).gameObject);
+        _structureEntryPoints.Clear();
+    }
+
+    /// <summary>
+    /// Reads (min, max) counts for every configured structure type. Types with max=0 are
+    /// excluded from the requirements map (they're explicitly disabled).
+    /// </summary>
+    private Dictionary<string, (int min, int max)> GetTypeRequirements() {
+        var reqs = new Dictionary<string, (int, int)>();
+        foreach (string type in GetConfiguredStructureTypes()) {
+            int min = WorldLoadingController.GetParamInt($"layout/structures/{type}/min", 0);
+            int max = WorldLoadingController.GetParamInt($"layout/structures/{type}/max", 0);
+            if (max == 0) continue;
+            reqs[type] = (min, max);
+        }
+        return reqs;
+    }
+
+    private List<WorldStructure> PlaceStructures(System.Random rng, float worldW, float worldH, float margin,
+            out Dictionary<string, int> placedCounts) {
+        placedCounts = new Dictionary<string, int>();
+
         // include manually pre-placed structures (not children of this loader)
         List<WorldStructure> placed = FindObjectsByType<WorldStructure>(FindObjectsSortMode.None)
             .Where(s => s.transform.parent != transform)
             .ToList();
 
-        
-
         if (verbose && placed.Count > 0)
             Debug.Log($"WorldLayoutLoader: found {placed.Count} manually placed structures");
+
+        // Per-type rejection-sampling budget. Default 200 matches the previous hard-coded cap.
+        int perTypeBudget = Mathf.Max(1,
+            WorldLoadingController.GetParamInt("layout/per_type_placement_attempts", 200));
 
         // discover which types are requested via config
         // we try to load a prefab for each type that has a non-zero max
@@ -160,21 +240,22 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
         foreach (string type in configuredTypes) {
             int min = WorldLoadingController.GetParamInt($"layout/structures/{type}/min", 0);
             int max = WorldLoadingController.GetParamInt($"layout/structures/{type}/max", 0);
-            if (max == 0) continue;
+            if (max == 0) { placedCounts[type] = 0; continue; }
 
             WorldStructure prefab = LoadPrefab(type);
-            if (prefab == null) continue;
+            if (prefab == null) { placedCounts[type] = 0; continue; }
 
             Vector2 size = GetSizeFromPrefab(prefab);
             if (size.sqrMagnitude < 0.01f) {
                 Debug.LogWarning($"WorldLayoutLoader: prefab '{type}' has no valid footprint collider size, skipping");
+                placedCounts[type] = 0;
                 continue;
             }
 
             int count = rng.Next(min, max + 1);
             int placedCount = 0, attempts = 0;
 
-            while (placedCount < count && attempts < 200) {
+            while (placedCount < count && attempts < perTypeBudget) {
                 attempts++;
 
                 float   rot    = (float)rng.NextDouble() * 360f;
@@ -203,8 +284,9 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
                 if (verbose) Debug.Log($"Placed {type} at {center}, rot={rot:F1}°, size={size}");
             }
 
-            if (placedCount < min)
-                Debug.LogWarning($"WorldLayoutLoader: could not place required {type} (min={min}, placed={placedCount})");
+            placedCounts[type] = placedCount;
+            if (placedCount < min && verbose)
+                Debug.Log($"WorldLayoutLoader: attempt placed {placedCount}/{min} of '{type}' (will retry if attempts remain)");
         }
 
         return placed;

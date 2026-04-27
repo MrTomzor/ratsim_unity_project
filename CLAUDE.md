@@ -41,6 +41,7 @@ The WorldGen system follows an **ECS-like pattern**:
 - `/sim_control/scene_select` (StringMessage) — loads a scene by name
 - `/sim_control/do_step` (StepRequestMessage) — controls whether physics is stepped
 - `/sim_control/step_finished` (StepFinishedMessage) — published by server each step
+- `/sim_control/worldgen_status` (WorldGenStatusMessage; `severity` ∈ `info|warning|error`, `source`, `message`) — published by world-gen subsystems via the static `WorldGenStatus.{Info,Warning,Error}` helper (`Assets/WorldGen/Utils/WorldGenStatus.cs`), which also mirrors to Unity's log. Python clients call `RoslikeUnityConnector.process_worldgen_status()` after each read to surface these in the user's terminal.
 
 **Timer registration:** Components call `conn.RegisterTimerDiscrete(callback, stepsPerTick)` or `conn.RegisterTimerContinuous(callback, periodSeconds)` in Start(). The server fires these each step via `HandleTimers`.
 
@@ -125,7 +126,7 @@ Flow: JSON params influence **loaders** → loaders produce **structures with ty
 Global providers (run in `Generate()`, dependency-ordered):
 - `WorldHeightLoader` (provides `Height`) — `IHeightProvider`: terrain height via "superflat" or "perlin" mode. Supports terrain modification influence zones: structures with `TerrainModification` component register OBB-shaped zones that flatten, set, or offset terrain height with smoothstep blending. `ProcessTerrainModifications()` is called by `WorldLayoutLoader` after structure placement. `GetBaseTerrainHeight(x,z)` returns unmodified height.
 - `WorldLayoutLoader` (provides `Layout`, depends on `Height`) — `ILayoutProvider`: places structures and road network (MST + extra edges). Runs eagerly in `Generate()`. No-ops when `layout/mode` ≠ `"default"`.
-- `MazeLayoutLoader` (provides `Layout`, depends on `Height`) — alternate `ILayoutProvider` + `IRoomProvider`. Active when `layout/mode = "maze"`. Generates a 2D binary wall/floor mask by rejection-sampling rectangular rooms and carving L-shaped corridors between them (MST + extras for loops), spawns one `maze_room` WorldStructure per room (empty footprint, queryable), and materializes wall cells as `maze_block` WorldStructures lazily per chunk at LOD0 (one scaled cube per wall cell, destroyed on chunk unload).
+- `MazeLayoutLoader` (provides `Layout`, depends on `Height`) — alternate `ILayoutProvider` + `IRoomProvider`. Active when `layout/mode = "maze"`. Generates a 2D binary wall/floor mask via one of two algorithms (`maze/mode`): `"rooms_and_corridors"` rejection-samples rectangular rooms and carves L-shaped wide corridors between them (MST + extras for loops); `"memory_maze"` mimics DeepMind labmaze (odd-aligned rooms + iterative DFS-backtracker 1-cell corridors filling the rest + one mandatory connector per region pair + probabilistic extras). Spawns one `maze_room` WorldStructure per room (empty footprint, queryable), and materializes wall cells as `maze_block` WorldStructures lazily per chunk at LOD0 (one scaled cube per wall cell, destroyed on chunk unload).
 - `WorldBoundaryLoader` (provides `Boundaries`, depends on `Height`, `Layout`) — spawns four wall WorldStructures enclosing the world when `world_bounds/boundary_type` = `visible_wall`. Prefab: `Resources/WorldGen/WorldStructurePrefabs/world_boundary`.
 - `SmokeLoader` (provides `Smoke`) — `ISmokeProvider`: event-driven loader that reacts to `SmokeOrigin` components appearing/disappearing anywhere in the scene. Subscribes to `SmokeOrigin.OnOriginEnabled`/`OnOriginDisabled` static events. For each origin, spawns smoke objects (2D mode: `SmokeObject2D` + `NamedSemanticObject`; 3D mode: stub for future particles). Supports both modes simultaneously. Smoke objects are parented to the origin and auto-destroyed when it is.
 - `LightingAndFogLoader` (provides `Lighting`) — applies lighting/fog settings each episode, optionally advances time-of-day.
@@ -210,6 +211,8 @@ Lighting (no deps, runs early)
 - `seed`, `world_bounds/width`, `world_bounds/height`, `world_bounds/structures_margin`
 - `layout/mode`: `"default"` (WorldLayoutLoader runs, `MazeLayoutLoader` stands down) or `"maze"` (vice versa). Default `"default"`.
 - `layout/structures/types` (comma list), `layout/structures/{type}/min`, `/max`
+- `layout/max_layout_attempts`: int (default 10). The whole structure-placement pass is repeated up to this many times until every type's `min` is satisfied. Each attempt uses a deterministic per-attempt seed `(masterSeed ^ "layout") ^ attempt_index`, so the retry sequence is reproducible from the world seed alone. If all attempts fail, an error is published on `/sim_control/worldgen_status` (visible in the user's terminal) listing the unmet types. If satisfaction took more than one attempt, an info message reports how many.
+- `layout/per_type_placement_attempts`: int (default 200). Per-type rejection-sampling budget within a single layout attempt. Increase if you have many large structures and a small world.
 - `city/house_spacing`, `city/max_houses`, `city/max_attempts`
 - `city/allowed_houses`: comma list of house prefab names to use (must exist in `Resources/WorldGen/WorldStructurePrefabs/` and start with `house`). Empty = use all discovered `house*` prefabs.
 - `city/{house_name}/probability`: relative spawn weight for a house prefab (default 1, 0 disables it)
@@ -242,8 +245,10 @@ Lighting (no deps, runs early)
 - `reward_objects/uniform_density`: objects per unit² for uniform world spawning (default 0 = disabled)
 - `reward_objects/uniform_constrain_to_rooms`: 0 or 1 (default 0) — when 1 and an `IRoomProvider` is registered (e.g. in maze mode), uniform spawns are rejected outside room footprints. Effective density inside rooms remains `uniform_density`; outside-room positions just don't place.
 - `reward_objects/allowed_structures`: comma list of structure types for structure-based spawning (default `""` = disabled)
-- `reward_objects/{type}/spawn_probability`: 0.0–1.0 per spawn position within a structure (default 1)
+- `reward_objects/{type}/spawn_probability`: 0.0–1.0 per spawn position within a structure (default 1). Ignored when `min_per_structure` or `max_per_structure` is set.
 - `reward_objects/{type}/skip_probability`: 0.0–1.0 chance to skip an entire structure (default 0)
+- `reward_objects/{type}/min_per_structure`: int. Minimum reward count per structure (default -1 = unset). When either min or max is set the loader uses **count mode**: it picks N in `[min, max]` and fills N random distinct `rewardSpawnPositions` slots; `spawn_probability` is ignored. Both bounds must be `<= childCount(rewardSpawnPositions)`; otherwise an error is published on `/sim_control/worldgen_status` and the structure is skipped.
+- `reward_objects/{type}/max_per_structure`: int. Maximum reward count per structure (default -1 = unset). If only one of min/max is set the other mirrors it (fixed N).
 - `reward_objects/signal_source/enable_probability`: 0.0–1.0 chance each spawned reward gets an enabled `SignalSource` (default 0 = off)
 - `reward_objects/signal_source/channel`: channel name for attached sources (default `"reward"`)
 - `reward_objects/signal_source/strength`: peak signal value at distance 0 (default 1)
@@ -268,17 +273,19 @@ Lighting (no deps, runs early)
 - `smoke/3dmode_enabled`: 0 or 1 (default 0) — spawn particle-based smoke for RGB (stub, future)
 - `smoke/default_radius`: radius of each smoke circle in world units (default 10)
 - `smoke/default_density`: probability of a random lidar hit per meter of ray travel through smoke (default 0.1)
-- `maze/mode`: maze generator variant (default `"rooms_and_corridors"`)
-- `maze/cell_size`: world units per mask cell (default 1)
+- `maze/mode`: maze generator variant: `"rooms_and_corridors"` (default; rectangular rooms + L-shaped wide corridors via MST + extras) or `"memory_maze"` (DeepMind labmaze algorithm — odd-aligned rooms + 1-cell DFS corridors + per-region-pair connectors. Mimics https://github.com/jurgisp/memory-maze).
+- `maze/cell_size`: world units per mask cell (default 1). In `memory_maze` mode the mask is forced to odd dimensions, so the effective world coverage is `cell_size × (floor(world/cell_size) | rounded down to odd)`.
 - `maze/wall_height`: Y scale of each block (default 3)
-- `maze/n_rooms`: target number of rooms (default 8)
-- `maze/room_min_size_cells`, `maze/room_max_size_cells`: room side range in cells (defaults 6 / 12)
-- `maze/room_min_separation_cells`: min gap between room rects, in cells (default 2)
-- `maze/room_max_attempts`: rejection-sampling budget per room (default 200)
-- `maze/corridor_width_cells`: corridor width in cells (default 3)
-- `maze/extra_corridor_fraction`: [0,1]; extras beyond MST as fraction of non-tree room pairs (default 0.3). Higher = more loops.
+- `maze/n_rooms`: target room count in `rooms_and_corridors` / max-rooms budget in `memory_maze` (default 8)
+- `maze/room_min_size_cells`, `maze/room_max_size_cells`: room side range in cells (defaults 6 / 12). `memory_maze` rounds these up to odd and clamps min to >=3.
+- `maze/room_min_separation_cells`: min gap between room rects, in cells (default 2). Ignored in `memory_maze` (always 1 — odd alignment guarantees a wall between non-overlapping rooms).
+- `maze/room_max_attempts`: rejection-sampling budget. `rooms_and_corridors`: per-room. `memory_maze`: total retry budget (matches labmaze `retry_count`, default suggests 1000 in this mode).
+- `maze/corridor_width_cells`: (`rooms_and_corridors` only) corridor width in cells (default 3). In `memory_maze` corridors are always 1 cell wide.
+- `maze/extra_corridor_fraction`: (`rooms_and_corridors` only) [0,1]; extras beyond MST as fraction of non-tree room pairs (default 0.3). Higher = more loops.
+- `maze/extra_connection_probability`: (`memory_maze` only) [0,1]; per-candidate-wall probability of opening an extra connection beyond the mandatory one per region pair (default 0.0 = pure tree, matching labmaze default).
 - `maze/border_walls`: 0 or 1 (default 1) — keep a 1-cell wall ring at the mask edge
 - `maze/semantic_name`: semantic class name for maze blocks (default `"maze_wall"`)
+- `maze/corridor_structures/*` — `rooms_and_corridors` only. The `memory_maze` algorithm carves 1-cell DFS corridors that don't have well-defined "segments" for elongated structures, so this feature is skipped there.
 - `maze/corridor_structures/types`: comma list of `WorldStructure` prefab names (in `Resources/WorldGen/WorldStructurePrefabs/`) to attempt per corridor segment. Empty = feature off.
 - `maze/corridor_structures/max_per_corridor`: global attempt budget per corridor segment (default 0 = off). An "attempt" picks one random slot and tries each type in list order; the first that fits without overlapping already-placed structures wins.
 - `maze/corridor_structures/{type}/chance`: per-attempt spawn probability for this type (default 1.0). Types are tried in list order, so earlier entries win ties — use this to prioritise.
@@ -337,6 +344,8 @@ All sensors publish via `conn.Publish(topic, msg)` on a discrete timer. All actu
 **`SectorSignalSensor`** reads from the global `SignalSource` registry (`Assets/WorldGen/Data/SignalSource.cs`). Each source broadcasts a scalar on a named channel with linear or exponential distance falloff and a range cutoff; sources self-register on OnEnable. The sensor bins active sources into egocentric forward-centered sectors per channel (gaussian falloff across neighbors, σ in bin widths), max-aggregates per (channel, sector), clamps to [0,1], and publishes a `FloatArrayMessage` per channel on `<topic_prefix>/<channel>` (default prefix `/sector_signal`). No occlusion — sources contribute within their range regardless of walls. Loaders attach/remove/configure `SignalSource` conditionally (e.g. `RewardObjectLoader` exposes `reward_objects/signal_source/*` to turn a random fraction of spawned rewards into sources).
 
 **Actuators** (`Assets/Actuators/`): `Twist2DActuator` (subscribes to `TwistMessage` for velocity/acceleration control), `PoseTeleportActuator` (subscribes to `PoseMessage`)
+
+**Human control input.** When `/enable_human_control = true`, `Twist2DActuator` ignores TCP commands and instead reads `InputSystem_Actions` (the new Unity Input System asset at `Assets/InputSystem_Actions.inputactions`): `Player.Move` for forward/turn, `Player.Sprint` (bound to LeftShift) for full-speed; without Sprint, output is scaled by `Twist2DActuator.humanControlDefaultSpeedScale` (default 0.5). `WorldMechanics/HumanControlManager` only toggles the human-control camera — it does NOT own input handling.
 
 **Coordinate convention:** All data crossing TCP uses ROS standard (x=forward, y=left, z=up). Unity sensors/actuators convert internally via `CoordConversion.cs` (`Assets/TCPConnector/`). Sensors publish `PoseMessage`; actuators subscribe to `TwistMessage` or `PoseMessage`.
 

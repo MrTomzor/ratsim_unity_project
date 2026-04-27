@@ -36,5 +36,6 @@ public class MessageRegistry
         { "RGBDMessage", typeof(RGBDMessage) },
         { "CameraIntrinsicsMessage", typeof(CameraIntrinsicsMessage) },
         { "MapGenTemplate2D", typeof(MapGenTemplate2D)},
+        { "WorldGenStatusMessage", typeof(WorldGenStatusMessage)},
     };
 }

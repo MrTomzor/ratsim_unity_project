@@ -100,6 +100,18 @@ public class CameraIntrinsicsMessage : Message
     public float verticalFOV { get; set; }
 }
 
+/// <summary>
+/// Status report from world generation (errors, warnings, retry events).
+/// Severity is one of: "info", "warning", "error".
+/// Source identifies the originating subsystem (e.g. "WorldLayoutLoader", "RewardObjectLoader").
+/// </summary>
+public class WorldGenStatusMessage : Message
+{
+    public string severity { get; set; }
+    public string source { get; set; }
+    public string message { get; set; }
+}
+
 public class MapGenTemplate2D : Message
 {
     // Dimensions of the masks

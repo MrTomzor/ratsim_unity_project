@@ -37,6 +37,11 @@ public class Twist2DActuator : MonoBehaviour
     public enum HumanControlMode { Velocity, Acceleration }
     public HumanControlMode humanControlMode = HumanControlMode.Velocity;
 
+    [Tooltip("Speed multiplier applied while the Sprint action (LeftShift) is NOT held. " +
+             "Sprint-held = full max velocity/acceleration.")]
+    [Range(0f, 1f)]
+    public float humanControlDefaultSpeedScale = 0.5f;
+
     private InputSystem_Actions _inputActions;
     private Vector2 _moveInput;
 
@@ -144,19 +149,23 @@ public class Twist2DActuator : MonoBehaviour
 
         _moveInput = _inputActions.Player.Move.ReadValue<Vector2>();
 
+        // Sprint action (LeftShift by default) gates max speed; otherwise scale down.
+        bool sprinting = _inputActions.Player.Sprint.IsPressed();
+        float scale = sprinting ? 1f : humanControlDefaultSpeedScale;
+
         TwistMessage msg = new TwistMessage();
         // Move.y = forward/backward (W/S or left stick Y), Move.x = left/right (A/D or left stick X)
         if (humanControlMode == HumanControlMode.Velocity)
         {
-            msg.linear_x = _moveInput.y * maxLinearVelocity;
-            msg.angular_z = -_moveInput.x * maxAngularVelocity;
-            Debug.Log("Human control raw input: " + _moveInput + " -> velocity cmd: linear_x=" + msg.linear_x + ", angular_z=" + msg.angular_z);
+            msg.linear_x = _moveInput.y * maxLinearVelocity * scale;
+            msg.angular_z = -_moveInput.x * maxAngularVelocity * scale;
+            Debug.Log("Human control raw input: " + _moveInput + " sprint=" + sprinting + " -> velocity cmd: linear_x=" + msg.linear_x + ", angular_z=" + msg.angular_z);
             ApplyVelocity(msg);
         }
         else
         {
-            msg.linear_x = _moveInput.y * maxLinearAcceleration;
-            msg.angular_z = -_moveInput.x * maxAngularAcceleration;
+            msg.linear_x = _moveInput.y * maxLinearAcceleration * scale;
+            msg.angular_z = -_moveInput.x * maxAngularAcceleration * scale;
             ApplyAcceleration(msg);
         }
     }

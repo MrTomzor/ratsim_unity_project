@@ -31,16 +31,17 @@ using UnityEngine;
 ///
 /// Config params (all under "maze/" unless noted):
 ///   layout/mode                  -- "default" (disables this loader) or "maze" (default "default")
-///   maze/mode                    -- maze generator variant (default "rooms_and_corridors")
+///   maze/mode                    -- "rooms_and_corridors" (default) | "memory_maze"
 ///   maze/cell_size               -- world units per mask cell (default 1)
 ///   maze/wall_height             -- Y scale of each block (default 3)
-///   maze/n_rooms                 -- target number of rooms (default 8)
-///   maze/room_min_size_cells     -- min room side in cells (default 6)
-///   maze/room_max_size_cells     -- max room side in cells (default 12)
-///   maze/room_min_separation_cells -- min gap between room rects, in cells (default 2)
-///   maze/room_max_attempts       -- rejection-sampling budget per room (default 200)
-///   maze/corridor_width_cells    -- corridor width in cells (default 3)
-///   maze/extra_corridor_fraction -- [0,1]; extras beyond MST as fraction of non-tree pairs (default 0.3)
+///   maze/n_rooms                 -- target room count (rooms_and_corridors) / max-rooms budget (memory_maze) (default 8)
+///   maze/room_min_size_cells     -- min room side in cells (default 6; memory_maze rounds up to odd)
+///   maze/room_max_size_cells     -- max room side in cells (default 12; memory_maze rounds up to odd)
+///   maze/room_min_separation_cells -- min gap between room rects, in cells (default 2; ignored in memory_maze, fixed at 1)
+///   maze/room_max_attempts       -- rejection-sampling budget (per room in r&c, total in memory_maze) (default 200)
+///   maze/corridor_width_cells    -- (rooms_and_corridors only) corridor width in cells (default 3)
+///   maze/extra_corridor_fraction -- (rooms_and_corridors only) [0,1] extras beyond MST as fraction of non-tree pairs (default 0.3)
+///   maze/extra_connection_probability -- (memory_maze only) [0,1] per-candidate-wall extra-loop prob beyond mandatory (default 0.0)
 ///   maze/border_walls            -- 0/1; stamp a 1-cell-thick wall ring along the mask edge (default 1)
 ///   maze/semantic_name           -- semantic name used for blocks (default "maze_wall")
 ///
@@ -56,6 +57,9 @@ using UnityEngine;
 /// Per attempt (max_per_corridor times per corridor segment), entries are tried in list order and the first
 /// one whose `chance` roll succeeds is placed — so list order is priority order. Placed structures occupy an
 /// interval along the corridor and won't overlap other already-placed structures in the same segment.
+///
+/// Note: corridor structure spawning is rooms_and_corridors only (memory_maze produces 1-cell DFS
+/// corridors that don't have well-defined "segments" for elongated structures).
 /// </summary>
 public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvider {
 
@@ -140,6 +144,9 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         switch (mazeMode.ToLowerInvariant()) {
             case "rooms_and_corridors":
                 GenerateRoomsAndCorridors(rng);
+                break;
+            case "memory_maze":
+                GenerateMemoryMaze(rng);
                 break;
             default:
                 Debug.LogWarning($"MazeLayoutLoader: unknown maze/mode '{mazeMode}', falling back to rooms_and_corridors");
@@ -404,6 +411,203 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         if (verbose)
             Debug.Log($"MazeLayoutLoader: corridors MST={mstAdded}, extras={extrasAdded}/{extraBudget}");
+    }
+
+    // ─────────────────────────────────────────────
+    //  Mask generation: memory-maze style (labmaze algorithm)
+    // ─────────────────────────────────────────────
+    //
+    // Mirrors DeepMind labmaze (which memory-maze uses verbatim). Operates on
+    // an odd-sized grid where walls live on even coords and floors on odd
+    // coords — that's what makes corridors come out 1 cell wide and rooms
+    // odd-sized.
+    //
+    //   1. Rejection-sample odd-aligned, odd-sized rooms (each gets a region id).
+    //   2. Iterative DFS backtracker fills every remaining odd cell with
+    //      1-wide corridors. Each connected blob gets its own region id.
+    //   3. For each unordered pair of adjacent regions, collect every wall
+    //      cell that separates them. Knock out exactly one (mandatory connector,
+    //      guarantees connectivity) and then knock out each remaining one with
+    //      probability `extra_connection_probability` (loops).
+    //
+    // Corridor segment recording is skipped — DFS corridors don't have clean
+    // "segments" for the corridor-structures feature.
+
+    private void GenerateMemoryMaze(System.Random rng) {
+        // Force mask dims odd (labmaze invariant). Recenter origin on whatever we end up with.
+        int oddW = (_maskW % 2 == 1) ? _maskW : _maskW - 1;
+        int oddH = (_maskH % 2 == 1) ? _maskH : _maskH - 1;
+        if (oddW < 5 || oddH < 5) {
+            Debug.LogError($"MazeLayoutLoader.memory_maze: mask too small ({oddW}x{oddH}); need >=5x5");
+            return;
+        }
+        _maskW = oddW;
+        _maskH = oddH;
+        _originX = -_maskW * _cellSize * 0.5f;
+        _originZ = -_maskH * _cellSize * 0.5f;
+
+        _mask = new bool[_maskW, _maskH];
+        int[,] regions = new int[_maskW, _maskH]; // 0 = wall (initial)
+        for (int i = 0; i < _maskW; i++)
+            for (int j = 0; j < _maskH; j++)
+                _mask[i, j] = true;
+
+        float extraProb = Mathf.Clamp01(
+            WorldLoadingController.GetParamFloat("maze/extra_connection_probability", 0f));
+        int maxRooms = nRooms;
+
+        // Round room sizes up to odd (labmaze convention).
+        int rMin = roomMinSizeCells | 1;
+        int rMax = roomMaxSizeCells | 1;
+        if (rMin < 3) rMin = 3;
+        if (rMax < rMin) rMax = rMin;
+
+        int nextRegion = 1;
+        List<RoomRect> rooms = new List<RoomRect>();
+
+        // Phase 1: place rooms. Counter increments only on placement failure (matches labmaze retry semantics).
+        int retries = 0;
+        while (rooms.Count < maxRooms && retries < roomMaxAttempts) {
+            int wHalf = (rMax - rMin) / 2;
+            int w = rMin + 2 * rng.Next(0, wHalf + 1);
+            int h = rMin + 2 * rng.Next(0, wHalf + 1);
+            // Position must be odd; leave a 1-cell border so outer walls stay intact.
+            int xMaxOdd = _maskW - 1 - w;
+            int zMaxOdd = _maskH - 1 - h;
+            if (xMaxOdd < 1 || zMaxOdd < 1) { retries++; continue; }
+            int x0 = 1 + 2 * rng.Next(0, (xMaxOdd - 1) / 2 + 1);
+            int z0 = 1 + 2 * rng.Next(0, (zMaxOdd - 1) / 2 + 1);
+
+            RoomRect candidate = new RoomRect { x0 = x0, z0 = z0, w = w, h = h };
+            // Min-1 separation guarantees a wall between rooms; odd alignment makes that automatic
+            // when rooms don't overlap, but explicit check is cheap insurance.
+            if (rooms.Any(r => RoomsOverlapWithSeparation(r, candidate, 1))) {
+                retries++;
+                continue;
+            }
+
+            int rid = nextRegion++;
+            for (int i = x0; i < x0 + w; i++)
+                for (int j = z0; j < z0 + h; j++) {
+                    _mask[i, j] = false;
+                    regions[i, j] = rid;
+                }
+            rooms.Add(candidate);
+        }
+
+        // Phase 2: fill the rest with 1-wide DFS corridors. Each blob is a new region.
+        Vector2Int[] cardinals = {
+            new Vector2Int( 2,  0), new Vector2Int(-2,  0),
+            new Vector2Int( 0,  2), new Vector2Int( 0, -2)
+        };
+        Stack<Vector2Int> stack = new Stack<Vector2Int>();
+        List<Vector2Int> dirBuf = new List<Vector2Int>(4);
+
+        for (int si = 1; si < _maskW; si += 2) {
+            for (int sj = 1; sj < _maskH; sj += 2) {
+                if (regions[si, sj] != 0) continue;
+                int rid = nextRegion++;
+                stack.Clear();
+                stack.Push(new Vector2Int(si, sj));
+                _mask[si, sj] = false;
+                regions[si, sj] = rid;
+
+                while (stack.Count > 0) {
+                    Vector2Int cur = stack.Peek();
+                    dirBuf.Clear();
+                    foreach (Vector2Int d in cardinals) {
+                        int ni = cur.x + d.x, nj = cur.y + d.y;
+                        if (ni <= 0 || ni >= _maskW - 1 || nj <= 0 || nj >= _maskH - 1) continue;
+                        if (regions[ni, nj] != 0) continue;
+                        dirBuf.Add(d);
+                    }
+                    if (dirBuf.Count == 0) { stack.Pop(); continue; }
+                    Vector2Int dd = dirBuf[rng.Next(dirBuf.Count)];
+                    int wi = cur.x + dd.x / 2, wj = cur.y + dd.y / 2; // wall between
+                    int ti = cur.x + dd.x,     tj = cur.y + dd.y;     // target cell
+                    _mask[wi, wj] = false; regions[wi, wj] = rid;
+                    _mask[ti, tj] = false; regions[ti, tj] = rid;
+                    stack.Push(new Vector2Int(ti, tj));
+                }
+            }
+        }
+
+        // Phase 3: collect candidate connectors (walls separating two different regions).
+        // Only scan +x and +z directions to avoid double-counting.
+        Dictionary<long, List<Vector2Int>> connectors = new Dictionary<long, List<Vector2Int>>();
+        for (int i = 1; i < _maskW; i += 2) {
+            for (int j = 1; j < _maskH; j += 2) {
+                int r0 = regions[i, j];
+                if (r0 == 0) continue;
+                // +x neighbor
+                if (i + 2 < _maskW) {
+                    int r1 = regions[i + 2, j];
+                    if (r1 != 0 && r1 != r0) {
+                        long key = PairKey(r0, r1);
+                        if (!connectors.TryGetValue(key, out var list)) {
+                            list = new List<Vector2Int>();
+                            connectors[key] = list;
+                        }
+                        list.Add(new Vector2Int(i + 1, j));
+                    }
+                }
+                // +z neighbor
+                if (j + 2 < _maskH) {
+                    int r1 = regions[i, j + 2];
+                    if (r1 != 0 && r1 != r0) {
+                        long key = PairKey(r0, r1);
+                        if (!connectors.TryGetValue(key, out var list)) {
+                            list = new List<Vector2Int>();
+                            connectors[key] = list;
+                        }
+                        list.Add(new Vector2Int(i, j + 1));
+                    }
+                }
+            }
+        }
+
+        // Mandatory: knock out exactly one wall per region pair.
+        int extras = 0, mandatory = 0;
+        foreach (var kv in connectors) {
+            var locs = kv.Value;
+            if (locs.Count == 0) continue;
+            Vector2Int chosen = locs[rng.Next(locs.Count)];
+            _mask[chosen.x, chosen.y] = false;
+            mandatory++;
+        }
+        // Extras: each non-chosen connector with probability extraProb.
+        if (extraProb > 0f) {
+            foreach (var kv in connectors) {
+                foreach (Vector2Int c in kv.Value) {
+                    if (!_mask[c.x, c.y]) continue; // already opened
+                    if (rng.NextDouble() <= extraProb) {
+                        _mask[c.x, c.y] = false;
+                        extras++;
+                    }
+                }
+            }
+        }
+
+        // Store room bounds for IRoomProvider.
+        _rooms.Clear();
+        foreach (RoomRect r in rooms) {
+            Vector2 center = new Vector2(
+                _originX + (r.x0 + r.w * 0.5f) * _cellSize,
+                _originZ + (r.z0 + r.h * 0.5f) * _cellSize
+            );
+            Vector2 size = new Vector2(r.w * _cellSize, r.h * _cellSize);
+            _rooms.Add(new Bounds2D(center, size, 0f));
+        }
+
+        if (verbose)
+            Debug.Log($"MazeLayoutLoader.memory_maze: {_maskW}x{_maskH} mask, rooms={rooms.Count}/{maxRooms} " +
+                      $"(retries={retries}), regions={nextRegion - 1}, mandatory={mandatory}, extras={extras}");
+    }
+
+    // Pack two ints into a long for use as a dict key (order-independent).
+    private static long PairKey(int a, int b) {
+        int lo = Mathf.Min(a, b), hi = Mathf.Max(a, b);
+        return ((long)lo << 32) | (uint)hi;
     }
 
     // ─────────────────────────────────────────────

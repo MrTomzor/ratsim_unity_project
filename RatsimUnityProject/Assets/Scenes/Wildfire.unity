@@ -1145,6 +1145,7 @@ MonoBehaviour:
   gridSpacingZ: 50
   gridMargin: 15
   gridRoadWidth: 6
+  allowedHousePrefabs: 
 --- !u!4 &639286121
 Transform:
   m_ObjectHideFlags: 0
@@ -2081,7 +2082,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugStartEpisodeOnAwake: 0
-  debugRandomizeSeedOnStart: 1
+  debugRandomizeSeedOnStart: 0
   agentObject: {fileID: 0}
   masterSeed: 42
   chunkWidth: 128
@@ -2818,6 +2819,7 @@ MonoBehaviour:
   prefabName: reward_obj1
   uniformDensity: 0
   boundaryBuffer: 5
+  uniformConstrainToRooms: 0
   allowedStructures: 
   signalEnableProbability: 1
   signalChannel: reward
