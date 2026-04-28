@@ -45,11 +45,24 @@ using UnityEngine;
 ///   maze/room_min_size_cells     -- min room side in cells (default 6; memory_maze rounds up to odd)
 ///   maze/room_max_size_cells     -- max room side in cells (default 12; memory_maze rounds up to odd)
 ///   maze/room_min_separation_cells -- min gap between room rects, in cells (default 2; ignored in memory_maze, fixed at 1)
-///   maze/room_max_attempts       -- rejection-sampling budget (per room in r&c, total in memory_maze) (default 200)
+///   maze/room_max_attempts       -- rejection-sampling budget (per room in r&c, total per outer attempt in memory_maze) (default 200)
+///   maze/room_placement_retries  -- (memory_maze only) outer retries: if rejection sampling exhausts room_max_attempts
+///                                   without filling n_rooms, we restart room placement from scratch up to this many times.
+///                                   Tight packings (e.g. 9 rooms of size 3 in a 15x15 mask, near labmaze's theoretical
+///                                   limit) often need many restarts because a greedy random pass can paint itself into
+///                                   a corner. We keep the best (largest) attempt across restarts. Default 100.
 ///   maze/corridor_width_cells    -- (rooms_and_corridors only) corridor width in cells (default 3)
 ///   maze/extra_corridor_fraction -- (rooms_and_corridors only) [0,1] extras beyond MST as fraction of non-tree pairs (default 0.3)
 ///   maze/extra_connection_probability -- (memory_maze only) [0,1] per-candidate-wall extra-loop prob beyond mandatory (default 0.0)
 ///   maze/border_walls            -- 0/1; stamp a 1-cell-thick wall ring along the mask edge (default 1)
+///   maze/edge_walls_only         -- 0/1; only spawn block structures for wall cells with at least
+///                                   one 4-connected floor neighbor (default 1). Skipped interior
+///                                   walls are invisible to physics, lidar, and cameras (no floor
+///                                   sees them), so culling them is purely a perf win — typically
+///                                   5-10x fewer GameObjects in dense mazes. Disable only for
+///                                   debugging or visual top-down maps that need solid wall fill.
+///                                   Force-disabled in memory_maze mode (4-connected cull would
+///                                   drop diagonal corner walls and leak rays between regions).
 ///   maze/semantic_name           -- semantic name used for blocks (default "maze_wall")
 ///
 /// Room labeling (optional — empty list → all rooms get structureType="maze_room"):
@@ -101,6 +114,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     public int corridorWidthCells = 3;
     public float extraCorridorFraction = 0.3f;
     public bool borderWalls = true;
+    public bool edgeWallsOnly = true;
     public string semanticName = "maze_wall";
 
     // ─────────────────────────────────────────────
@@ -260,6 +274,7 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         corridorWidthCells    = WorldLoadingController.GetParamInt  ("maze/corridor_width_cells",     corridorWidthCells);
         extraCorridorFraction = WorldLoadingController.GetParamFloat("maze/extra_corridor_fraction",  extraCorridorFraction);
         borderWalls           = WorldLoadingController.GetParamInt  ("maze/border_walls", borderWalls ? 1 : 0) != 0;
+        edgeWallsOnly         = WorldLoadingController.GetParamInt  ("maze/edge_walls_only", edgeWallsOnly ? 1 : 0) != 0;
         semanticName          = WorldLoadingController.GetParamString("maze/semantic_name",           semanticName);
 
         _worldW = WorldLoadingController.GetParamFloat("world_bounds/width",  100f);
@@ -460,6 +475,16 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     // "segments" for the corridor-structures feature.
 
     private void GenerateMemoryMaze(System.Random rng) {
+        // memory_maze has 1-cell-thick walls. At the corner cells where four corridors meet,
+        // a wall cell can have floor neighbors only on the diagonals — its four 4-connected
+        // neighbors are all walls. The 4-connected `edge_walls_only` cull would drop those
+        // corners, opening diagonal pinholes through which lidar rays leak between regions.
+        // Force-disable here regardless of config (mode-specific guard, not a user knob).
+        if (edgeWallsOnly) {
+            if (verbose) Debug.Log("MazeLayoutLoader.memory_maze: ignoring edge_walls_only=1 (would leak diagonal corner walls)");
+            edgeWallsOnly = false;
+        }
+
         // Force mask dims odd (labmaze invariant). Recenter origin on whatever we end up with.
         int oddW = (_maskW % 2 == 1) ? _maskW : _maskW - 1;
         int oddH = (_maskH % 2 == 1) ? _maskH : _maskH - 1;
@@ -489,36 +514,49 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         if (rMax < rMin) rMax = rMin;
 
         int nextRegion = 1;
+
+        // Phase 1: place rooms. Random placement with rejection sampling can paint itself
+        // into a corner when the packing is tight (e.g. 9 rooms of size 3 in a 15x15 mask
+        // is at the theoretical limit), so we wrap the inner placement loop with an outer
+        // retry: if the inner loop exhausts roomMaxAttempts without filling maxRooms, we
+        // restart room sampling from scratch. We keep the best (largest) attempt so that
+        // even if every restart falls short, we return as many rooms as we managed.
+        int outerRetries = Mathf.Max(1,
+            WorldLoadingController.GetParamInt("maze/room_placement_retries", 100));
+        int roomsBaseSeed = WorldLoadingController.GetDerivedSeed("maze_rooms");
         List<RoomRect> rooms = new List<RoomRect>();
+        int totalInnerRetries = 0;
+        int outerAttemptsUsed = 0;
+        for (int outer = 0; outer < outerRetries; outer++) {
+            outerAttemptsUsed++;
+            // Deterministic per-attempt seed via HashCode.Combine (NOT XOR) — same pattern
+            // as WorldLayoutLoader. XOR(baseSeed, attempt) has overlapping cosets across
+            // adjacent base seeds (e.g. seed=43,attempt=0 produces the same rng seed as
+            // seed=42,attempt=1), so a master-seed bump would converge to the same layout
+            // after retries. Per-attempt fresh RNG also makes the result robust to
+            // room_max_attempts changes (a failing attempt no longer shifts later ones).
+            System.Random attemptRng = new System.Random(System.HashCode.Combine(roomsBaseSeed, outer));
+            List<RoomRect> attempt = SampleMemoryMazeRooms(maxRooms, rMin, rMax, roomMaxAttempts, attemptRng, out int innerRetries);
+            totalInnerRetries += innerRetries;
+            if (attempt.Count > rooms.Count) rooms = attempt;
+            if (rooms.Count >= maxRooms) break;
+        }
 
-        // Phase 1: place rooms. Counter increments only on placement failure (matches labmaze retry semantics).
-        int retries = 0;
-        while (rooms.Count < maxRooms && retries < roomMaxAttempts) {
-            int wHalf = (rMax - rMin) / 2;
-            int w = rMin + 2 * rng.Next(0, wHalf + 1);
-            int h = rMin + 2 * rng.Next(0, wHalf + 1);
-            // Position must be odd; leave a 1-cell border so outer walls stay intact.
-            int xMaxOdd = _maskW - 1 - w;
-            int zMaxOdd = _maskH - 1 - h;
-            if (xMaxOdd < 1 || zMaxOdd < 1) { retries++; continue; }
-            int x0 = 1 + 2 * rng.Next(0, (xMaxOdd - 1) / 2 + 1);
-            int z0 = 1 + 2 * rng.Next(0, (zMaxOdd - 1) / 2 + 1);
+        if (rooms.Count < maxRooms) {
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"memory_maze: only placed {rooms.Count}/{maxRooms} rooms after {outerAttemptsUsed} " +
+                $"outer retries (each with up to {roomMaxAttempts} inner samples). " +
+                $"Reduce maze/n_rooms, raise maze/room_placement_retries, or grow the world.");
+        }
 
-            RoomRect candidate = new RoomRect { x0 = x0, z0 = z0, w = w, h = h };
-            // Min-1 separation guarantees a wall between rooms; odd alignment makes that automatic
-            // when rooms don't overlap, but explicit check is cheap insurance.
-            if (rooms.Any(r => RoomsOverlapWithSeparation(r, candidate, 1))) {
-                retries++;
-                continue;
-            }
-
+        // Carve the chosen rooms into the mask and assign region IDs.
+        foreach (RoomRect r in rooms) {
             int rid = nextRegion++;
-            for (int i = x0; i < x0 + w; i++)
-                for (int j = z0; j < z0 + h; j++) {
+            for (int i = r.x0; i < r.x0 + r.w; i++)
+                for (int j = r.z0; j < r.z0 + r.h; j++) {
                     _mask[i, j] = false;
                     regions[i, j] = rid;
                 }
-            rooms.Add(candidate);
         }
 
         // Phase 2: fill the rest with 1-wide DFS corridors. Each blob is a new region.
@@ -629,7 +667,42 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         if (verbose)
             Debug.Log($"MazeLayoutLoader.memory_maze: {_maskW}x{_maskH} mask, rooms={rooms.Count}/{maxRooms} " +
-                      $"(retries={retries}), regions={nextRegion - 1}, mandatory={mandatory}, extras={extras}");
+                      $"(outer_retries={outerAttemptsUsed}, total_inner_retries={totalInnerRetries}), " +
+                      $"regions={nextRegion - 1}, mandatory={mandatory}, extras={extras}");
+    }
+
+    /// <summary>
+    /// One pass of memory_maze room placement: rejection-sample odd-aligned, odd-sized rooms
+    /// until we hit `maxRooms` or exhaust `innerAttempts` consecutive failures. Pure — does
+    /// not mutate `_mask` or `regions`. Caller (GenerateMemoryMaze) wraps this in an outer
+    /// retry to recover from greedy placements that get stuck below the target count.
+    /// </summary>
+    private List<RoomRect> SampleMemoryMazeRooms(int maxRooms, int rMin, int rMax,
+                                                 int innerAttempts, System.Random rng,
+                                                 out int retries) {
+        List<RoomRect> rooms = new List<RoomRect>();
+        retries = 0;
+        while (rooms.Count < maxRooms && retries < innerAttempts) {
+            int wHalf = (rMax - rMin) / 2;
+            int w = rMin + 2 * rng.Next(0, wHalf + 1);
+            int h = rMin + 2 * rng.Next(0, wHalf + 1);
+            // Position must be odd; leave a 1-cell border so outer walls stay intact.
+            int xMaxOdd = _maskW - 1 - w;
+            int zMaxOdd = _maskH - 1 - h;
+            if (xMaxOdd < 1 || zMaxOdd < 1) { retries++; continue; }
+            int x0 = 1 + 2 * rng.Next(0, (xMaxOdd - 1) / 2 + 1);
+            int z0 = 1 + 2 * rng.Next(0, (zMaxOdd - 1) / 2 + 1);
+
+            RoomRect candidate = new RoomRect { x0 = x0, z0 = z0, w = w, h = h };
+            // Min-1 separation guarantees a wall between rooms; odd alignment makes that automatic
+            // when rooms don't overlap, but explicit check is cheap insurance.
+            if (rooms.Any(r => RoomsOverlapWithSeparation(r, candidate, 1))) {
+                retries++;
+                continue;
+            }
+            rooms.Add(candidate);
+        }
+        return rooms;
     }
 
     // Pack two ints into a long for use as a dict key (order-independent).
@@ -661,6 +734,10 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
             if (cxw < chunkMinX || cxw >= chunkMaxX) continue;
             for (int j = jMin; j <= jMax; j++) {
                 if (!_mask[i, j]) continue;
+                // edge_walls_only: skip wall cells whose 4-connected neighbors are all walls
+                // or out-of-bounds. Such cells are invisible (no floor sees them) and don't
+                // affect physics or lidar. Cuts block count ~5-10x in dense mazes.
+                if (edgeWallsOnly && !IsExposedWall(i, j)) continue;
                 float czw = _originZ + (j + 0.5f) * _cellSize;
                 if (czw < chunkMinZ || czw >= chunkMaxZ) continue;
 
@@ -671,6 +748,19 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         if (blocks.Count > 0) _chunkBlocks[new Vector2Int(cx, cz)] = blocks;
         if (verbose) Debug.Log($"MazeLayoutLoader: chunk ({cx},{cz}) spawned {blocks.Count} blocks");
+    }
+
+    /// <summary>
+    /// True if the wall cell at (i, j) has at least one 4-connected floor neighbor
+    /// inside the mask. Out-of-bounds neighbors count as walls. Used to cull
+    /// invisible interior wall cells when `edge_walls_only` is enabled.
+    /// </summary>
+    private bool IsExposedWall(int i, int j) {
+        if (i > 0           && !_mask[i - 1, j]) return true;
+        if (i < _maskW - 1  && !_mask[i + 1, j]) return true;
+        if (j > 0           && !_mask[i, j - 1]) return true;
+        if (j < _maskH - 1  && !_mask[i, j + 1]) return true;
+        return false;
     }
 
     // Builds a single-GameObject WorldStructure with a cube mesh+collider.
