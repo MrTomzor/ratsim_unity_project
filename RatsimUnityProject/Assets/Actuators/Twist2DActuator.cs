@@ -4,11 +4,11 @@ using UnityEngine.InputSystem;
 public class Twist2DActuator : MonoBehaviour
 {
     RoslikeTCPServer conn;
-    public float maxLinearVelocity = 10f;
-    public float maxAngularVelocity = 5f;
+    public float maxLinearVelocity = 1f;
+    public float maxAngularVelocity = .5f;
 
-    public float maxLinearAcceleration = 5f;
-    public float maxAngularAcceleration = 2f;
+    public float maxLinearAcceleration = .5f;
+    public float maxAngularAcceleration = .2f;
 
     public string velCmdTopic = "/cmd_vel";
     public string accelCmdTopic = "/cmd_accel";

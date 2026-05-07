@@ -144,10 +144,10 @@ Rigidbody:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1675505943394758802}
-  serializedVersion: 5
+  serializedVersion: 4
   m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_Drag: 0
+  m_AngularDrag: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -176,8 +176,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f723204076dfa8b46ae18beefb5939cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxLinearVelocity: 10
-  maxAngularVelocity: 2.5
+  maxLinearVelocity: 2
+  maxAngularVelocity: 0.5
   maxLinearAcceleration: 5
   maxAngularAcceleration: 2
   velCmdTopic: /cmd_vel
@@ -348,6 +348,7 @@ MonoBehaviour:
   imageWidth: 640
   imageHeight: 480
   depthImageMaxRange: 100
+  captureDepth: 1
   linearDepthShader: {fileID: 0}
 --- !u!114 &-653628547537935938
 MonoBehaviour:

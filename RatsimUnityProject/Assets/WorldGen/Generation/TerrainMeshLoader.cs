@@ -12,6 +12,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
     [Header("Mesh Settings")]
     public Material terrainMaterial;
+    public float textureScale = 0.4f;
 
     [Header("Perlin (used only if WorldHeightLoader is not present)")]
     public float heightScale = 30f;
@@ -117,6 +118,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
     //  Mesh building
     // ─────────────────────────────────────────────
 
+    
     private ChunkData BuildChunk(int chunkX, int chunkZ, int lod) {
         int origLOD = lod;
         lod = lod + resolutionScale; // apply global resolution scale
@@ -139,7 +141,9 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
             float h      = WorldServices.Get<IHeightProvider>().GetTerrainHeight(worldX, worldZ);
             int   idx    = z * vertsPerSide + x;
             vertices[idx] = new Vector3(x * step, h, z * step);
-            uvs[idx]      = new Vector2((float)x / (vertsPerSide - 1), (float)z / (vertsPerSide - 1));
+            
+            //uvs[idx]      = new Vector2((float)x / (vertsPerSide - 1), (float)z / (vertsPerSide - 1));
+            uvs[idx] = new Vector2(worldX * textureScale/100, worldZ * textureScale/100);
         }
 
         int quadsPerSide = vertsPerSide - 1;
@@ -166,10 +170,9 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
         GameObject go = new GameObject($"TerrainChunk_{chunkX}_{chunkZ}");
         go.transform.SetParent(transform, false);
-        go.transform.position = new Vector3(ox, 0f, oz);
+        go.transform.position = new Vector3(ox, -0.01f, oz);
         go.AddComponent<MeshFilter>().sharedMesh     = mesh;
-        go.AddComponent<MeshRenderer>().sharedMaterial = terrainMaterial != null
-            ? terrainMaterial : CreateDefaultMaterial();
+        go.AddComponent<MeshRenderer>().sharedMaterial = terrainMaterial != null ? terrainMaterial : CreateDefaultMaterial();
         go.AddComponent<MeshCollider>().sharedMesh   = mesh;
 
         return new ChunkData { go = go, mesh = mesh, vertices = vertices, normals = normals, vertsPerSide = vertsPerSide, lod = origLOD };
@@ -242,7 +245,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
     private static Material CreateDefaultMaterial() {
         Material mat = new Material(Shader.Find("Standard"));
-        mat.color = new Color(0.76f, 0.60f, 0.42f);
+        mat.color = new Color(0.99f, 0.00f, 0.42f);
         return mat;
     }
 

@@ -1145,6 +1145,7 @@ MonoBehaviour:
   gridSpacingZ: 50
   gridMargin: 15
   gridRoadWidth: 6
+  allowedHousePrefabs: 
 --- !u!4 &639286121
 Transform:
   m_ObjectHideFlags: 0
@@ -1187,20 +1188,20 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
+  m_Color: {r: 1, g: 0.9621859, b: 0.7971698, a: 1}
   m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize: 17.89
   m_Shadows:
     m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 1
-    m_Bias: 0.05
-    m_NormalBias: 0.4
-    m_NearPlane: 0.2
+    m_Bias: 0.031
+    m_NormalBias: 0.051
+    m_NearPlane: 0.1
     m_CullingMatrixOverride:
       e00: 1
       e01: 0
@@ -1286,8 +1287,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d56cd7ec3046afa06b2a0f94555c42e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  displayMode: 1
-  displayRadius: 300
+  displayMode: 0
+  displayRadius: 610.8
   noHitColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.5}
   arcColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.25}
   rayWidth: 2
@@ -2010,6 +2011,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -2182,7 +2184,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   resolutionScale: 4
   verbose: 0
-  terrainMaterial: {fileID: 0}
+  terrainMaterial: {fileID: 2100000, guid: 81914263fd8970c4385770e21a367a06, type: 2}
+  textureScale: 0.4
   heightScale: 30
   noiseScale: 0.01
 --- !u!4 &1656317691
@@ -2354,6 +2357,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -2490,6 +2494,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -2818,6 +2823,7 @@ MonoBehaviour:
   prefabName: reward_obj1
   uniformDensity: 0
   boundaryBuffer: 5
+  uniformConstrainToRooms: 0
   allowedStructures: 
   signalEnableProbability: 1
   signalChannel: reward
@@ -2889,6 +2895,63 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d6a031b061151653592091cb5443a330, type: 3}
+--- !u!1001 &5642567989832018257
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 348
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -465
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4065560628523369694, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8037676387041853972, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
+      propertyPath: m_Name
+      value: house_realistic
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f2d3ce41d4f397440adebe9d1f1a3997, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2921,3 +2984,4 @@ SceneRoots:
   - {fileID: 1911142609}
   - {fileID: 627128692}
   - {fileID: 2060525579}
+  - {fileID: 5642567989832018257}
