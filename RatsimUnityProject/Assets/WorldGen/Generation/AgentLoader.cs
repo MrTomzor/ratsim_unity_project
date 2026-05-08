@@ -92,8 +92,19 @@ public class AgentLoader : WorldDataProvider {
         // Find safe spawn position (mode driven by world config param "agents_spawn_pos")
         Vector3 spawnPos = FindSafeSpawnPosition(prefab);
 
+        // Spawn rotation: identity by default, or random yaw if requested. We use a
+        // separate derived seed so randomized rotation doesn't shift the spawn-position
+        // RNG stream (changing this flag mid-experiment doesn't move spawn coords).
+        Quaternion spawnRot = Quaternion.identity;
+        bool randomizeRotation = WorldLoadingController.GetParamInt("agents_spawn_pos/randomize_rotation", 0) != 0;
+        if (randomizeRotation) {
+            System.Random yawRng = new System.Random(WorldLoadingController.GetDerivedSeed("agent_rotation"));
+            float yaw = (float)(yawRng.NextDouble() * 360.0);
+            spawnRot = Quaternion.Euler(0f, yaw, 0f);
+        }
+
         // Instantiate
-        GameObject agent = Instantiate(prefab, spawnPos, Quaternion.identity, transform);
+        GameObject agent = Instantiate(prefab, spawnPos, spawnRot, transform);
         string namePrefix;
         if (config.TryGetValue("name_prefix", out namePrefix))
             agent.name = namePrefix;
@@ -221,6 +232,14 @@ public class AgentLoader : WorldDataProvider {
     //                                                Faster and works when colliders aren't loaded
     //                                                yet, but doesn't catch overlaps with rewards
     //                                                / props / chunk-streamed walls.
+    //       agents_spawn_pos/randomize_rotation   -- 0/1 (default 0); when 1, sample yaw uniformly
+    //                                                in [0°, 360°) on spawn (rotation around Y).
+    //                                                Useful when you don't want the agent to always
+    //                                                face the same direction (e.g. mazes where the
+    //                                                spawn cell has an obvious "natural" facing).
+    //                                                Uses derived seed "agent_rotation" — independent
+    //                                                from the spawn-position RNG so toggling it
+    //                                                doesn't shift spawn coordinates.
     //
     //  2. LEGACY (still supported): single-string "agents_spawn_pos":
     //       "origin"/"random"     → mode=uniform

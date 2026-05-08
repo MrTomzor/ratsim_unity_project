@@ -654,10 +654,18 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     //
     // Cells in the unbuffered "boundary" diagonal area between wedges are NOT walls.
     // They start as wall (mask=true) but corridors are free to carve through them when
-    // routing — this is what makes corridors look continuous. They simply don't host
-    // rooms and won't connect any sectors because no other-sector room can have a cell
-    // close enough to be 4-connected to a carved boundary cell (the buffer guarantees
-    // at least one column of uncarved wall sits between them).
+    // routing — this is what makes corridors look continuous.
+    //
+    // KNOWN IMPERFECTION: cross-sector connections via overlapping L-corridors. The
+    // buffer ensures that no other-sector ROOM can be 4-connected to a carved boundary
+    // cell, but two L-corridors from different sectors can both legitimately route
+    // through the same boundary cell while staying inside their own wedge buffer. When
+    // they do, they share a floor cell and merge their connected components — yielding
+    // a sector-to-sector path that doesn't go through the chamber. This is rare in
+    // practice (boundary cells are a small fraction of carve area) but isn't prevented.
+    // To eliminate it cleanly we'd need either corridor-level pathfinding that avoids
+    // already-carved foreign-sector floor, or a strict spatial sector cut (walls). For
+    // now we've decided the rare leakage is acceptable.
     //
     // First room: per sector, one room is forced axis-aligned (i=mid_x for N/S, j=mid_z
     // for E/W) and on the correct side of the chamber. The cardinal corridor runs
