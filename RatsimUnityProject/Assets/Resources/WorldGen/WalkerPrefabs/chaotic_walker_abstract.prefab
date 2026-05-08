@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 1955634283253617994}
   - component: {fileID: 1058538769324694673}
   - component: {fileID: 6090933384520069618}
+  - component: {fileID: 3948175439641637520}
   m_Layer: 0
   m_Name: chaotic_walker_abstract
   m_TagString: Untagged
@@ -152,8 +153,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 0
-  avoidant: 0
-  avoidanceDistance: 0
+  mode: 0
+  reactionRadius: 0
+  reactionVelocity: 0
   walkMinSteps: 0
   walkMaxSteps: 0
   pauseMinSteps: 0
@@ -162,3 +164,16 @@ MonoBehaviour:
   boundCenter: {x: 0, y: 0}
   boundRadius: 0
   inwardBiasStrength: 0
+--- !u!114 &3948175439641637520
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3604941359812818010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b340e703cb2a120391c0bfeb006851e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  semanticName: walker

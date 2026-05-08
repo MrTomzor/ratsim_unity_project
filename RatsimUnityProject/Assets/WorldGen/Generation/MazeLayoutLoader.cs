@@ -65,6 +65,39 @@ using UnityEngine;
 ///                                   drop diagonal corner walls and leak rays between regions).
 ///   maze/semantic_name           -- semantic name used for blocks (default "maze_wall")
 ///
+/// Sectored mode (rooms_and_corridors only — memory_maze ignores these for now):
+///   maze/sectors/style -- "none" (default; sectors disabled), "quadrants" or "orthogonal".
+///     - "quadrants" : sectors are NE/NW/SE/SW corner quadrants, dividers along the cardinal
+///                     axes from chamber edges. Chamber participates in each sector's MST
+///                     and picks up extra short edges as loop extras → typically MORE than
+///                     4 corridors out of the chamber. Sectors look "diagonally oriented".
+///     - "orthogonal": sectors are N/E/S/W spatial wedges, but with NO walls between
+///                     them. Rooms are constrained by rejection sampling to lie entirely
+///                     in their assigned wedge with a buffer of (corridor_width/2 + 1)
+///                     cells from the diagonal — wide enough that L-corridor strips
+///                     between two same-wedge rooms keep their full perpendicular width
+///                     inside the wedge, so no cross-sector floor merge can occur. The
+///                     boundary diagonal area between wedges is just unclassified wall
+///                     cells (mask=true) that corridors are free to carve through when
+///                     routing — no walls split corridors. Per sector, ONE first room
+///                     is forced axis-aligned (i=mid_x for N/S, j=mid_z for E/W) and on
+///                     the correct side of the chamber, and a single straight cardinal
+///                     corridor connects chamber to that first room. Chamber stays out
+///                     of every sector's MST → exactly 4 chamber corridors total.
+///   In both styles, loops (extra_corridor_fraction) apply per-sector only — the only path
+///   between any two sectors goes through the chamber. Designed to break memoryless RL
+///   policies (an agent that forgets which sector it came from has no shortcut back).
+///
+///   maze/sectors/central_chamber_size_cells -- chamber side in cells (default 5; min 3).
+///                                              For "quadrants" style, must exceed
+///                                              corridor_width_cells (cardinal-corridor
+///                                              strip squeezes through the chamber's edge).
+///                                              For "orthogonal" style, just larger than
+///                                              corridor_width_cells.
+///   When sectors are enabled, exactly one room type in maze/rooms/types must have
+///   force_central=1 with min=1 and max=1 — that type's structureType is applied to the
+///   chamber. The remaining sector rooms' types come from the other specs as usual.
+///
 /// Room labeling (optional — empty list → all rooms get structureType="maze_room"):
 ///   maze/rooms/types         -- comma list of structure types to apply to generated rooms.
 ///                                Geometry is unaffected; this just sets each room's
@@ -72,6 +105,9 @@ using UnityEngine;
 ///                                other structure-aware loader) can target specific rooms.
 ///   maze/rooms/{type}/min    -- minimum rooms of this type (default 0)
 ///   maze/rooms/{type}/max    -- maximum rooms of this type (-1 = unlimited; default -1)
+///   maze/rooms/{type}/force_central -- 0/1; in sectors mode, marks this type as the central
+///                                      chamber's type (must have min=1 and max=1, exactly
+///                                      one type may set this). Ignored when sectors disabled.
 /// Validation: sum(min) <= rooms_generated, max >= min, and either some type has max=-1
 /// or sum(max) >= rooms_generated. Failures emit WorldGenStatus.Error and the loader
 /// falls back to all-rooms = "maze_room".
@@ -123,6 +159,9 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
     // true = wall, false = floor
     private bool[,] _mask;
+    // true = "do not carve" — used for sector dividers in sectors mode so that L-corridors
+    // pass over them as no-ops, leaving the wall intact. Null when not in sectors mode.
+    private bool[,] _protectedWalls;
     private int _maskW, _maskH;       // cells along X (width) and Z (height)
     private float _worldW, _worldH;   // cached world bounds
     private float _cellSize;          // active cell size for this episode
@@ -132,6 +171,12 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     private readonly List<Bounds2D> _rooms = new List<Bounds2D>();
     // parallel to _rooms; cell-space rects, used to lay out per-cell rewardSpawnPositions
     private readonly List<RoomRect> _roomRects = new List<RoomRect>();
+    // parallel to _rooms; -1 = not the chamber, 0..3 = sector room (NE=0, NW=1, SE=2, SW=3),
+    // -2 = chamber. Used by SpawnRoomStructures/AssignRoomTypes to give the chamber its
+    // force_central type without going through the regular assignment.
+    private readonly List<int> _roomSectorIds = new List<int>();
+    // index of chamber in _rooms when sectors are enabled; -1 otherwise.
+    private int _chamberRoomIndex = -1;
     private readonly List<WorldStructure> _roomStructures = new List<WorldStructure>();
 
     // corridor segments, filled by CarveLCorridor → RecordSegment
@@ -177,6 +222,16 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         string mazeMode = WorldLoadingController.GetParamString("maze/mode", "rooms_and_corridors");
         System.Random rng = new System.Random(WorldLoadingController.GetDerivedSeed("maze"));
+
+        // Sectored layout is currently only implemented for rooms_and_corridors. Warn loudly
+        // if the user pairs it with memory_maze rather than silently generating a regular maze.
+        string warnStyle = WorldLoadingController.GetParamString("maze/sectors/style", "none");
+        if (!warnStyle.Equals("none", System.StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(warnStyle)
+            && !mazeMode.Equals("rooms_and_corridors", System.StringComparison.OrdinalIgnoreCase)) {
+            Debug.LogWarning($"MazeLayoutLoader: maze/sectors/style='{warnStyle}' is only implemented for " +
+                             $"maze/mode=rooms_and_corridors (got '{mazeMode}'); generating without sectors.");
+        }
 
         switch (mazeMode.ToLowerInvariant()) {
             case "rooms_and_corridors":
@@ -233,9 +288,12 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         _generatedChunks.Clear();
         _rooms.Clear();
         _roomRects.Clear();
+        _roomSectorIds.Clear();
+        _chamberRoomIndex = -1;
         _roomStructures.Clear();
         _corridors.Clear();
         _mask = null;
+        _protectedWalls = null;
         _generated = false;
         _active = false;
     }
@@ -319,10 +377,59 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
             for (int j = 0; j < _maskH; j++)
                 _mask[i, j] = true; // start all wall
 
-        // 1. place rooms via rejection sampling
+        string sectorStyle = WorldLoadingController.GetParamString("maze/sectors/style", "none").ToLowerInvariant();
+
+        List<RoomRect> rooms;
+        List<int> sectorIds;
+        int chamberIndex;
+        switch (sectorStyle) {
+            case "quadrants":
+                rooms = GenerateQuadrantsSectoredLayout(rng, out sectorIds, out chamberIndex);
+                break;
+            case "orthogonal":
+                rooms = GenerateOrthogonalSectoredLayout(rng, out sectorIds, out chamberIndex);
+                break;
+            case "none":
+            case "":
+                rooms = GenerateUniformLayout(rng);
+                sectorIds = new List<int>(rooms.Count);
+                for (int i = 0; i < rooms.Count; i++) sectorIds.Add(-1);
+                chamberIndex = -1;
+                break;
+            default:
+                Debug.LogWarning($"MazeLayoutLoader: unknown maze/sectors/style '{sectorStyle}'; falling back to 'none'");
+                rooms = GenerateUniformLayout(rng);
+                sectorIds = new List<int>(rooms.Count);
+                for (int i = 0; i < rooms.Count; i++) sectorIds.Add(-1);
+                chamberIndex = -1;
+                break;
+        }
+
+        // store room bounds in world coords for IRoomProvider
+        _rooms.Clear();
+        _roomRects.Clear();
+        _roomSectorIds.Clear();
+        for (int i = 0; i < rooms.Count; i++) {
+            RoomRect r = rooms[i];
+            Vector2 center = new Vector2(
+                _originX + (r.x0 + r.w * 0.5f) * _cellSize,
+                _originZ + (r.z0 + r.h * 0.5f) * _cellSize
+            );
+            Vector2 size = new Vector2(r.w * _cellSize, r.h * _cellSize);
+            _rooms.Add(new Bounds2D(center, size, 0f));
+            _roomRects.Add(r);
+            _roomSectorIds.Add(sectorIds[i]);
+        }
+        _chamberRoomIndex = chamberIndex;
+    }
+
+    /// <summary>
+    /// Classic rooms-and-corridors layout: rejection-sample rooms anywhere in the world,
+    /// connect them all with one MST + extras. No central chamber, no sector restrictions.
+    /// </summary>
+    private List<RoomRect> GenerateUniformLayout(System.Random rng) {
         List<RoomRect> rooms = new List<RoomRect>();
         int attempts = 0;
-        // reserve at least a 1-cell border so rooms don't touch world edge
         int border = borderWalls ? 1 : 0;
         while (rooms.Count < nRooms && attempts < nRooms * roomMaxAttempts) {
             attempts++;
@@ -338,25 +445,442 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
 
         if (verbose) Debug.Log($"MazeLayoutLoader: placed {rooms.Count}/{nRooms} rooms after {attempts} attempts");
 
-        // carve rooms
         foreach (RoomRect r in rooms) CarveRect(r.x0, r.z0, r.w, r.h);
-
-        // 2. connect rooms: MST by distance + extras
         if (rooms.Count >= 2) ConnectRooms(rooms, rng);
-
-        // 3. store room bounds in world coords for IRoomProvider
-        _rooms.Clear();
-        _roomRects.Clear();
-        foreach (RoomRect r in rooms) {
-            Vector2 center = new Vector2(
-                _originX + (r.x0 + r.w * 0.5f) * _cellSize,
-                _originZ + (r.z0 + r.h * 0.5f) * _cellSize
-            );
-            Vector2 size = new Vector2(r.w * _cellSize, r.h * _cellSize);
-            _rooms.Add(new Bounds2D(center, size, 0f));
-            _roomRects.Add(r);
-        }
+        return rooms;
     }
+
+    // ─────────────────────────────────────────────
+    //  Sectored layout — "quadrants" style
+    // ─────────────────────────────────────────────
+    //
+    // Topology: 4 sector quadrants (NE, NW, SE, SW) connected only via a central chamber.
+    // Loops are confined to within-sector pairs — there's no extra connector between two
+    // different sectors, so the only path between sector i and sector j is through the
+    // chamber. (This is the property that breaks memoryless RL policies: an agent that
+    // forgets which sector it came from has no shortcut back.)
+    //
+    // Note: chamber participates in each sector's MST, so it ends up with one MST edge per
+    // sector (4 edges) PLUS any short chamber-room edges picked up as extras. To get
+    // exactly 4 cardinal exits, use the "orthogonal" style instead.
+    //
+    // Geometry (mid_x = chamber x-center cell, mid_z = chamber z-center cell):
+    //     +-------------------------+
+    //     |    NW    | N |    NE    |   "N strip" = column of cells north of chamber, in
+    //     |          | s |          |   chamber's x-range. Split by N-divider at i=mid_x.
+    //     +----+-----+---+-----+----+
+    //     | W  |    chamber    |  E |   E/W strips analogous, split by E/W-dividers at
+    //     | s  |               |  s |   j=mid_z.
+    //     +----+-----+---+-----+----+
+    //     |    SW    | S |    SE    |
+    //     |          | s |          |
+    //     +-------------------------+
+    //
+    // The dividers (column i=mid_x outside chamber, row j=mid_z outside chamber) are
+    // stamped as protected walls before any carving — CarveRect skips protected cells, so
+    // L-corridors that cross a divider have a notch removed where they'd cut it. The
+    // chamber-to-room corridors anchor at the chamber's sector-corner cell (e.g. NE corner
+    // for an NE-sector room), so the carved strip stays in that sector's territory.
+    //
+    // Loop tuning: extra_corridor_fraction applies per-sector (each sector's room subgraph
+    // gets its own MST + extras pass). Cross-sector loops are not configurable (would
+    // violate the topology guarantee).
+    private List<RoomRect> GenerateQuadrantsSectoredLayout(System.Random rng,
+                                                           out List<int> sectorIds,
+                                                           out int chamberIndex) {
+        sectorIds = new List<int>();
+        chamberIndex = -1;
+
+        int chamberSizeCells = WorldLoadingController.GetParamInt("maze/sectors/central_chamber_size_cells", 5);
+        chamberSizeCells = Mathf.Max(3, chamberSizeCells);
+
+        int border = borderWalls ? 1 : 0;
+        // Need: chamber + at least one cell on each side for divider + sector room space.
+        int minMaskSide = chamberSizeCells + 2 * (border + roomMinSizeCells + 1);
+        if (_maskW < minMaskSide || _maskH < minMaskSide) {
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"sectors mode: world too small for chamber={chamberSizeCells} + 4 sectors. " +
+                $"Mask {_maskW}x{_maskH} needs >= {minMaskSide}x{minMaskSide}.");
+            return new List<RoomRect>();
+        }
+
+        // Place chamber centered (or as close as parity allows). Snap so that mid_x, mid_z
+        // are well-defined integers.
+        int Cx = (_maskW - chamberSizeCells) / 2;
+        int Cz = (_maskH - chamberSizeCells) / 2;
+        RoomRect chamber = new RoomRect { x0 = Cx, z0 = Cz, w = chamberSizeCells, h = chamberSizeCells };
+        int mid_x = Cx + chamberSizeCells / 2;
+        int mid_z = Cz + chamberSizeCells / 2;
+
+        // Carve the chamber, then stamp dividers as protected walls.
+        CarveRect(chamber.x0, chamber.z0, chamber.w, chamber.h);
+        _protectedWalls = new bool[_maskW, _maskH];
+        // Vertical divider (column i=mid_x) above and below chamber.
+        for (int j = 0; j < Cz; j++) { _mask[mid_x, j] = true; _protectedWalls[mid_x, j] = true; }
+        for (int j = Cz + chamberSizeCells; j < _maskH; j++) { _mask[mid_x, j] = true; _protectedWalls[mid_x, j] = true; }
+        // Horizontal divider (row j=mid_z) east and west of chamber.
+        for (int i = 0; i < Cx; i++) { _mask[i, mid_z] = true; _protectedWalls[i, mid_z] = true; }
+        for (int i = Cx + chamberSizeCells; i < _maskW; i++) { _mask[i, mid_z] = true; _protectedWalls[i, mid_z] = true; }
+
+        // 4 sector AABBs (cell ranges where rooms may be placed, exclusive upper bounds).
+        // We sample rooms strictly within these — no room may straddle a divider or the
+        // chamber. Buffer of 1 cell from the divider line is implicit because the divider
+        // itself is at i=mid_x / j=mid_z and AABBs stop before that.
+        SectorBounds[] sectors = new SectorBounds[4] {
+            // NE: i in [Cx+CW, _maskW-border), j in [Cz+CW, _maskH-border)
+            new SectorBounds { id = 0, name = "NE",
+                xLo = Cx + chamberSizeCells, xHi = _maskW - border,
+                zLo = Cz + chamberSizeCells, zHi = _maskH - border,
+                anchorX = Cx + chamberSizeCells - 1, anchorZ = Cz + chamberSizeCells - 1 },
+            // NW: i in [border, Cx), j in [Cz+CW, _maskH-border)
+            new SectorBounds { id = 1, name = "NW",
+                xLo = border, xHi = Cx,
+                zLo = Cz + chamberSizeCells, zHi = _maskH - border,
+                anchorX = Cx, anchorZ = Cz + chamberSizeCells - 1 },
+            // SE
+            new SectorBounds { id = 2, name = "SE",
+                xLo = Cx + chamberSizeCells, xHi = _maskW - border,
+                zLo = border, zHi = Cz,
+                anchorX = Cx + chamberSizeCells - 1, anchorZ = Cz },
+            // SW
+            new SectorBounds { id = 3, name = "SW",
+                xLo = border, xHi = Cx,
+                zLo = border, zHi = Cz,
+                anchorX = Cx, anchorZ = Cz },
+        };
+
+        // Sample sector rooms. The chamber counts toward maze/n_rooms (so a config of
+        // n_rooms=9 in sectors mode means 1 chamber + 8 sector rooms — round-robin gives
+        // 2 per sector). Round-robin sector assignment keeps counts balanced; without this,
+        // random sampling can bias toward whichever sector happens to fill up last.
+        int sectorRoomBudget = Mathf.Max(0, nRooms - 1);
+        List<RoomRect> sectorRooms = new List<RoomRect>();
+        List<int> sectorRoomIds = new List<int>();
+        int totalAttempts = 0;
+        int totalBudget = Mathf.Max(1, sectorRoomBudget) * roomMaxAttempts;
+        int nextSector = 0;
+        while (sectorRooms.Count < sectorRoomBudget && totalAttempts < totalBudget) {
+            totalAttempts++;
+            SectorBounds sb = sectors[nextSector];
+            int w = rng.Next(roomMinSizeCells, roomMaxSizeCells + 1);
+            int h = rng.Next(roomMinSizeCells, roomMaxSizeCells + 1);
+            // Room must fit entirely within sector AABB.
+            int xMax = sb.xHi - w; // exclusive
+            int zMax = sb.zHi - h;
+            if (xMax <= sb.xLo || zMax <= sb.zLo) { nextSector = (nextSector + 1) % 4; continue; }
+            int x0 = rng.Next(sb.xLo, xMax);
+            int z0 = rng.Next(sb.zLo, zMax);
+            RoomRect candidate = new RoomRect { x0 = x0, z0 = z0, w = w, h = h };
+            if (sectorRooms.Any(r => RoomsOverlapWithSeparation(r, candidate, roomMinSeparationCells))) continue;
+            // Don't bother checking chamber overlap or divider overlap — sector AABBs already
+            // exclude both.
+            sectorRooms.Add(candidate);
+            sectorRoomIds.Add(sb.id);
+            nextSector = (nextSector + 1) % 4;
+        }
+
+        if (verbose)
+            Debug.Log($"MazeLayoutLoader.sectors: placed {sectorRooms.Count}/{sectorRoomBudget} sector rooms " +
+                      $"+ 1 chamber ({chamberSizeCells}x{chamberSizeCells} at ({Cx},{Cz})) after {totalAttempts} attempts");
+
+        // Carve sector rooms.
+        foreach (RoomRect r in sectorRooms) CarveRect(r.x0, r.z0, r.w, r.h);
+
+        // Per-sector connectivity: build {chamber + sector_i_rooms} graph and run MST + extras.
+        // Chamber appears as the same physical room in all 4 graphs; chamber-to-room L-corridors
+        // anchor at the sector-side chamber corner (sb.anchorX, sb.anchorZ) so the carved strip
+        // stays in that sector's territory.
+        for (int s = 0; s < 4; s++) {
+            SectorBounds sb = sectors[s];
+            List<RoomRect> sectorGraph = new List<RoomRect>();
+            // Chamber rect uses sector-corner as its "center" for distance + corridor anchoring.
+            // We hand a synthetic RoomRect to ConnectRooms whose CenterX/Z point at the sector
+            // corner — this keeps L-corridors inside the sector without changing ConnectRooms.
+            sectorGraph.Add(MakeSyntheticAnchorRoom(sb.anchorX, sb.anchorZ));
+            for (int i = 0; i < sectorRooms.Count; i++) {
+                if (sectorRoomIds[i] == s) sectorGraph.Add(sectorRooms[i]);
+            }
+            if (sectorGraph.Count >= 2) ConnectRooms(sectorGraph, rng);
+        }
+
+        // Assemble final room list: chamber at index 0, then sector rooms in order.
+        List<RoomRect> all = new List<RoomRect>();
+        all.Add(chamber);
+        sectorIds.Add(-2); // chamber sentinel
+        chamberIndex = 0;
+        for (int i = 0; i < sectorRooms.Count; i++) {
+            all.Add(sectorRooms[i]);
+            sectorIds.Add(sectorRoomIds[i]);
+        }
+        return all;
+    }
+
+    private struct SectorBounds {
+        public int id;
+        public string name;
+        public int xLo, xHi; // cell-space, exclusive upper
+        public int zLo, zHi;
+        public int anchorX, anchorZ; // chamber's sector-side corner cell (corridor anchor)
+    }
+
+    /// <summary>
+    /// Build a synthetic 1x1 RoomRect whose CenterX/CenterZ resolve to the given anchor cell.
+    /// Used so ConnectRooms treats the chamber as a "room" placed at its sector-side corner —
+    /// the L-corridor from chamber to sector-room then carves a strip that stays inside the
+    /// sector instead of running through the divider line at chamber center.
+    /// </summary>
+    private static RoomRect MakeSyntheticAnchorRoom(int anchorX, int anchorZ) {
+        // Center = x0 + w/2 with w=1 → center = x0. So set x0 = anchorX.
+        return new RoomRect { x0 = anchorX, z0 = anchorZ, w = 1, h = 1 };
+    }
+
+    // ─────────────────────────────────────────────
+    //  Sectored layout — "orthogonal" style
+    // ─────────────────────────────────────────────
+    //
+    // Topology: 4 cardinal sectors (N, E, S, W), each entered from the chamber by exactly
+    // one straight cardinal corridor leading to a unique "first room". After the first
+    // room, the rest of the sector branches via a within-sector MST + extras. The chamber
+    // does NOT participate in any sector's MST, so it has exactly 4 corridors total.
+    //
+    // Sectors are spatial wedges (N / E / S / W) but with NO walls between them. Rooms
+    // are constrained by rejection sampling to lie entirely in their assigned wedge,
+    // with a "wedge buffer" margin from the diagonals that's wide enough that any
+    // L-corridor between two same-wedge rooms keeps its full perpendicular strip width
+    // inside the wedge. With buffer >= corridor_width/2 + 1 and corridor_width=3, rooms
+    // must satisfy dz > |dx| + 2 for N etc. — corridor strips of width 3 between two
+    // such rooms can't reach a cell in another wedge, so no cross-sector floor merge
+    // can happen.
+    //
+    // Cells in the unbuffered "boundary" diagonal area between wedges are NOT walls.
+    // They start as wall (mask=true) but corridors are free to carve through them when
+    // routing — this is what makes corridors look continuous. They simply don't host
+    // rooms and won't connect any sectors because no other-sector room can have a cell
+    // close enough to be 4-connected to a carved boundary cell (the buffer guarantees
+    // at least one column of uncarved wall sits between them).
+    //
+    // First room: per sector, one room is forced axis-aligned (i=mid_x for N/S, j=mid_z
+    // for E/W) and on the correct side of the chamber. The cardinal corridor runs
+    // straight from the chamber's cardinal-edge midpoint to this room's center, using
+    // CarveLCorridor with collinear endpoints (the L collapses to a single straight leg).
+    //
+    // Chamber-size constraint: just that the chamber be wider than the corridor.
+    private List<RoomRect> GenerateOrthogonalSectoredLayout(System.Random rng,
+                                                            out List<int> sectorIds,
+                                                            out int chamberIndex) {
+        sectorIds = new List<int>();
+        chamberIndex = -1;
+
+        int chamberSizeCells = WorldLoadingController.GetParamInt("maze/sectors/central_chamber_size_cells", 5);
+        chamberSizeCells = Mathf.Max(3, chamberSizeCells);
+
+        int border = borderWalls ? 1 : 0;
+        int minMaskSide = chamberSizeCells + 2 * (border + roomMinSizeCells + 1);
+        if (_maskW < minMaskSide || _maskH < minMaskSide) {
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"orthogonal sectors: world too small for chamber={chamberSizeCells} + 4 sectors. " +
+                $"Mask {_maskW}x{_maskH} needs >= {minMaskSide}x{minMaskSide}.");
+            return new List<RoomRect>();
+        }
+
+        int Cx = (_maskW - chamberSizeCells) / 2;
+        int Cz = (_maskH - chamberSizeCells) / 2;
+        int mid_x = Cx + chamberSizeCells / 2;
+        int mid_z = Cz + chamberSizeCells / 2;
+        RoomRect chamber = new RoomRect { x0 = Cx, z0 = Cz, w = chamberSizeCells, h = chamberSizeCells };
+
+        CarveRect(chamber.x0, chamber.z0, chamber.w, chamber.h);
+
+        // Classify cells into wedges with a buffer wide enough that any L-corridor
+        // between two same-wedge rooms keeps its perpendicular strip in the wedge —
+        // preventing cross-sector floor merges without stamping any walls. No
+        // _protectedWalls in this style; the boundary diagonals are just unclassified
+        // wall cells (mask=true, uncarved) that corridors are free to pass through.
+        int wedgeBuffer = corridorWidthCells / 2 + 1;
+        int[,] sectorOf = new int[_maskW, _maskH];
+        for (int i = 0; i < _maskW; i++) {
+            for (int j = 0; j < _maskH; j++) {
+                bool inChamber = (i >= Cx && i < Cx + chamberSizeCells &&
+                                  j >= Cz && j < Cz + chamberSizeCells);
+                if (inChamber) { sectorOf[i, j] = -2; continue; }
+                bool inBorder = (i < border || i >= _maskW - border ||
+                                 j < border || j >= _maskH - border);
+                if (inBorder) { sectorOf[i, j] = -1; continue; }
+                int dx = i - mid_x;
+                int dz = j - mid_z;
+                int adx = System.Math.Abs(dx), adz = System.Math.Abs(dz);
+                if      (dz >  adx + wedgeBuffer) sectorOf[i, j] = 0; // N
+                else if (dx >  adz + wedgeBuffer) sectorOf[i, j] = 1; // E
+                else if (-dz > adx + wedgeBuffer) sectorOf[i, j] = 2; // S
+                else if (-dx > adz + wedgeBuffer) sectorOf[i, j] = 3; // W
+                else sectorOf[i, j] = -1; // boundary diagonal area, not a wall (corridors may carve through)
+            }
+        }
+
+        // Per-sector cardinal axis info: which axis the first room must align to and the
+        // chamber-edge midpoint where the cardinal corridor starts.
+        OrthoSectorAxis[] axes = new OrthoSectorAxis[4] {
+            new OrthoSectorAxis { id = 0, name = "N",
+                anchorX = mid_x, anchorZ = Cz + chamberSizeCells - 1, axis = AxisDir.Vertical, sign = +1 },
+            new OrthoSectorAxis { id = 1, name = "E",
+                anchorX = Cx + chamberSizeCells - 1, anchorZ = mid_z, axis = AxisDir.Horizontal, sign = +1 },
+            new OrthoSectorAxis { id = 2, name = "S",
+                anchorX = mid_x, anchorZ = Cz, axis = AxisDir.Vertical, sign = -1 },
+            new OrthoSectorAxis { id = 3, name = "W",
+                anchorX = Cx, anchorZ = mid_z, axis = AxisDir.Horizontal, sign = -1 },
+        };
+
+        List<RoomRect> sectorRooms = new List<RoomRect>();
+        List<int> sectorRoomIds = new List<int>();
+        int[] firstRoomIdx = { -1, -1, -1, -1 };
+
+        // Step 1: place one axis-aligned first room per sector. We try up to roomMaxAttempts
+        // per sector. A fail here = no entry from chamber to that sector at all (the sector
+        // ends up sealed off), so we log a hard error.
+        for (int s = 0; s < 4; s++) {
+            OrthoSectorAxis ax = axes[s];
+            for (int attempt = 0; attempt < roomMaxAttempts; attempt++) {
+                int w = rng.Next(roomMinSizeCells, roomMaxSizeCells + 1);
+                int h = rng.Next(roomMinSizeCells, roomMaxSizeCells + 1);
+                int x0, z0;
+                if (ax.axis == AxisDir.Vertical) {
+                    // Center on x = mid_x → x0 = mid_x - w/2
+                    x0 = mid_x - w / 2;
+                    if (ax.sign > 0) {
+                        // N: room must be entirely above chamber (z0 >= Cz+CW), within mask.
+                        int zLo = Cz + chamberSizeCells;
+                        int zHi = _maskH - border - h;
+                        if (zHi < zLo) break;
+                        z0 = rng.Next(zLo, zHi + 1);
+                    } else {
+                        int zLo = border;
+                        int zHi = Cz - h;
+                        if (zHi < zLo) break;
+                        z0 = rng.Next(zLo, zHi + 1);
+                    }
+                } else {
+                    // Center on z = mid_z → z0 = mid_z - h/2
+                    z0 = mid_z - h / 2;
+                    if (ax.sign > 0) {
+                        int xLo = Cx + chamberSizeCells;
+                        int xHi = _maskW - border - w;
+                        if (xHi < xLo) break;
+                        x0 = rng.Next(xLo, xHi + 1);
+                    } else {
+                        int xLo = border;
+                        int xHi = Cx - w;
+                        if (xHi < xLo) break;
+                        x0 = rng.Next(xLo, xHi + 1);
+                    }
+                }
+                RoomRect candidate = new RoomRect { x0 = x0, z0 = z0, w = w, h = h };
+                if (!IsRoomEntirelyInSector(candidate, s, sectorOf)) continue;
+                if (RoomsOverlapWithSeparation(candidate, chamber, 1)) continue;
+                if (sectorRooms.Any(r => RoomsOverlapWithSeparation(r, candidate, roomMinSeparationCells))) continue;
+                sectorRooms.Add(candidate);
+                sectorRoomIds.Add(s);
+                firstRoomIdx[s] = sectorRooms.Count - 1;
+                break;
+            }
+            if (firstRoomIdx[s] < 0) {
+                WorldGenStatus.Error("MazeLayoutLoader",
+                    $"orthogonal sectors: failed to place axis-aligned first room in sector '{axes[s].name}' " +
+                    $"after {roomMaxAttempts} attempts. The sector will be unreachable from the chamber. " +
+                    $"Try shrinking room sizes, growing the world, or reducing the chamber size.");
+            }
+        }
+
+        // Step 2: round-robin sector assignment. Each candidate must lie entirely in the
+        // current target wedge (using the buffered sectorOf classification), so corridors
+        // between two same-sector rooms can't drift into a neighbouring wedge.
+        int sectorRoomBudget = Mathf.Max(0, nRooms - 1);
+        int totalAttempts = 0;
+        int totalBudget = Mathf.Max(1, sectorRoomBudget) * roomMaxAttempts;
+        int nextSector = 0;
+        while (sectorRooms.Count < sectorRoomBudget && totalAttempts < totalBudget) {
+            totalAttempts++;
+            int s = nextSector;
+            int w = rng.Next(roomMinSizeCells, roomMaxSizeCells + 1);
+            int h = rng.Next(roomMinSizeCells, roomMaxSizeCells + 1);
+            int xMax = _maskW - border - w;
+            int zMax = _maskH - border - h;
+            if (xMax < border || zMax < border) { nextSector = (nextSector + 1) % 4; continue; }
+            int x0 = rng.Next(border, xMax + 1);
+            int z0 = rng.Next(border, zMax + 1);
+            RoomRect candidate = new RoomRect { x0 = x0, z0 = z0, w = w, h = h };
+            if (!IsRoomEntirelyInSector(candidate, s, sectorOf)) continue;
+            if (RoomsOverlapWithSeparation(candidate, chamber, 1)) continue;
+            if (sectorRooms.Any(r => RoomsOverlapWithSeparation(r, candidate, roomMinSeparationCells))) continue;
+            sectorRooms.Add(candidate);
+            sectorRoomIds.Add(s);
+            nextSector = (nextSector + 1) % 4;
+        }
+
+        if (verbose)
+            Debug.Log($"MazeLayoutLoader.orthogonal: placed {sectorRooms.Count}/{sectorRoomBudget} sector rooms " +
+                      $"+ 1 chamber ({chamberSizeCells}x{chamberSizeCells} at ({Cx},{Cz})) after {totalAttempts} attempts");
+
+        foreach (RoomRect r in sectorRooms) CarveRect(r.x0, r.z0, r.w, r.h);
+
+        // Step 3: cardinal corridors. CarveLCorridor with collinear endpoints (same x for
+        // N/S, same z for E/W) collapses the L into a single straight leg of the right
+        // axis — exactly what we want.
+        for (int s = 0; s < 4; s++) {
+            if (firstRoomIdx[s] < 0) continue;
+            OrthoSectorAxis ax = axes[s];
+            RoomRect first = sectorRooms[firstRoomIdx[s]];
+            if (ax.axis == AxisDir.Vertical) {
+                // Vertical corridor at i=mid_x. CarveLCorridor with ax.x=first.CenterX=mid_x
+                // collapses to one vertical leg.
+                CarveLCorridor(ax.anchorX, ax.anchorZ, first.CenterX, first.CenterZ, horizontalFirst: false);
+            } else {
+                CarveLCorridor(ax.anchorX, ax.anchorZ, first.CenterX, first.CenterZ, horizontalFirst: true);
+            }
+        }
+
+        // Step 4: per-sector MST + extras over sector rooms only (chamber stays out of all
+        // graphs — that's how we guarantee exactly 4 chamber corridors). The first room is
+        // a regular node; the MST will connect it to its neighbors.
+        for (int s = 0; s < 4; s++) {
+            List<RoomRect> sectorGraph = new List<RoomRect>();
+            for (int i = 0; i < sectorRooms.Count; i++) {
+                if (sectorRoomIds[i] == s) sectorGraph.Add(sectorRooms[i]);
+            }
+            if (sectorGraph.Count >= 2) ConnectRooms(sectorGraph, rng);
+        }
+
+        List<RoomRect> all = new List<RoomRect>();
+        all.Add(chamber);
+        sectorIds.Add(-2);
+        chamberIndex = 0;
+        for (int i = 0; i < sectorRooms.Count; i++) {
+            all.Add(sectorRooms[i]);
+            sectorIds.Add(sectorRoomIds[i]);
+        }
+        return all;
+    }
+
+    private enum AxisDir { Vertical, Horizontal }
+
+    private struct OrthoSectorAxis {
+        public int id;
+        public string name;
+        public int anchorX, anchorZ; // chamber-edge midpoint where the cardinal corridor starts
+        public AxisDir axis;         // the axis the first room must align to
+        public int sign;             // +1 = north/east of chamber, -1 = south/west
+    }
+
+    private bool IsRoomEntirelyInSector(RoomRect r, int sectorId, int[,] sectorOf) {
+        for (int i = r.x0; i < r.x0 + r.w; i++) {
+            if (i < 0 || i >= _maskW) return false;
+            for (int j = r.z0; j < r.z0 + r.h; j++) {
+                if (j < 0 || j >= _maskH) return false;
+                if (sectorOf[i, j] != sectorId) return false;
+            }
+        }
+        return true;
+    }
+
 
     private static bool RoomsOverlapWithSeparation(RoomRect a, RoomRect b, int sep) {
         // Expand a by sep on all sides; check AABB overlap with b.
@@ -372,8 +896,14 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         int z1 = Mathf.Min(_maskH, z0 + h);
         x0 = Mathf.Max(0, x0); z0 = Mathf.Max(0, z0);
         for (int i = x0; i < x1; i++)
-            for (int j = z0; j < z1; j++)
+            for (int j = z0; j < z1; j++) {
+                // Respect sector dividers (sectors mode only) — corridors that overlap them
+                // simply skip those cells, leaving the divider intact. This is what enforces
+                // the "no inter-sector connectivity except through the chamber" topology
+                // even when the L-corridor's perpendicular width spans across a divider line.
+                if (_protectedWalls != null && _protectedWalls[i, j]) continue;
                 _mask[i, j] = false;
+            }
     }
 
     // L-corridor: horizontal segment then vertical, of width `corridorWidthCells`,
@@ -800,7 +1330,8 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     private struct RoomTypeSpec {
         public string type;
         public int min;
-        public int max; // -1 = unlimited
+        public int max;          // -1 = unlimited
+        public bool forceCentral; // true = this type designates the central chamber in sectors mode
     }
 
     private List<RoomTypeSpec> LoadRoomTypeSpecs() {
@@ -811,9 +1342,10 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
             string type = raw.Trim();
             if (string.IsNullOrEmpty(type)) continue;
             specs.Add(new RoomTypeSpec {
-                type = type,
-                min  = WorldLoadingController.GetParamInt($"maze/rooms/{type}/min",  0),
-                max  = WorldLoadingController.GetParamInt($"maze/rooms/{type}/max", -1),
+                type         = type,
+                min          = WorldLoadingController.GetParamInt($"maze/rooms/{type}/min",  0),
+                max          = WorldLoadingController.GetParamInt($"maze/rooms/{type}/max", -1),
+                forceCentral = WorldLoadingController.GetParamInt($"maze/rooms/{type}/force_central", 0) != 0,
             });
         }
         return specs;
@@ -912,10 +1444,58 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     private void SpawnRoomStructures() {
         List<RoomTypeSpec> specs = LoadRoomTypeSpecs();
         System.Random rng = new System.Random(WorldLoadingController.GetDerivedSeed("maze_room_types"));
-        string[] types = AssignRoomTypes(specs, _rooms.Count, rng);
 
+        // In sectors mode, the chamber takes the force_central type and is removed from the
+        // pool used for the remaining rooms — so e.g. a config with reward_room/min=4,
+        // central_chamber/min=1 over 9 rooms means: chamber gets central_chamber, then
+        // AssignRoomTypes runs over the 8 sector rooms with reward_room/min=4 etc.
+        string chamberType = null;
+        List<RoomTypeSpec> nonChamberSpecs = specs;
+        if (_chamberRoomIndex >= 0 && specs.Count > 0) {
+            int forceIdx = -1;
+            for (int i = 0; i < specs.Count; i++) {
+                if (specs[i].forceCentral) {
+                    if (forceIdx >= 0) {
+                        WorldGenStatus.Error("MazeLayoutLoader",
+                            $"sectors mode: more than one room type has force_central=1 " +
+                            $"('{specs[forceIdx].type}' and '{specs[i].type}'). Exactly one is required.");
+                        forceIdx = -1; break;
+                    }
+                    forceIdx = i;
+                }
+            }
+            if (forceIdx >= 0) {
+                RoomTypeSpec fc = specs[forceIdx];
+                if (fc.min != 1 || fc.max != 1) {
+                    WorldGenStatus.Error("MazeLayoutLoader",
+                        $"sectors mode: force_central type '{fc.type}' must have min=1 and max=1 " +
+                        $"(got min={fc.min}, max={fc.max}).");
+                } else {
+                    chamberType = fc.type;
+                    nonChamberSpecs = new List<RoomTypeSpec>(specs.Count - 1);
+                    for (int i = 0; i < specs.Count; i++)
+                        if (i != forceIdx) nonChamberSpecs.Add(specs[i]);
+                }
+            } else if (specs.Count > 0) {
+                WorldGenStatus.Error("MazeLayoutLoader",
+                    "sectors mode: no room type has force_central=1. Add it to one of " +
+                    $"maze/rooms/types ({string.Join(", ", specs.Select(s => s.type))}) " +
+                    "so the central chamber has a designated type.");
+            }
+        }
+
+        // Assignments for non-chamber rooms.
+        int nNonChamber = (_chamberRoomIndex >= 0) ? _rooms.Count - 1 : _rooms.Count;
+        string[] nonChamberTypes = AssignRoomTypes(nonChamberSpecs, nNonChamber, rng);
+
+        int nonChamberCursor = 0;
         for (int i = 0; i < _rooms.Count; i++) {
-            string type = (types != null) ? types[i] : "maze_room";
+            string type;
+            if (i == _chamberRoomIndex) {
+                type = chamberType ?? "central_chamber";
+            } else {
+                type = (nonChamberTypes != null) ? nonChamberTypes[nonChamberCursor++] : "maze_room";
+            }
             WorldStructure ws = SpawnRoomStructure(_rooms[i].center, _rooms[i].size, _roomRects[i], type);
             if (ws != null) _roomStructures.Add(ws);
         }
