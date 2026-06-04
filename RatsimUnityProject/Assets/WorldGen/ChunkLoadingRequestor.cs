@@ -14,7 +14,7 @@ public class ChunkLoadingRequestor : MonoBehaviour {
     private void OnDestroy() { registered.Remove(this); }
 
     // --- Config ---
-    [SerializeField] private int radius = 3;           // in chunks
+    [SerializeField] private int radius = 1;           // in chunks
     [SerializeField] private int longRangeRadius = 8;  // LOD1 radius
     // --- State ---
     private Dictionary<Vector2Int, int> _loadedChunks = new Dictionary<Vector2Int, int>(); // chunkID → current LOD
@@ -54,6 +54,10 @@ public class ChunkLoadingRequestor : MonoBehaviour {
         foreach (var kvp in desiredChunks) {
             if (_loadedChunks.TryGetValue(kvp.Key, out int currentLOD) && currentLOD != kvp.Value) {
                 if (kvp.Value < currentLOD) { // lower int = better LOD
+                    _loadedChunks[kvp.Key] = kvp.Value;
+                    NotifyLoaded(kvp.Key, kvp.Value);
+                } else { // downgrade: higher int = worse LOD
+                    NotifyUnloaded(kvp.Key, currentLOD);
                     _loadedChunks[kvp.Key] = kvp.Value;
                     NotifyLoaded(kvp.Key, kvp.Value);
                 }

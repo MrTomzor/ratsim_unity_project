@@ -9,7 +9,7 @@ public class AgentLoader : WorldDataProvider {
     public override WorldDataType[] Provides => new[] { WorldDataType.Agents };
     public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureContent };
 
-    public TopdownCameraFollower agentCameraFollower;
+    public CameraFollowerParent agentCameraFollower;
 
     private bool _spawned = false;
     private readonly List<GameObject> _spawnedAgents = new List<GameObject>();

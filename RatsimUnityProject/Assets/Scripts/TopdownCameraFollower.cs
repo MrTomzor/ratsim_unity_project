@@ -1,12 +1,12 @@
 using UnityEngine;
 
-public class TopdownCameraFollower : MonoBehaviour
+public class TopdownCameraFollower : CameraFollowerParent
 {
-    public GameObject target;
+    //public GameObject target;
     public float height = 50;
-    public bool lockRotation = true;
-    public float rotationAngle = 0;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    //public bool lockRotation = true;
+    //public float rotationAngle = 0;
+    
     void Start()
     {
         

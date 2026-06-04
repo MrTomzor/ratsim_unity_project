@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System;
 
 public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
@@ -12,7 +13,6 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
     [Header("Mesh Settings")]
     public Material terrainMaterial;
-    public float textureScale = 0.4f;
 
     [Header("Perlin (used only if WorldHeightLoader is not present)")]
     public float heightScale = 30f;
@@ -57,6 +57,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
     // ─────────────────────────────────────────────
 
     public override void GenerateChunk(int cx, int cz, int lod) {
+        
         Vector2Int key = new Vector2Int(cx, cz);
 
         if (_chunks.TryGetValue(key, out ChunkData existing) ) {
@@ -112,6 +113,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
             if (kvp.Value.go != null) Destroy(kvp.Value.go);
         _chunks.Clear();
         _chunkWidthInt = WorldLoadingController.GetParamInt("chunk_width", _chunkWidthInt);
+        _chunkWidthInt = (int)WorldLoadingController.GetChunkWidth();
     }
 
     // ─────────────────────────────────────────────
@@ -127,12 +129,12 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         if(verbose)
             Debug.Log($"Building chunk ({chunkX}, {chunkZ}) at LOD{lod} with step {step} and {vertsPerSide} verts/side");
 
-
         float ox = chunkX * _chunkWidthInt;
         float oz = chunkZ * _chunkWidthInt;
 
         Vector3[] vertices = new Vector3[vertsPerSide * vertsPerSide];
         Vector2[] uvs      = new Vector2[vertsPerSide * vertsPerSide];
+        Color[] colors     = new Color[vertsPerSide * vertsPerSide];
 
         for (int z = 0; z < vertsPerSide; z++)
         for (int x = 0; x < vertsPerSide; x++) {
@@ -143,7 +145,52 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
             vertices[idx] = new Vector3(x * step, h, z * step);
             
             //uvs[idx]      = new Vector2((float)x / (vertsPerSide - 1), (float)z / (vertsPerSide - 1));
-            uvs[idx] = new Vector2(worldX * textureScale/100, worldZ * textureScale/100);
+            uvs[idx] = new Vector2(worldX, worldZ);
+
+            // Use Perlin noise to assign either Layer R or Layer G
+            float noiseVal = Mathf.PerlinNoise(worldX * noiseScale, worldZ * noiseScale);
+            float saturated = Mathf.SmoothStep(0f, 1f, noiseVal); 
+            saturated = Mathf.SmoothStep(0f, 1f, saturated); 
+            float weightR = saturated;
+            float weightG = 1-saturated;
+            float weightB = 0f;
+            float weightA = 0f;
+            colors[idx] = new Color(weightR, weightG, weightB, weightA);
+        }
+
+        Rect ChunkBounds = new Rect(ox, oz, _chunkWidthInt, _chunkWidthInt);      
+        foreach(TagRoad road in TagRoad.Registry)
+        if (road.Overlaps(ChunkBounds))
+        for (int z = 0; z < vertsPerSide; z++)
+        for (int x = 0; x < vertsPerSide; x++){
+            float worldX = ox + x * step;
+            float worldZ = oz + z * step;
+            int   idx    = z * vertsPerSide + x;
+            if (road.IsInsideXZProjection(worldX, worldZ)){
+                float weightR = 0f;
+                float weightG = 0f;
+                float weightB = 1f;
+                float weightA = 0f;
+
+                colors[idx] = new Color(weightR, weightG, weightB, weightA);
+            }
+        }
+
+        foreach(TagGarden garden in TagGarden.Registry)
+        if (garden.Overlaps(ChunkBounds))
+        for (int z = 0; z < vertsPerSide; z++)
+        for (int x = 0; x < vertsPerSide; x++){
+            float worldX = ox + x * step;
+            float worldZ = oz + z * step;
+            int   idx    = z * vertsPerSide + x;
+            if (garden.IsInsideXZProjection(worldX, worldZ)){
+                float weightR = 0f;
+                float weightG = 0f;
+                float weightB = 0f;
+                float weightA = 1f;
+
+                colors[idx] = new Color(weightR, weightG, weightB, weightA);
+            }
         }
 
         int quadsPerSide = vertsPerSide - 1;
@@ -164,12 +211,15 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         mesh.vertices    = vertices;
         mesh.triangles   = triangles;
         mesh.uv          = uvs;
+        mesh.colors      = colors;
         mesh.RecalculateNormals();
 
         Vector3[] normals = mesh.normals;
 
         GameObject go = new GameObject($"TerrainChunk_{chunkX}_{chunkZ}");
         go.transform.SetParent(transform, false);
+        
+        go.tag = "ShadowReceiverForGrass";
         go.transform.position = new Vector3(ox, -0.01f, oz);
         go.AddComponent<MeshFilter>().sharedMesh     = mesh;
         go.AddComponent<MeshRenderer>().sharedMaterial = terrainMaterial != null ? terrainMaterial : CreateDefaultMaterial();
@@ -242,7 +292,6 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
     // ─────────────────────────────────────────────
     //  Helpers
     // ─────────────────────────────────────────────
-
     private static Material CreateDefaultMaterial() {
         Material mat = new Material(Shader.Find("Standard"));
         mat.color = new Color(0.99f, 0.00f, 0.42f);

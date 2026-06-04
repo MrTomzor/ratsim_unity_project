@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using System.Globalization;
 
 
 public class WorldLoadingController : MonoBehaviour {
@@ -77,7 +78,10 @@ public class WorldLoadingController : MonoBehaviour {
     }
 
     public static float GetParamFloat(string name) {
-        if (_instance._params.TryGetValue(name, out string val) && float.TryParse(val, out float result)) return result;
+        if (_instance._params.TryGetValue(name, out string val) && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out float result)) {
+            //Debug.Log($"WorldLoadingController: ::: {name} = {result}");
+            return result;
+        }
         Debug.LogWarning($"WorldLoadingController: param '{name}' not found or not a float");
         return 0f;
     }
@@ -92,7 +96,11 @@ public class WorldLoadingController : MonoBehaviour {
     // Overloads with fallback values
 
     public static float GetParamFloat(string name, float fallback) {
-        if (instance._params.TryGetValue(name, out string val) && float.TryParse(val, out float result)) return result;
+        if (instance._params.TryGetValue(name, out string val) && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out float result)) {
+            ///Debug.Log($"WorldLoadingController: ::: {name} = {result}");
+            return result;
+        }
+        Debug.Log($"WorldLoadingController: ::: {name} = fallback");
         return fallback;
     }
 
@@ -110,7 +118,7 @@ public class WorldLoadingController : MonoBehaviour {
 
     public static int GetSeed() => _instance.masterSeed;
 
-    public static float GetChunkWidth() => _instance.chunkWidth;
+    public static float GetChunkWidth() => GetParamFloat("chunk_width", _instance.chunkWidth);
 
     public static int GetDerivedSeed(string domain) => _instance.masterSeed ^ domain.GetHashCode();
 

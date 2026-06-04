@@ -27,7 +27,7 @@ public class SimpleStructureLoader : WorldStructureProvider {
 
             if (child.name == lodName) {
                 child.gameObject.SetActive(true);
-                SetLayerRecursive(child.gameObject, 0);
+                //SetLayerRecursive(child.gameObject, 0);
             } else {
                 child.gameObject.SetActive(false);
             }
@@ -55,7 +55,7 @@ public class SimpleStructureLoader : WorldStructureProvider {
         return true;
     }
 
-    private static void SetLayerRecursive(GameObject go, int layer) {
+    public static void SetLayerRecursive(GameObject go, int layer) {
         go.layer = layer;
         foreach (Transform child in go.transform)
             SetLayerRecursive(child.gameObject, layer);

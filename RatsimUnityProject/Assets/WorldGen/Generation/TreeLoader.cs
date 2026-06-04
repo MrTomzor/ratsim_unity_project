@@ -60,6 +60,7 @@ public class TreeLoader : WorldDataProvider {
                     continue;
                 }
                 float density = WorldLoadingController.GetParamFloat($"vegetation/{name}/density", 0f);
+                Debug.Log($"TreeLoader: ::: vegetation/{name}/density  |  {density}");    
                 _vegetationEntries.Add(new VegetationEntry { prefab = prefab, density = density });
             }
             Debug.Log($"TreeLoader: loaded {_vegetationEntries.Count} vegetation prefabs from config");
@@ -155,8 +156,9 @@ public class TreeLoader : WorldDataProvider {
             int chunkSeed = baseChunkSeed ^ (vi * 7919);
             System.Random rng = new System.Random(chunkSeed);
 
+
             int count = Mathf.RoundToInt(entry.density * _chunkWidth * _chunkWidth);
-            if (verbose) Debug.Log($"TreeLoader: chunk ({chunkID.x},{chunkID.y}) prefab={entry.prefab.name} seed={chunkSeed} attempting {count} placements, {blockers.Length} blockers ({vegMods.Count} with VegMod)");
+            if (verbose) Debug.Log($"TreeLoader: chunk ({chunkID.x},{chunkID.y}) prefab={entry.prefab.name} seed={chunkSeed} attempting {count} placements, {blockers.Length} blockers ({vegMods.Count} with VegMod)::: {entry.density}|{_chunkWidth}");
 
             for (int i = 0; i < count; i++) {
                 float x = originX + (float)rng.NextDouble() * _chunkWidth;

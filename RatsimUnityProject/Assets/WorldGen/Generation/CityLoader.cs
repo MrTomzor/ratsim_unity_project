@@ -94,10 +94,9 @@ public class CityLoader : WorldStructureProvider {
     }
 
     public override void OnWorldStructureUnloaded(WorldStructure s, int lod) {
-        // Houses are children of the city GO — they are destroyed automatically when
-        // the city is destroyed (episode clear). Just remove from the processed set
-        // so the city can be re-populated if loaded again.
-        _processedCities.Remove(s);
+        // Houses are registered as persistent WorldStructures.
+        // SimpleStructureLoader handles hiding their LODs, and HouseLoader destroys their interiors.
+        // Do NOT remove from _processedCities, otherwise revisiting the city spawns duplicate houses.
     }
 
     public override void Clear() {
@@ -268,6 +267,7 @@ public class CityLoader : WorldStructureProvider {
 
         // 3b. Spawn grid roads
         // E-W roads (one per gridZ value)
+        Debug.Log($"::: Spawning roads!!!");
         for (int j = 0; j < nZ; j++) {
             Vector2 localMid = new Vector2(0f, gridZ[j]);
             Vector2 worldMid = CityLocalToWorld(localMid, cityBounds);

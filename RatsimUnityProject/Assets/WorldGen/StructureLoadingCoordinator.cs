@@ -88,7 +88,12 @@ public class StructureLoadingCoordinator : WorldDataProvider {
 
     private void HandleNewStructureRegistered(WorldStructure s) {
         int bestLod = GetBestLodForStructure(s);
-        if (bestLod == -1) return; // not inside any currently loaded chunk
+        if (bestLod == -1) {
+            // The structure is outside the active chunks. 
+            // Explicitly notify unloaded so SimpleStructureLoader hides its default LOD0 meshes.
+            NotifyUnloaded(s, -1);
+            return; 
+        }
 
         // Build the chunk tracking set for this structure
         if (!_structureChunks.TryGetValue(s, out var chunks)) {
