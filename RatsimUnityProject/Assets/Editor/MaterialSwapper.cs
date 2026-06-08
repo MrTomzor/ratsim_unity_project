@@ -42,7 +42,30 @@ public class MaterialSwapper : EditorWindow
         }
 
         // Find all objects in the scene with your category tag
-        GameObject[] targetObjects = GameObject.FindGameObjectsWithTag(categoryTag);
+        GameObject[] targetObjects;
+        if (categoryTag == "Untagged")
+        {
+            // Fetch all active GameObjects in the scene and filter for Untagged
+            #if UNITY_2023_1_OR_NEWER
+            GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            #else
+            GameObject[] allObjects = Object.FindObjectsOfType<GameObject>();
+            #endif
+            var untaggedList = new System.Collections.Generic.List<GameObject>();
+            foreach (var obj in allObjects)
+            {
+                if (obj.CompareTag("Untagged"))
+                {
+                    untaggedList.Add(obj);
+                }
+            }
+            targetObjects = untaggedList.ToArray();
+        }
+        else
+        {
+            targetObjects = GameObject.FindGameObjectsWithTag(categoryTag);
+        }
+        
         int changedCount = 0;
 
         foreach (GameObject obj in targetObjects)

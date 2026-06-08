@@ -24,6 +24,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
     private class ChunkData {
         public GameObject go;
         public Mesh       mesh;
+        public Mesh       colliderMesh;
         public Vector3[]  vertices;
         public Vector3[]  normals;
         public int        vertsPerSide;
@@ -63,6 +64,8 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         if (_chunks.TryGetValue(key, out ChunkData existing) ) {
             // If more detailed LOD is requested and worse one loaded, remove loaded and continue
             if (lod < existing.lod) {
+                if (existing.mesh != null) Destroy(existing.mesh);
+                if (existing.colliderMesh != null && existing.colliderMesh != existing.mesh) Destroy(existing.colliderMesh);
                 Destroy(existing.go);
                 _chunks.Remove(key);
             } else {
@@ -103,14 +106,22 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
                 if (_chunks.TryGetValue(nKey, out ChunkData neighbour))
                     RecomputeEdgeNormals(nKey, neighbour);
             }
+            if (data.mesh != null) Destroy(data.mesh);
+            if (data.colliderMesh != null && data.colliderMesh != data.mesh) Destroy(data.colliderMesh);
             Destroy(data.go);
             _chunks.Remove(key);
         }
     }
 
     public override void Clear() {
-        foreach (var kvp in _chunks)
-            if (kvp.Value.go != null) Destroy(kvp.Value.go);
+        foreach (var kvp in _chunks) {
+            ChunkData data = kvp.Value;
+            if (data != null) {
+                if (data.mesh != null) Destroy(data.mesh);
+                if (data.colliderMesh != null && data.colliderMesh != data.mesh) Destroy(data.colliderMesh);
+                if (data.go != null) Destroy(data.go);
+            }
+        }
         _chunks.Clear();
         _chunkWidthInt = WorldLoadingController.GetParamInt("chunk_width", _chunkWidthInt);
         _chunkWidthInt = (int)WorldLoadingController.GetChunkWidth();
@@ -136,11 +147,14 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         Vector2[] uvs      = new Vector2[vertsPerSide * vertsPerSide];
         Color[] colors     = new Color[vertsPerSide * vertsPerSide];
 
+        bool flat = true;
+        float firstHeight = WorldServices.Get<IHeightProvider>().GetTerrainHeight(ox, oz);
         for (int z = 0; z < vertsPerSide; z++)
         for (int x = 0; x < vertsPerSide; x++) {
             float worldX = ox + x * step;
             float worldZ = oz + z * step;
             float h      = WorldServices.Get<IHeightProvider>().GetTerrainHeight(worldX, worldZ);
+            flat = flat && Mathf.Approximately(h, firstHeight);
             int   idx    = z * vertsPerSide + x;
             vertices[idx] = new Vector3(x * step, h, z * step);
             
@@ -221,11 +235,36 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         
         go.tag = "ShadowReceiverForGrass";
         go.transform.position = new Vector3(ox, -0.01f, oz);
+        
         go.AddComponent<MeshFilter>().sharedMesh     = mesh;
         go.AddComponent<MeshRenderer>().sharedMaterial = terrainMaterial != null ? terrainMaterial : CreateDefaultMaterial();
-        go.AddComponent<MeshCollider>().sharedMesh   = mesh;
+        
+        Mesh colliderMesh = mesh;
+        if (!flat){
+            Debug.Log(":::A");
+            go.AddComponent<MeshCollider>().sharedMesh   = mesh;
+        }
+        else {
+            Debug.Log(":::B");
+            colliderMesh = new Mesh();
+            colliderMesh.name = "FlatTerrainColliderMesh";
+            colliderMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            colliderMesh.vertices = new Vector3[] {
+                new Vector3(0, firstHeight, 0),
+                new Vector3(_chunkWidthInt, firstHeight, 0),
+                new Vector3(0, firstHeight, _chunkWidthInt),
+                new Vector3(_chunkWidthInt, firstHeight, _chunkWidthInt)
+            };
+            colliderMesh.triangles = new int[] {
+                0, 2, 1,
+                1, 2, 3
+            };
+            go.AddComponent<MeshCollider>().sharedMesh   = colliderMesh;
+        }
+            
 
-        return new ChunkData { go = go, mesh = mesh, vertices = vertices, normals = normals, vertsPerSide = vertsPerSide, lod = origLOD };
+
+        return new ChunkData { go = go, mesh = mesh, colliderMesh = colliderMesh, vertices = vertices, normals = normals, vertsPerSide = vertsPerSide, lod = origLOD };
     }
 
     // ─────────────────────────────────────────────
@@ -272,7 +311,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
     private void ApplyNormals(ChunkData data) {
         data.mesh.normals = data.normals;
         MeshCollider mc = data.go.GetComponent<MeshCollider>();
-        if (mc != null) mc.sharedMesh = data.mesh;
+        if (mc != null && mc.sharedMesh == data.mesh) mc.sharedMesh = data.mesh;
     }
 
     // ─────────────────────────────────────────────
