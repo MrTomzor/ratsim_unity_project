@@ -96,6 +96,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2321627116857395905}
   - component: {fileID: 487563690010102415}
+  - component: {fileID: 4103892856743578576}
   m_Layer: 0
   m_Name: gtree3
   m_TagString: Untagged
@@ -140,11 +141,34 @@ LODGroup:
     - renderer: {fileID: 8894386854027009095}
     - renderer: {fileID: 8687710323316897173}
     - renderer: {fileID: 615239170904579150}
-  - screenRelativeHeight: 0.01
+  - screenRelativeHeight: 0
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 2476618612749132462}
   m_Enabled: 1
+--- !u!136 &4103892856743578576
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3284321741206351885}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.17
+  m_Height: 7.58
+  m_Direction: 1
+  m_Center: {x: 0, y: 3.52, z: 0}
 --- !u!1 &3725887806685162558
 GameObject:
   m_ObjectHideFlags: 0
@@ -244,7 +268,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ef4b1eadb5a40740a7acaf849e170c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useInitialRotation: 1
+  useInitialRotation: 0
   targetRotationEuler: {x: 0, y: 0, z: 0}
   updateTime: 1
 --- !u!1001 &7831372835364634819

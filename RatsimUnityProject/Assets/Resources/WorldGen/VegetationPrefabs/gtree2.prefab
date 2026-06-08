@@ -99,7 +99,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ef4b1eadb5a40740a7acaf849e170c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useInitialRotation: 1
+  useInitialRotation: 0
   targetRotationEuler: {x: 0, y: 0, z: 0}
   updateTime: 1
 --- !u!1 &6036552848940814316
@@ -198,6 +198,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2617701448584763212}
   - component: {fileID: 3149324393966949984}
+  - component: {fileID: 5185399971757387467}
   m_Layer: 0
   m_Name: gtree2
   m_TagString: Untagged
@@ -242,11 +243,34 @@ LODGroup:
     - renderer: {fileID: 6310876763697138516}
     - renderer: {fileID: 6083091789421240966}
     - renderer: {fileID: 3051792017393698933}
-  - screenRelativeHeight: 0.01
+  - screenRelativeHeight: 0
     fadeTransitionWidth: 0
     renderers:
     - renderer: {fileID: 2001852821017625766}
   m_Enabled: 1
+--- !u!136 &5185399971757387467
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6553061407821455394}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.17
+  m_Height: 7.58
+  m_Direction: 1
+  m_Center: {x: 0, y: 3.52, z: 0}
 --- !u!1001 &4635656863269902288
 PrefabInstance:
   m_ObjectHideFlags: 0

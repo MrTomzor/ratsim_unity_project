@@ -6,11 +6,15 @@ using System.IO;
 public class MeshJoinerByMaterial : Editor
 {
     private const string EXPORT_FOLDER = "OptimizedHouses";
+    private const string IGNORE_TAG = "IgnoreCombine";
 
     [MenuItem("Tools/Join Mesh of Selected Object", false, 1)]
     [MenuItem("GameObject/Join Mesh of Selected Object", false, 10)]
     public static void CombineSelectedHouse()
     {
+        // Ensure the ignore tag exists in project settings
+        CreateTag(IGNORE_TAG);
+
         // 1. Get the currently selected GameObject
         GameObject selectedRoot = Selection.activeGameObject;
 
@@ -43,6 +47,10 @@ public class MeshJoinerByMaterial : Editor
         {
             // Skip the root container node itself if it happens to have a mesh filter
             if (filter.transform == combinedRoot.transform)
+                continue;
+
+            // Skip if the object or any of its parents is tagged with the ignore tag
+            if (IsOrHasParentTagged(filter.transform, combinedRoot.transform, IGNORE_TAG))
                 continue;
 
             MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
@@ -164,6 +172,48 @@ public class MeshJoinerByMaterial : Editor
 
         // Clean up our temporary working copy from the active open scene hierarchy
         DestroyImmediate(combinedRoot);
+    }
+
+    // Helper to check if a transform or its parents are tagged
+    private static bool IsOrHasParentTagged(Transform target, Transform root, string tag)
+    {
+        Transform current = target;
+        while (current != null && current != root)
+        {
+            if (current.CompareTag(tag))
+            {
+                return true;
+            }
+            current = current.parent;
+        }
+        return false;
+    }
+
+    // Helper to ensure tag exists in project settings
+    private static void CreateTag(string tag)
+    {
+        var tagManagerAsset = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset");
+        if (tagManagerAsset == null || tagManagerAsset.Length == 0) return;
+
+        SerializedObject tagManager = new SerializedObject(tagManagerAsset[0]);
+        SerializedProperty tagsProp = tagManager.FindProperty("tags");
+        
+        bool found = false;
+        for (int i = 0; i < tagsProp.arraySize; i++)
+        {
+            if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag)
+            {
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found)
+        {
+            tagsProp.InsertArrayElementAtIndex(0);
+            tagsProp.GetArrayElementAtIndex(0).stringValue = tag;
+            tagManager.ApplyModifiedProperties();
+        }
     }
 
     // Helper method to recursively clean up empty objects from the bottom up
