@@ -10,12 +10,16 @@ public class TagParent : MonoBehaviour
         public Vector2 p0;
         public Vector2 p1;
         public Vector2 p2;
+        public Vector2 min;
+        public Vector2 max;
 
         public Triangle2D(Vector2 p0, Vector2 p1, Vector2 p2)
         {
             this.p0 = p0;
             this.p1 = p1;
             this.p2 = p2;
+            this.min = new Vector2(Mathf.Min(p0.x, Mathf.Min(p1.x, p2.x)), Mathf.Min(p0.y, Mathf.Min(p1.y, p2.y)));
+            this.max = new Vector2(Mathf.Max(p0.x, Mathf.Max(p1.x, p2.x)), Mathf.Max(p0.y, Mathf.Max(p1.y, p2.y)));
         }
     }
 
@@ -27,7 +31,7 @@ public class TagParent : MonoBehaviour
     private bool _XZBoundsCalculated = false;
 
     // List of pre-calculated world-space triangles for exact float testing
-    private List<Triangle2D> cachedTriangles = new List<Triangle2D>();
+    private Triangle2D[] cachedTriangles = new Triangle2D[0];
 
     protected virtual void OnEnable()
     {
@@ -71,12 +75,91 @@ public class TagParent : MonoBehaviour
 
         // 2. Narrow-Phase Check: Test against the actual cached 2D triangles
         // Using a manual for-loop here to avoid garbage collection allocation
-        for (int i = 0; i < cachedTriangles.Count; i++)
+        for (int i = 0; i < cachedTriangles.Length; i++)
         {
-            if (IsPointIn2DTriangle(point, cachedTriangles[i]))
+            Triangle2D tri = cachedTriangles[i];
+            
+            // Fast rejection: check if point is inside the triangle's bounding box
+            if (point.x < tri.min.x || point.x > tri.max.x || point.y < tri.min.y || point.y > tri.max.y)
+                continue;
+
+            if (IsPointIn2DTriangle(point, tri))
             {
                 return true; // Point is inside the road!
             }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Chunk-level fast filtering: checks if a rectangular chunk overlaps ANY triangle in this mesh.
+    /// Uses Separating Axis Theorem (SAT) against the triangle's edges.
+    /// </summary>
+    public bool IntersectsChunk(Rect chunkBounds)
+    {
+        if (!_XZBoundsCalculated)
+            RecalculateProjectionData();
+
+        if (!XZBounds.Overlaps(chunkBounds))
+            return false;
+
+        Vector2 c0 = new Vector2(chunkBounds.xMin, chunkBounds.yMin);
+        Vector2 c1 = new Vector2(chunkBounds.xMax, chunkBounds.yMin);
+        Vector2 c2 = new Vector2(chunkBounds.xMin, chunkBounds.yMax);
+        Vector2 c3 = new Vector2(chunkBounds.xMax, chunkBounds.yMax);
+
+        for (int i = 0; i < cachedTriangles.Length; i++)
+        {
+            Triangle2D tri = cachedTriangles[i];
+
+            // 1. Separating axes from the chunk (AABB check)
+            if (chunkBounds.xMin > tri.max.x || chunkBounds.xMax < tri.min.x ||
+                chunkBounds.yMin > tri.max.y || chunkBounds.yMax < tri.min.y)
+                continue;
+
+            // 2. If any corner is inside the triangle, they intersect
+            if (IsPointIn2DTriangle(c0, tri)) return true;
+            if (IsPointIn2DTriangle(c1, tri)) return true;
+            if (IsPointIn2DTriangle(c2, tri)) return true;
+            if (IsPointIn2DTriangle(c3, tri)) return true;
+
+            // 3. Separating axes from the triangle (Vertex Area signature check)
+            float inSign1 = EdgeSideSign(tri.p2, tri.p0, tri.p1);
+            float d1_0 = EdgeSideSign(c0, tri.p0, tri.p1);
+            float d1_1 = EdgeSideSign(c1, tri.p0, tri.p1);
+            float d1_2 = EdgeSideSign(c2, tri.p0, tri.p1);
+            float d1_3 = EdgeSideSign(c3, tri.p0, tri.p1);
+            bool out1_0 = (d1_0 > 0 && inSign1 < 0) || (d1_0 < 0 && inSign1 > 0);
+            bool out1_1 = (d1_1 > 0 && inSign1 < 0) || (d1_1 < 0 && inSign1 > 0);
+            bool out1_2 = (d1_2 > 0 && inSign1 < 0) || (d1_2 < 0 && inSign1 > 0);
+            bool out1_3 = (d1_3 > 0 && inSign1 < 0) || (d1_3 < 0 && inSign1 > 0);
+            if (out1_0 && out1_1 && out1_2 && out1_3) continue; // All corners strictly outside edge 1
+
+            float inSign2 = EdgeSideSign(tri.p0, tri.p1, tri.p2);
+            float d2_0 = EdgeSideSign(c0, tri.p1, tri.p2);
+            float d2_1 = EdgeSideSign(c1, tri.p1, tri.p2);
+            float d2_2 = EdgeSideSign(c2, tri.p1, tri.p2);
+            float d2_3 = EdgeSideSign(c3, tri.p1, tri.p2);
+            bool out2_0 = (d2_0 > 0 && inSign2 < 0) || (d2_0 < 0 && inSign2 > 0);
+            bool out2_1 = (d2_1 > 0 && inSign2 < 0) || (d2_1 < 0 && inSign2 > 0);
+            bool out2_2 = (d2_2 > 0 && inSign2 < 0) || (d2_2 < 0 && inSign2 > 0);
+            bool out2_3 = (d2_3 > 0 && inSign2 < 0) || (d2_3 < 0 && inSign2 > 0);
+            if (out2_0 && out2_1 && out2_2 && out2_3) continue; // All corners strictly outside edge 2
+
+            float inSign3 = EdgeSideSign(tri.p1, tri.p2, tri.p0);
+            float d3_0 = EdgeSideSign(c0, tri.p2, tri.p0);
+            float d3_1 = EdgeSideSign(c1, tri.p2, tri.p0);
+            float d3_2 = EdgeSideSign(c2, tri.p2, tri.p0);
+            float d3_3 = EdgeSideSign(c3, tri.p2, tri.p0);
+            bool out3_0 = (d3_0 > 0 && inSign3 < 0) || (d3_0 < 0 && inSign3 > 0);
+            bool out3_1 = (d3_1 > 0 && inSign3 < 0) || (d3_1 < 0 && inSign3 > 0);
+            bool out3_2 = (d3_2 > 0 && inSign3 < 0) || (d3_2 < 0 && inSign3 > 0);
+            bool out3_3 = (d3_3 > 0 && inSign3 < 0) || (d3_3 < 0 && inSign3 > 0);
+            if (out3_0 && out3_1 && out3_2 && out3_3) continue; // All corners strictly outside edge 3
+
+            // If no separating axis exists, the chunk MUST intersect the triangle!
+            return true;
         }
 
         return false;
@@ -89,12 +172,13 @@ public class TagParent : MonoBehaviour
     public void RecalculateProjectionData()
     {
         _XZBoundsCalculated = true;
-        cachedTriangles.Clear();
+        List<Triangle2D> tempTriangles = new List<Triangle2D>();
         MeshFilter[] meshFilters = GetComponentsInChildren<MeshFilter>();
 
         if (meshFilters.Length == 0)
         {
             XZBounds = new Rect(transform.position.x, transform.position.z, 0, 0);
+            cachedTriangles = new Triangle2D[0];
             return;
         }
 
@@ -129,9 +213,10 @@ public class TagParent : MonoBehaviour
                 Vector2 p1 = new Vector2(wV1.x, wV1.z);
                 Vector2 p2 = new Vector2(wV2.x, wV2.z);
 
-                cachedTriangles.Add(new Triangle2D(p0, p1, p2));
+                tempTriangles.Add(new Triangle2D(p0, p1, p2));
             }
         }
+        cachedTriangles = tempTriangles.ToArray();
     }
 
     // Mathematical sub-function: Point-in-Triangle barycentric/edge-side test

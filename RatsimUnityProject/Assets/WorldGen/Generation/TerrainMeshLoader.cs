@@ -147,13 +147,14 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         Vector2[] uvs      = new Vector2[vertsPerSide * vertsPerSide];
         Color[] colors     = new Color[vertsPerSide * vertsPerSide];
 
+        IHeightProvider HeightProvider = WorldServices.Get<IHeightProvider>();
         bool flat = true;
-        float firstHeight = WorldServices.Get<IHeightProvider>().GetTerrainHeight(ox, oz);
+        float firstHeight = HeightProvider.GetTerrainHeight(ox, oz);
         for (int z = 0; z < vertsPerSide; z++)
         for (int x = 0; x < vertsPerSide; x++) {
             float worldX = ox + x * step;
             float worldZ = oz + z * step;
-            float h      = WorldServices.Get<IHeightProvider>().GetTerrainHeight(worldX, worldZ);
+            float h      = HeightProvider.GetTerrainHeight(worldX, worldZ);
             flat = flat && Mathf.Approximately(h, firstHeight);
             int   idx    = z * vertsPerSide + x;
             vertices[idx] = new Vector3(x * step, h, z * step);
@@ -174,7 +175,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
         Rect ChunkBounds = new Rect(ox, oz, _chunkWidthInt, _chunkWidthInt);      
         foreach(TagRoad road in TagRoad.Registry)
-        if (road.Overlaps(ChunkBounds))
+        if (road.Overlaps(ChunkBounds) && road.IntersectsChunk(ChunkBounds))
         for (int z = 0; z < vertsPerSide; z++)
         for (int x = 0; x < vertsPerSide; x++){
             float worldX = ox + x * step;
@@ -191,7 +192,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
         }
 
         foreach(TagGarden garden in TagGarden.Registry)
-        if (garden.Overlaps(ChunkBounds))
+        if (garden.Overlaps(ChunkBounds) && garden.IntersectsChunk(ChunkBounds))
         for (int z = 0; z < vertsPerSide; z++)
         for (int x = 0; x < vertsPerSide; x++){
             float worldX = ox + x * step;

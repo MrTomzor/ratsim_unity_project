@@ -1,0 +1,90 @@
+#pragma kernel InitPass
+#pragma kernel JumpPass
+#pragma kernel DistancePass
+
+Texture2D<float4> InputTexture; // The original image with seeds (red channel)
+Texture2D<float2> ReadBuffer;   // Ping-pong read buffer (stores closest seed UV)
+RWTexture2D<float2> WriteBuffer;// Ping-pong write buffer
+RWTexture2D<float> OutputDistance; // Final RFloat distance texture
+
+float StepSize;
+float Resolution;
+float SideLength;
+int ChannelIndex;
+
+// Helper to get normalized UV from pixel ID
+float2 GetUV(uint2 id) {
+    return float2(id.x + 0.5, id.y + 0.5) / Resolution;
+}
+
+[numthreads(8,8,1)]
+void InitPass (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)Resolution || id.y >= (uint)Resolution) return;
+
+    // Check if pixel is a seed
+    float isSeed = InputTexture[id.xy][ChannelIndex];
+    
+    if (isSeed > 0.99) {
+        // Store own UV
+        WriteBuffer[id.xy] = GetUV(id.xy);
+    } else {
+        // Store invalid UV
+        WriteBuffer[id.xy] = float2(-1.0, -1.0);
+    }
+}
+
+[numthreads(8,8,1)]
+void JumpPass (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)Resolution || id.y >= (uint)Resolution) return;
+
+    float2 bestSeedUV = float2(-1.0, -1.0);
+    float bestDistSq = 9999999.0;
+    
+    float2 myUV = GetUV(id.xy);
+
+    // Check 9 neighbors (3x3 grid with spacing = StepSize)
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            int2 neighborId = (int2)id.xy + int2(x, y) * (int)StepSize;
+            
+            // Boundary check
+            if (neighborId.x >= 0 && neighborId.x < (int)Resolution && 
+                neighborId.y >= 0 && neighborId.y < (int)Resolution) 
+            {
+                float2 seedUV = ReadBuffer[neighborId];
+                
+                // If it's a valid seed
+                if (seedUV.x >= 0.0) {
+                    float2 diff = seedUV - myUV;
+                    float distSq = dot(diff, diff); // Use squared distance for comparison
+                    
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestSeedUV = seedUV;
+                    }
+                }
+            }
+        }
+    }
+    
+    WriteBuffer[id.xy] = bestSeedUV;
+}
+
+[numthreads(8,8,1)]
+void DistancePass (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)Resolution || id.y >= (uint)Resolution) return;
+
+    float2 seedUV = ReadBuffer[id.xy];
+    
+    if (seedUV.x >= 0.0) {
+        float2 myUV = GetUV(id.xy);
+        float distUV = distance(seedUV, myUV);
+        OutputDistance[id.xy] = distUV * SideLength; // Map UV distance to absolute world units
+    } else {
+        // Fallback if no seed was found on the entire texture
+        OutputDistance[id.xy] = SideLength * 2.0; 
+    }
+}

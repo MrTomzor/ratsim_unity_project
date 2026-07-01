@@ -20,9 +20,9 @@ TagManager:
   - WorldGen
   - GrassGround
   - Doors
-  - 
-  - 
-  - 
+  - PostProcessing
+  - GrassMask
+  - WaterMask
   - 
   - 
   - 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ClipmapTerrain;
 using UnityEngine;
 
 public class TreeLoader : WorldDataProvider {
@@ -166,7 +167,8 @@ public class TreeLoader : WorldDataProvider {
 
                 if (ShouldSkipTree(new Vector2(x, z), blockers, vegMods, rng)) continue;
 
-                float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
+                //float y = WorldServices.Get<IHeightProvider>().GetTerrainHeight(x, z);
+                float y = TerrainNoise.GetTerrainHeight(new Vector2(x, z));
                 GameObject obj = Instantiate(entry.prefab, new Vector3(x, y, z), Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
                 obj.transform.SetParent(chunkObj.transform);
             }
@@ -267,7 +269,8 @@ public class TreeLoader : WorldDataProvider {
                 if (wx < originX || wx > originX + _chunkWidth) continue;
                 if (wz < originZ || wz > originZ + _chunkWidth) continue;
 
-                float wy = WorldServices.Get<IHeightProvider>().GetTerrainHeight(wx, wz);
+                //float wy = WorldServices.Get<IHeightProvider>().GetTerrainHeight(wx, wz);
+                float wy = TerrainNoise.GetTerrainHeight(new Vector2(wx, wz));
                 GameObject obj = Instantiate(
                     entry.prefab,
                     new Vector3(wx, wy, wz),

@@ -13,8 +13,8 @@ public class AgentPOVCameraFollower : CameraFollowerParent
         
     }
 
-    // Update is called once per frame
-    void Update()
+    // LateUpdate is called after all Update functions have been called
+    void LateUpdate()
     {
         if (target != null)
         {

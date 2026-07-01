@@ -39,7 +39,7 @@ Shader "Custom/Terrain4WayBlend" {
         LOD 200
 
         CGPROGRAM
-        #pragma surface surf Standard fullforwardshadows
+        #pragma surface surf Standard fullforwardshadows vertex:vert addshadow
         #pragma target 3.0
 
         // Textures
@@ -56,7 +56,16 @@ Shader "Custom/Terrain4WayBlend" {
         struct Input {
             float2 uv_LayerR; // Reused for all layers since tiling is global
             float4 color : COLOR; // Vertex Color Weights
+            float heightRatio;
         };
+        
+        #include "Assets/ClipmapTerrain/ClipmapDisplacement.cginc"
+
+        void vert(inout appdata_full v, out Input o)
+        {
+            UNITY_INITIALIZE_OUTPUT(Input, o);
+            DisplaceClipmapVertex(v, o.heightRatio);;
+        }
 
         void surf (Input IN, inout SurfaceOutputStandard o) {
             float2 tiledUV = IN.uv_LayerR * _UVScale;

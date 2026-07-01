@@ -112,6 +112,7 @@ GameObject:
   - component: {fileID: -8653734782038556784}
   - component: {fileID: -3201670612083729221}
   - component: {fileID: 8636935748284226829}
+  - component: {fileID: 3826862030811725955}
   m_Layer: 7
   m_Name: SphereAgent
   m_TagString: Untagged
@@ -176,7 +177,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f723204076dfa8b46ae18beefb5939cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxLinearVelocity: 2
+  maxLinearVelocity: 20.34
   maxAngularVelocity: 0.5
   maxLinearAcceleration: 5
   maxAngularAcceleration: 2
@@ -441,6 +442,19 @@ MonoBehaviour:
   sigmaBins: 1
   topicPrefix: /sector_signal
   channelNames: []
+--- !u!114 &3826862030811725955
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aeb87cf0c3b19ab4da03dd3f653536f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hoverHeight: 2
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0
