@@ -42,6 +42,10 @@ public class WellLoader : WorldDataProvider, IWellProvider {
     public string allowedStructures = "";            // wells/allowed_structures (CSV)
     public string seedKey = "wells";                 // wells/seed_key ("reward" → land on the same slots reward objects would)
     public bool debugGizmo = true;                   // wells/debug_gizmo (editor state gizmo)
+    public float roomEdgeBuffer = 0f;                // wells/room_edge_buffer: min distance (world units) from the
+                                                     // host structure's footprint edge; keeps wells (and their reward
+                                                     // annulus) off maze walls. 0 = off. If a room is too small for
+                                                     // the buffer, falls back to the slot(s) nearest the room centre.
 
     [Header("Physical defaults (per-well; overridable in config)")]
     public float arrivalRadius = 1.0f;
@@ -107,6 +111,7 @@ public class WellLoader : WorldDataProvider, IWellProvider {
         debugGizmo        = WorldLoadingController.GetParamInt("wells/debug_gizmo", debugGizmo ? 1 : 0) != 0;
         prefabName        = WorldLoadingController.GetParamString("wells/prefab_name", prefabName);
         allowedStructures = WorldLoadingController.GetParamString("wells/allowed_structures", allowedStructures);
+        roomEdgeBuffer    = WorldLoadingController.GetParamFloat("wells/room_edge_buffer", roomEdgeBuffer);
 
         arrivalRadius      = WorldLoadingController.GetParamFloat("wells/arrival_radius", arrivalRadius);
         dispenseDelaySteps = WorldLoadingController.GetParamInt("wells/dispense_delay_steps", dispenseDelaySteps);
@@ -181,8 +186,9 @@ public class WellLoader : WorldDataProvider, IWellProvider {
             if (group == null || group.childCount == 0) continue;
 
             System.Random rng = StructureSlotDistribution.MakeRng(s, _wellSeed);
+            List<Transform> pool = CollectSlotPool(s, group, entry.Value.spec);
             List<Transform> slots = StructureSlotDistribution.SelectSlots(
-                group, entry.Value.spec, rng, "WellLoader", s.name);
+                pool, entry.Value.spec, rng, "WellLoader", s.name);
             foreach (Transform slot in slots)
                 anchors.Add((s, slot, slot.GetSiblingIndex()));
         }
@@ -248,6 +254,51 @@ public class WellLoader : WorldDataProvider, IWellProvider {
             if (structureType.StartsWith(_entries[i].type, System.StringComparison.OrdinalIgnoreCase))
                 return _entries[i];
         return null;
+    }
+
+    /// <summary>
+    /// The slot pool for one structure: all slots at least <c>wells/room_edge_buffer</c>
+    /// from the structure's footprint edge (keeps wells + their reward-spawn annulus off
+    /// maze walls). If the room is too small for the buffer to leave enough eligible
+    /// slots, falls back to the slot(s) nearest the room centre (loud in verbose mode).
+    /// Footprint math is world-axis-aligned — fine for RoomStructureBuilder rooms
+    /// (unrotated, unit scale), which is where multi-slot structures come from.
+    /// </summary>
+    private List<Transform> CollectSlotPool(WorldStructure s, Transform group,
+                                            StructureSlotDistribution.Spec spec) {
+        var all = new List<Transform>(group.childCount);
+        foreach (Transform t in group) all.Add(t);
+        if (roomEdgeBuffer <= 0f) return all;
+
+        Vector2 center = s.GetCenter2D();
+        Vector2 size = s.GetSize();
+        float hx = size.x * 0.5f, hz = size.y * 0.5f;
+
+        var eligible = new List<Transform>(all.Count);
+        foreach (Transform t in all) {
+            float dx = Mathf.Abs(t.position.x - center.x);
+            float dz = Mathf.Abs(t.position.z - center.y);
+            if (hx - dx >= roomEdgeBuffer && hz - dz >= roomEdgeBuffer) eligible.Add(t);
+        }
+
+        // Enough eligible slots to satisfy the spec (count mode needs min; probability
+        // mode just needs any) → use the filtered pool.
+        int needed = spec.UseCountMode ? Mathf.Max(1, spec.minPerStructure) : 1;
+        if (eligible.Count >= needed) return eligible;
+
+        // Fallback: room too small for the buffer → the `needed` slots nearest the centre.
+        all.Sort((a, b) => {
+            float da = (a.position.x - center.x) * (a.position.x - center.x)
+                     + (a.position.z - center.y) * (a.position.z - center.y);
+            float db = (b.position.x - center.x) * (b.position.x - center.x)
+                     + (b.position.z - center.y) * (b.position.z - center.y);
+            return da.CompareTo(db);
+        });
+        int take = Mathf.Min(needed, all.Count);
+        if (verbose)
+            Debug.LogWarning($"WellLoader: '{s.name}' too small for room_edge_buffer={roomEdgeBuffer} " +
+                             $"({eligible.Count}/{needed} eligible slots) — falling back to {take} centre-most slot(s)");
+        return all.GetRange(0, take);
     }
 
     /// <summary>Parse "cell_i_j" slot names into a grid coord; (-1,-1) otherwise.</summary>

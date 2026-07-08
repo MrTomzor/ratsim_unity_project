@@ -71,13 +71,27 @@ public static class StructureSlotDistribution {
     public static List<Transform> SelectSlots(
         Transform group, Spec spec, System.Random rng, string source, string context) {
 
+        if (group == null || group.childCount == 0) return new List<Transform>();
+        var pool = new List<Transform>(group.childCount);
+        foreach (Transform slot in group) pool.Add(slot);
+        return SelectSlots(pool, spec, rng, source, context);
+    }
+
+    /// <summary>
+    /// List-based overload for callers that pre-filter the slot pool (e.g. WellLoader's
+    /// room-edge buffer). Selection over an unfiltered child list draws the RNG in the
+    /// same order as the group overload, so legacy layouts are unchanged.
+    /// </summary>
+    public static List<Transform> SelectSlots(
+        List<Transform> pool, Spec spec, System.Random rng, string source, string context) {
+
         var result = new List<Transform>();
-        if (group == null || group.childCount == 0) return result;
+        if (pool == null || pool.Count == 0) return result;
 
         // Per-structure skip chance.
         if ((float)rng.NextDouble() < spec.skipProbability) return result;
 
-        int slotCount = group.childCount;
+        int slotCount = pool.Count;
 
         if (spec.UseCountMode) {
             int min = spec.minPerStructure;
@@ -97,10 +111,10 @@ public static class StructureSlotDistribution {
                 int tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
             }
             for (int k = 0; k < n; k++)
-                result.Add(group.GetChild(indices[k]));
+                result.Add(pool[indices[k]]);
         } else {
             // Probability mode: independent per-slot Bernoulli.
-            foreach (Transform slot in group) {
+            foreach (Transform slot in pool) {
                 if ((float)rng.NextDouble() > spec.spawnProbability) continue;
                 result.Add(slot);
             }
