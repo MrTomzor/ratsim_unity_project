@@ -1513,55 +1513,24 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
         IHeightProvider heights = WorldServices.Get<IHeightProvider>();
         float terrainY = heights.GetTerrainHeight(center.x, center.y);
 
-        GameObject root = new GameObject(structureType);
-        root.SetActive(false);
-
-        // Footprint-only child: disabled BoxCollider on WorldGen layer. Disabled
-        // means no physics queries (CheckBox, Raycast) ever hit it, so rooms
-        // don't block agents or other spawners by accident — they remain
-        // queryable only via WorldStructure.GetBoundingBox2D() / IRoomProvider.
-        GameObject footprint = new GameObject("Footprint");
-        footprint.transform.SetParent(root.transform, false);
-        int wgLayer = LayerMask.NameToLayer("WorldGen");
-        if (wgLayer >= 0) footprint.layer = wgLayer;
-
-        BoxCollider col = footprint.AddComponent<BoxCollider>();
-        col.size = Vector3.one;
-        col.isTrigger = true;
-        col.enabled = false;
-
-        WorldStructure ws = root.AddComponent<WorldStructure>();
-        ws.structureType = structureType;
-        ws.footprintCollider = col;
-
-        root.transform.SetParent(transform);
-        root.transform.position = new Vector3(center.x, terrainY, center.y);
-        // Scale only the footprint child so WorldStructure.GetSize() (size × lossyScale) returns `size`.
-        footprint.transform.localScale = new Vector3(size.x, 1f, size.y);
-
-        // LOD0/rewardSpawnPositions/cell_i_j — one Transform at the center of every cell in the
-        // room. Built for every room regardless of label so any structure-aware loader can use
-        // them; RewardObjectLoader picks from these when reward_objects/allowed_structures
-        // includes this room's type, with min/max_per_structure controlling reward count.
-        // Must be in place BEFORE SetActive(true), which fires WorldStructure.Awake and the
-        // OnWorldStructureLoaded callback that reads this hierarchy.
-        GameObject lod0 = new GameObject("LOD0");
-        lod0.transform.SetParent(root.transform, false);
-        GameObject group = new GameObject("rewardSpawnPositions");
-        group.transform.SetParent(lod0.transform, false);
+        // One spawn slot at the center of every cell in the room. RewardObjectLoader
+        // picks from these when reward_objects/allowed_structures includes this room's
+        // type (min/max_per_structure controls reward count); WellLoader does the same.
+        var slots = new List<RoomStructureBuilder.Slot>(rect.w * rect.h);
         for (int i = 0; i < rect.w; i++) {
             for (int j = 0; j < rect.h; j++) {
                 float wx = _originX + (rect.x0 + i + 0.5f) * _cellSize;
                 float wz = _originZ + (rect.z0 + j + 0.5f) * _cellSize;
                 float wy = heights.GetTerrainHeight(wx, wz);
-                GameObject sp = new GameObject($"cell_{i}_{j}");
-                sp.transform.SetParent(group.transform, false);
-                sp.transform.position = new Vector3(wx, wy, wz);
+                slots.Add(new RoomStructureBuilder.Slot {
+                    name = $"cell_{i}_{j}",
+                    position = new Vector3(wx, wy, wz)
+                });
             }
         }
 
-        root.SetActive(true);
-        return ws;
+        return RoomStructureBuilder.Build(
+            transform, structureType, new Vector3(center.x, terrainY, center.y), size, slots);
     }
 
     // ─────────────────────────────────────────────

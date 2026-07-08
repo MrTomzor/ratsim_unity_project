@@ -82,12 +82,7 @@ public class RewardObjectLoader : WorldStructureProvider {
 
     private struct StructureEntry {
         public string type;
-        public float spawnProbability;
-        public float skipProbability;
-        // -1 means "unset". When either is >= 0, count mode is active.
-        public int   minPerStructure;
-        public int   maxPerStructure;
-        public bool UseCountMode => minPerStructure >= 0 || maxPerStructure >= 0;
+        public StructureSlotDistribution.Spec spec;
     }
 
     private GameObject _rewardPrefab;
@@ -167,31 +162,17 @@ public class RewardObjectLoader : WorldStructureProvider {
             foreach (string raw in allowedStructures.Split(',')) {
                 string type = raw.Trim();
                 if (string.IsNullOrEmpty(type)) continue;
-                _structureEntries.Add(new StructureEntry {
-                    type             = type,
+                var spec = new StructureSlotDistribution.Spec {
                     spawnProbability = WorldLoadingController.GetParamFloat($"reward_objects/{type}/spawn_probability", 1f),
                     skipProbability  = WorldLoadingController.GetParamFloat($"reward_objects/{type}/skip_probability", 0f),
                     minPerStructure  = WorldLoadingController.GetParamInt($"reward_objects/{type}/min_per_structure", -1),
                     maxPerStructure  = WorldLoadingController.GetParamInt($"reward_objects/{type}/max_per_structure", -1),
-                });
+                };
+                // Normalise count-mode (mirror min/max, validate min <= max). Per-structure
+                // validation against slot count happens later in SelectSlots.
+                StructureSlotDistribution.NormalizeSpec(ref spec, "RewardObjectLoader", $"structure '{type}'");
+                _structureEntries.Add(new StructureEntry { type = type, spec = spec });
             }
-        }
-
-        // Normalise count-mode entries: if only one of min/max was provided, mirror it,
-        // and validate min <= max. Validation against childCount happens at structure-load time
-        // (we don't know the prefab's spawn-position count until then).
-        for (int i = 0; i < _structureEntries.Count; i++) {
-            StructureEntry e = _structureEntries[i];
-            if (!e.UseCountMode) continue;
-            if (e.minPerStructure < 0) e.minPerStructure = e.maxPerStructure;
-            if (e.maxPerStructure < 0) e.maxPerStructure = e.minPerStructure;
-            if (e.minPerStructure > e.maxPerStructure) {
-                WorldGenStatus.Error("RewardObjectLoader",
-                    $"structure '{e.type}': min_per_structure ({e.minPerStructure}) > max_per_structure ({e.maxPerStructure}) — disabling count mode for this type");
-                e.minPerStructure = -1;
-                e.maxPerStructure = -1;
-            }
-            _structureEntries[i] = e;
         }
 
         _paramsLoaded = true;
@@ -204,10 +185,10 @@ public class RewardObjectLoader : WorldStructureProvider {
             $"structureTypes={_structureEntries.Count}");
         if (verbose) {
             foreach (var e in _structureEntries) {
-                if (e.UseCountMode)
-                    Debug.Log($"  structure '{e.type}': count mode min={e.minPerStructure} max={e.maxPerStructure}, skipProb={e.skipProbability:F2}");
+                if (e.spec.UseCountMode)
+                    Debug.Log($"  structure '{e.type}': count mode min={e.spec.minPerStructure} max={e.spec.maxPerStructure}, skipProb={e.spec.skipProbability:F2}");
                 else
-                    Debug.Log($"  structure '{e.type}': spawnProb={e.spawnProbability:F2}, skipProb={e.skipProbability:F2}");
+                    Debug.Log($"  structure '{e.type}': spawnProb={e.spec.spawnProbability:F2}, skipProb={e.spec.skipProbability:F2}");
             }
         }
     }
@@ -401,53 +382,23 @@ public class RewardObjectLoader : WorldStructureProvider {
             return;
         }
 
-        System.Random rng = MakeStructureRng(s);
-
-        // Per-structure skip chance
-        if ((float)rng.NextDouble() < entry.Value.skipProbability) {
-            if (verbose) Debug.Log($"RewardObjectLoader: '{s.name}' skipped (skipProb={entry.Value.skipProbability:F2})");
-            return;
-        }
+        // Shared selection (skip + count/probability modes). The same rng continues
+        // into MaybeAttachSignalSource below so the legacy draw sequence is preserved.
+        System.Random rng = StructureSlotDistribution.MakeRng(s, _rewardSeed);
+        List<Transform> slots = StructureSlotDistribution.SelectSlots(
+            group, entry.Value.spec, rng, "RewardObjectLoader",
+            $"'{s.name}' (type '{entry.Value.type}')");
+        if (slots.Count == 0) return;
 
         GameObject container = new GameObject(ContainerName);
         container.transform.SetParent(s.transform, false);
         container.transform.SetPositionAndRotation(s.transform.position, s.transform.rotation);
 
         int placed = 0;
-        if (entry.Value.UseCountMode) {
-            // Count mode: pick N in [min,max] then fill N random distinct spawn slots.
-            int slotCount = group.childCount;
-            int min = entry.Value.minPerStructure;
-            int max = entry.Value.maxPerStructure;
-            if (min > slotCount || max > slotCount) {
-                WorldGenStatus.Error("RewardObjectLoader",
-                    $"structure '{s.name}' (type '{entry.Value.type}'): min/max per structure ({min}/{max}) exceeds available rewardSpawnPositions ({slotCount}). " +
-                    $"Configure min/max <= {slotCount} or add more spawn positions to the '{entry.Value.type}' prefab.");
-                DestroyImmediate(container);
-                return;
-            }
-            int n = (min == max) ? min : (rng.Next(min, max + 1));
-            // Reservoir-style: shuffle indices [0..slotCount), take first n.
-            int[] indices = new int[slotCount];
-            for (int i = 0; i < slotCount; i++) indices[i] = i;
-            for (int i = slotCount - 1; i > 0; i--) {
-                int j = rng.Next(i + 1);
-                int tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
-            }
-            for (int k = 0; k < n; k++) {
-                Transform spawnPoint = group.GetChild(indices[k]);
-                GameObject go = Instantiate(_rewardPrefab, spawnPoint.position, spawnPoint.rotation, container.transform);
-                MaybeAttachSignalSource(go, rng);
-                placed++;
-            }
-        } else {
-            // Probability mode: per-slot independent Bernoulli sampling.
-            foreach (Transform spawnPoint in group) {
-                if ((float)rng.NextDouble() > entry.Value.spawnProbability) continue;
-                GameObject go = Instantiate(_rewardPrefab, spawnPoint.position, spawnPoint.rotation, container.transform);
-                MaybeAttachSignalSource(go, rng);
-                placed++;
-            }
+        foreach (Transform spawnPoint in slots) {
+            GameObject go = Instantiate(_rewardPrefab, spawnPoint.position, spawnPoint.rotation, container.transform);
+            MaybeAttachSignalSource(go, rng);
+            placed++;
         }
 
         _totalSpawned += placed;
@@ -491,13 +442,7 @@ public class RewardObjectLoader : WorldStructureProvider {
         return null;
     }
 
-    private System.Random MakeStructureRng(WorldStructure s) {
-        Vector2 center = s.GetCenter2D();
-        int seed = _rewardSeed
-            ^ (Mathf.RoundToInt(center.x * 100f) * 1000003)
-            ^ (Mathf.RoundToInt(center.y * 100f) * 999983);
-        return new System.Random(seed);
-    }
+    // Per-structure RNG seeding moved to StructureSlotDistribution.MakeRng (shared with WellLoader).
 
     /// <summary>
     /// With probability <see cref="signalEnableProbability"/>, attach an enabled

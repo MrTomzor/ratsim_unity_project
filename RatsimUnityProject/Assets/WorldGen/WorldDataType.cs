@@ -14,6 +14,8 @@ public enum WorldDataType
     StructureEvents,
     StructureContent,
     Rewards,
+    Wells,
+    WellSchedule,
     Agents,
     Vegetation,
     TerrainMesh,
