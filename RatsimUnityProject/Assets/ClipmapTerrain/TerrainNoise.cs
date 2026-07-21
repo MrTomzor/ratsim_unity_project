@@ -145,21 +145,25 @@ namespace ClipmapTerrain
         private static Texture2D _cachedTerrainTexture1;
         private static RenderTexture _lastRenderTexture1;
         private static Vector4 _terrainTexture1Bounds;
+        private static Vector4 _lastShaderBounds1;
         private static bool _isReadbackPending1 = false;
 
         private static Texture2D _cachedTerrainTexture2;
         private static RenderTexture _lastRenderTexture2;
         private static Vector4 _terrainTexture2Bounds;
+        private static Vector4 _lastShaderBounds2;
         private static bool _isReadbackPending2 = false;
 
         private static void UpdateTextureCache()
         {
             Texture globalTex1 = Shader.GetGlobalTexture("_TerrainTexture1");
+            Vector4 currentBounds1 = Shader.GetGlobalVector("_TerrainTexture1_Bounds");
             if (globalTex1 != null && globalTex1 is RenderTexture rt1)
             {
-                if (_lastRenderTexture1 != rt1)
+                if (_lastRenderTexture1 != rt1 || _lastShaderBounds1 != currentBounds1)
                 {
                     _lastRenderTexture1 = rt1;
+                    _lastShaderBounds1 = currentBounds1;
                     
                     if (_cachedTerrainTexture1 == null)
                     {
@@ -169,11 +173,13 @@ namespace ClipmapTerrain
                         RenderTexture.active = rt1;
                         _cachedTerrainTexture1.ReadPixels(new Rect(0, 0, rt1.width, rt1.height), 0, 0);
                         RenderTexture.active = currentActiveRT;
+                        _terrainTexture1Bounds = currentBounds1;
                     }
                     else if (!_isReadbackPending1)
                     {
                         // Subsequent updates: do asynchronously in the background to avoid lag spikes
                         _isReadbackPending1 = true;
+                        Vector4 pendingBounds1 = currentBounds1;
                         UnityEngine.Rendering.AsyncGPUReadback.Request(rt1, 0, (request) => 
                         {
                             _isReadbackPending1 = false;
@@ -191,20 +197,22 @@ namespace ClipmapTerrain
                             if (data.IsCreated && _cachedTerrainTexture1 != null)
                             {
                                 _cachedTerrainTexture1.LoadRawTextureData(data);
+                                _terrainTexture1Bounds = pendingBounds1;
                                 // Not calling Apply() because we only use this on CPU via GetPixelBilinear
                             }
                         });
                     }
                 }
             }
-            _terrainTexture1Bounds = Shader.GetGlobalVector("_TerrainTexture1_Bounds");
 
             Texture globalTex2 = Shader.GetGlobalTexture("_TerrainTexture2");
+            Vector4 currentBounds2 = Shader.GetGlobalVector("_TerrainTexture2_Bounds");
             if (globalTex2 != null && globalTex2 is RenderTexture rt2)
             {
-                if (_lastRenderTexture2 != rt2)
+                if (_lastRenderTexture2 != rt2 || _lastShaderBounds2 != currentBounds2)
                 {
                     _lastRenderTexture2 = rt2;
+                    _lastShaderBounds2 = currentBounds2;
                     
                     if (_cachedTerrainTexture2 == null)
                     {
@@ -214,11 +222,13 @@ namespace ClipmapTerrain
                         RenderTexture.active = rt2;
                         _cachedTerrainTexture2.ReadPixels(new Rect(0, 0, rt2.width, rt2.height), 0, 0);
                         RenderTexture.active = currentActiveRT;
+                        _terrainTexture2Bounds = currentBounds2;
                     }
                     else if (!_isReadbackPending2)
                     {
                         // Subsequent updates: do asynchronously in the background to avoid lag spikes
                         _isReadbackPending2 = true;
+                        Vector4 pendingBounds2 = currentBounds2;
                         UnityEngine.Rendering.AsyncGPUReadback.Request(rt2, 0, (request) => 
                         {
                             _isReadbackPending2 = false;
@@ -236,13 +246,13 @@ namespace ClipmapTerrain
                             if (data.IsCreated && _cachedTerrainTexture2 != null)
                             {
                                 _cachedTerrainTexture2.LoadRawTextureData(data);
+                                _terrainTexture2Bounds = pendingBounds2;
                                 // Not calling Apply() because we only use this on CPU via GetPixelBilinear
                             }
                         });
                     }
                 }
             }
-            _terrainTexture2Bounds = Shader.GetGlobalVector("_TerrainTexture2_Bounds");
         }
 
         private static float SampleBicubicBSpline(Texture2D tex, Vector2 uv)
@@ -298,6 +308,20 @@ namespace ClipmapTerrain
             
             float t = Mathf.Clamp01((dist - innerDist) / (outerDist - innerDist));
             return 1.0f - Mathf.SmoothStep(0.0f, 1.0f, t);
+        }
+
+        public static float GetRiverDistance(Vector2 worldXZ)
+        {
+            UpdateTextureCache();
+            if (_cachedTerrainTexture1 == null) return float.MaxValue;
+            
+            Vector4 bounds = _terrainTexture1Bounds;
+            Vector2 center = new Vector2(bounds.x, bounds.y);
+            float size = bounds.z;
+            if (size == 0.0f) size = 4000.0f;
+            
+            Vector2 uv = (worldXZ - center) / size + new Vector2(0.5f, 0.5f);
+            return SampleBicubicBSpline(_cachedTerrainTexture1, uv);
         }
 
         private static float Smax(float a, float b, float k) 

@@ -24,6 +24,9 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
         _RandomNormal("Random Normal", Range(0, 1)) = 0.1
         [Toggle] _ReceiveShadows("Receive Shadows", Float) = 1
         _ShadowAmbientDarkness("Shadow Ambient Darkness", Range(0, 1)) = 0.5
+        [Header(Rendering Options)][Space]
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull("Cull Mode (0=Off, 2=Back)", Float) = 0
+        _EdgeCullThreshold("Edge Culling (0=Off)", Range(0, 1)) = 0.0
     }
 
     SubShader
@@ -32,7 +35,7 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
 
         Pass
         {
-            Cull Off
+            Cull [_Cull]
             ZWrite On
             ZTest Less
             Tags { "LightMode" = "ForwardBase" }
@@ -92,6 +95,7 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
             float _ReceiveShadows;
             float _ShadowAmbientDarkness;
             float _AlphaCutoff;
+            float _EdgeCullThreshold;
 
             float2 _CenterPos;
 
@@ -272,7 +276,7 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
                 return OUT;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            fixed4 frag(v2f i, float facing : VFACE) : SV_Target
             {
                 half atten = 1.0;
                 #if defined(SHADOWS_SCREEN) || defined(SHADOWS_SHADOWMAP) || defined(SHADOWS_DEPTH) || defined(SHADOWS_CUBE)
@@ -280,8 +284,10 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
                     atten = lerp(1.0, shadowAtten, _ReceiveShadows);
                 #endif
 
-                half3 N = normalize(i.normal);
+                half3 N = normalize(i.normal) * (facing > 0 ? 1.0 : -1.0);
                 half3 V = normalize(i.viewDir);
+
+                clip(abs(dot(N, V)) - _EdgeCullThreshold);
 
                 // Sample base color texture array per-pixel using mesh UVs and the instance's texture index
                 float3 uvArray = float3(i.meshUV * _BaseColorTextureArray_ST.xy + _BaseColorTextureArray_ST.zw, i.texIndex);

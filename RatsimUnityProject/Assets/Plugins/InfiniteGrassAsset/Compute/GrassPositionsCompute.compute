@@ -103,7 +103,9 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                 float boundsY = 1.5 + _FrustumBuffer;
                 float boundsX = 1.1 + _FrustumBuffer;
 
-                if (absPosCS.z <= absPosCS.w && absPosCS.y <= absPosCS.w * boundsY && absPosCS.x <= absPosCS.w * boundsX && absPosCS.w <= _DrawDistance)
+                bool inFrustum = absPosCS.z <= absPosCS.w && absPosCS.y <= absPosCS.w * boundsY && absPosCS.x <= absPosCS.w * boundsX && absPosCS.w <= _DrawDistance;
+
+                if (inFrustum || distanceFromCamera < 10.0)
                 {
                     //Finally after succeeding all the tests our little position is appended to the buffer
                     _GrassPositions.Append(positionWS);

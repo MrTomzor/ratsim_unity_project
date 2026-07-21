@@ -7,8 +7,6 @@ using UnityEngine.Rendering;
 [ExecuteAlways]
 public class InfiniteGrassAssetRenderer : MonoBehaviour
 {
-    [HideInInspector] public static InfiniteGrassAssetRenderer instance;//Global ref of the script
-
     [Header("Internal")]
     public Material grassMaterial;
     public ComputeBuffer argsBuffer;
@@ -67,6 +65,7 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
     private readonly Vector2 fixedHeightBounds = new Vector2(-1000f, 1000f);
 
     private ComputeBuffer grassPositionsBuffer;
+    private MaterialPropertyBlock propertyBlock;
 
     private RenderTexture heightRT;
     private RenderTexture maskRT;
@@ -82,13 +81,10 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
 
     private void OnEnable()
     {
-        instance = this;
     }
 
     private void OnDisable()
     {
-        instance = null;
-
         argsBuffer?.Release();
         tBuffer?.Release();
         grassPositionsBuffer?.Release();
@@ -146,10 +142,12 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
         // Perform the top-down prepass rendering and dispatch the compute shader
         UpdateGrassData();
 
+        if (propertyBlock == null) propertyBlock = new MaterialPropertyBlock();
+
         // Pass mesh height to the shader so it can normalize vertex.y for wind/AO
         float meshHeight = grassMesh.bounds.max.y;
         if (meshHeight <= 0) meshHeight = 1.0f; // Safety fallback
-        grassMaterial.SetFloat("_MeshHeight", meshHeight);
+        propertyBlock.SetFloat("_MeshHeight", meshHeight);
 
         // Texture Array Setup ------------------------------------------------------
         if (TexturesChanged())
@@ -159,22 +157,26 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
 
         if (grassTextureArray != null)
         {
-            grassMaterial.SetTexture("_BaseColorTextureArray", grassTextureArray);
-            grassMaterial.SetFloat("_TextureCount", grassTextureArray.depth);
-            grassMaterial.SetFloatArray("_CumulativeTextureWeights", matchedCumulativeWeights);
+            propertyBlock.SetTexture("_BaseColorTextureArray", grassTextureArray);
+            propertyBlock.SetFloat("_TextureCount", grassTextureArray.depth);
+            propertyBlock.SetFloatArray("_CumulativeTextureWeights", matchedCumulativeWeights);
         }
         else
         {
-            grassMaterial.SetFloat("_TextureCount", 0);
+            propertyBlock.SetFloat("_TextureCount", 0);
         }
 
         //Material Setup ------------------------------------------------------------
-        grassMaterial.SetVector("_CenterPos", float.IsNaN(activeCenterPos.x) ? centerPos : activeCenterPos);
-        grassMaterial.SetFloat("_DrawDistance", drawDistance);
-        grassMaterial.SetFloat("_TextureUpdateThreshold", textureUpdateThreshold);
+        propertyBlock.SetVector("_CenterPos", float.IsNaN(activeCenterPos.x) ? centerPos : activeCenterPos);
+        propertyBlock.SetFloat("_DrawDistance", drawDistance);
+        propertyBlock.SetFloat("_TextureUpdateThreshold", textureUpdateThreshold);
+
+        propertyBlock.SetTexture("_GrassColorRT", enableColorPass && colorRT != null ? colorRT : Texture2D.blackTexture);
+        propertyBlock.SetTexture("_GrassSlopeRT", enableSlopePass && slopeRT != null ? slopeRT : Texture2D.blackTexture);
+        if (grassPositionsBuffer != null) propertyBlock.SetBuffer("_GrassPositions", grassPositionsBuffer);
 
         //Big Draw Call -------------------------------------------------------------
-        Graphics.DrawMeshInstancedIndirect(grassMesh, 0, grassMaterial, cameraBounds, argsBuffer);
+        Graphics.DrawMeshInstancedIndirect(grassMesh, 0, grassMaterial, cameraBounds, argsBuffer, 0, propertyBlock);
     }
 
     void CreateNoiseTexture()
@@ -244,12 +246,13 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
 
     Camera GetCamera(ref Camera camRef, string name)
     {
+        string uniqueName = name + "_" + gameObject.GetInstanceID();
         if (camRef == null)
         {
-            GameObject camGO = GameObject.Find(name);
+            GameObject camGO = GameObject.Find(uniqueName);
             if (camGO == null)
             {
-                camGO = new GameObject(name);
+                camGO = new GameObject(uniqueName);
                 camGO.hideFlags = HideFlags.HideAndDontSave;
             }
             camRef = camGO.GetComponent<Camera>();
@@ -413,10 +416,6 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
             }
         }
 
-        // Global textures for the grass blade shader
-        Shader.SetGlobalTexture("_GrassColorRT", enableColorPass ? colorRT : Texture2D.blackTexture);
-        Shader.SetGlobalTexture("_GrassSlopeRT", enableSlopePass ? slopeRT : Texture2D.blackTexture);
-
         // Compute grass positions buffer
         Vector2Int gridSize = new Vector2Int(Mathf.CeilToInt(cameraBounds.size.x / spacing), Mathf.CeilToInt(cameraBounds.size.z / spacing));
         Vector2Int gridStartIndex = new Vector2Int(Mathf.FloorToInt(cameraBounds.min.x / spacing), Mathf.FloorToInt(cameraBounds.min.z / spacing));
@@ -449,9 +448,6 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
         int threadGroupsX = Mathf.CeilToInt((float)gridSize.x / 8);
         int threadGroupsY = Mathf.CeilToInt((float)gridSize.y / 8);
         computeShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
-
-        // Set global buffer for the grass blade shader
-        Shader.SetGlobalBuffer("_GrassPositions", grassPositionsBuffer);
 
         // Copy counter value to indirect arguments argsBuffer
         ComputeBuffer.CopyCount(grassPositionsBuffer, argsBuffer, sizeof(uint));

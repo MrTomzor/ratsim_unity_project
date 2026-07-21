@@ -193,6 +193,9 @@ public class TreeLoader : WorldDataProvider {
         Dictionary<Collider, VegetationModification> vegMods,
         System.Random rng)
     {
+        if (TerrainNoise.GetRiverDistance(point) < 30f)
+            return true;
+
         // Suppress trees inside AgentLoader-registered clear zones (e.g. city_outskirts spawn).
         foreach (ClearZone zone in _clearZones) {
             if ((point - zone.center).sqrMagnitude <= zone.radius * zone.radius)
@@ -217,6 +220,7 @@ public class TreeLoader : WorldDataProvider {
                 // IncreaseDensity: always place; extras added in separate pass
             }
         }
+        
         return false;
     }
 

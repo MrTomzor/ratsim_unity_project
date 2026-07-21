@@ -1363,6 +1363,38 @@ MonoBehaviour:
       - 0.5
       - 0.5
       - 0.5
+--- !u!114 &-3785032619821698046
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e002e8fc15581694e92f9900d494e882, type: 3}
+  m_Name: SkyboxFog
+  m_EditorClassIdentifier: 
+  active: 0
+  enabled:
+    overrideState: 1
+    value: 1
+  skybox:
+    overrideState: 1
+    value: {fileID: 8900000, guid: dc543707962d70f48afcfe7d1cd9bf50, type: 3}
+    defaultState: 1
+  useRenderSettings:
+    overrideState: 1
+    value: 1
+  startDistance:
+    overrideState: 1
+    value: 500
+  endDistance:
+    overrideState: 1
+    value: 2500
+  maxDensity:
+    overrideState: 1
+    value: 1
 --- !u!114 &-2349158694331094690
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1412,7 +1444,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48a79b01ea5641d4aa6daa2e23605641, type: 3}
   m_Name: Bloom
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   enabled:
     overrideState: 1
     value: 1
@@ -1467,6 +1499,7 @@ MonoBehaviour:
   - {fileID: -749206034468883051}
   - {fileID: -2349158694331094690}
   - {fileID: 184521448358844014}
+  - {fileID: -3785032619821698046}
 --- !u!114 &184521448358844014
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1513,16 +1546,16 @@ MonoBehaviour:
     value: 1
   focusDistance:
     overrideState: 1
-    value: 332.93
+    value: 466.9
   aperture:
     overrideState: 1
-    value: 0.9
+    value: 0.1
   focalLength:
     overrideState: 1
-    value: 31
+    value: 138
   kernelSize:
     overrideState: 1
-    value: 1
+    value: 2
 --- !u!114 &2799448970459734232
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1535,7 +1568,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b94fcd11afffcb142908bfcb1e261fba, type: 3}
   m_Name: MotionBlur
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   enabled:
     overrideState: 1
     value: 1
@@ -1544,4 +1577,4 @@ MonoBehaviour:
     value: 360
   sampleCount:
     overrideState: 1
-    value: 14
+    value: 24

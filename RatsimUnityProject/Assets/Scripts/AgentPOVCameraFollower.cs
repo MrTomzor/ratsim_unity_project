@@ -21,6 +21,8 @@ public class AgentPOVCameraFollower : CameraFollowerParent
             // Calculate the offset in world coordinates relative to the target's local orientation
             Vector3 worldOffset = target.transform.TransformDirection(positionOffset);
             transform.position = target.transform.position + worldOffset;
+            if (lockHeight)
+                transform.position = new Vector3(transform.position.x, positionOffset.y, transform.position.z);
 
             if (!lockRotation)
             {
@@ -30,7 +32,7 @@ public class AgentPOVCameraFollower : CameraFollowerParent
             else
             {
                 // Use a locked custom Y rotation (similar to TopdownCameraFollower)
-                transform.rotation = Quaternion.Euler(0, rotationAngle, 0);
+                transform.rotation = Quaternion.Euler(rotationAngle2, rotationAngle, 0);
             }
         }
     }

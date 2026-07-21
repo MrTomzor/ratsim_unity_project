@@ -143,8 +143,13 @@ public class GlobalTextureSetter : MonoBehaviour
 
     public void CaptureTexture(bool forceSync = false)
     {
+        if (Application.isPlaying && forceSync) 
+            Debug.LogWarning("Stall Warning: Forced synchronous capture during gameplay!");
+
         if (captureCamera == null)
         {
+            if (Application.isPlaying)
+                Debug.LogWarning("Stall Warning: Capture camera was null, using GameObject.Find!");
             GameObject camGO = GameObject.Find("GlobalTextureCaptureCamera");
             if (camGO == null)
             {
@@ -173,6 +178,8 @@ public class GlobalTextureSetter : MonoBehaviour
 
         if (captureRT == null || captureRT.width != captureResolution)
         {
+            if (Application.isPlaying)
+                Debug.LogWarning("Stall Warning: RenderTexture was lost or changed resolution and re-allocated!");
             if (captureRT != null) captureRT.Release();
             captureRT = new RenderTexture(captureResolution, captureResolution, 24, RenderTextureFormat.ARGB32);
             captureRT.filterMode = FilterMode.Bilinear;

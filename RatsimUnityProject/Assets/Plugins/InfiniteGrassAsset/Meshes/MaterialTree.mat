@@ -7,16 +7,15 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: SKYBOX
-  m_Shader: {fileID: 106, guid: 0000000000000000f000000000000000, type: 0}
+  m_Name: MaterialTree
+  m_Shader: {fileID: 4800000, guid: 7686ccfb252e60545b59d2360f6e3f9d, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _SUNDISK_HIGH_QUALITY
+  m_ValidKeywords: []
   m_InvalidKeywords:
-  - _MAPPING_6_FRAMES_LAYOUT
+  - _RECEIVESHADOWS_ON
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -25,7 +24,11 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _BackTex:
+    - _BaseColorTexture:
+        m_Texture: {fileID: 2800000, guid: 08498694fcd19f0478edca2e564b3219, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BaseColorTextureArray:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -45,24 +48,12 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _DownTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _FrontTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _LeftTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: bd664fd964c1a5948a897e7e011ec974, type: 3}
+        m_Texture: {fileID: 2800000, guid: e0855a7616fd1224f96fd844b669503c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -77,51 +68,45 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _RightTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Tex:
-        m_Texture: {fileID: 8900000, guid: dc543707962d70f48afcfe7d1cd9bf50, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _UpTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
+    - _WindTexture:
+        m_Texture: {fileID: 2800000, guid: 538ddbbcf60210f4790c3eca26b4df98, type: 3}
+        m_Scale: {x: 0.05, y: 0.05}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AtmosphereThickness: 0.7
+    - _AlphaCutoff: 0.204
     - _BumpScale: 1
+    - _Cull: 1
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
+    - _DistanceScaleMultiplier: 1.04
     - _DstBlend: 0
-    - _Exposure: 1
+    - _EdgeCullThreshold: 0.139
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _ImageType: 0
-    - _Layout: 0
-    - _Mapping: 0
+    - _GrassScale: 3.78
+    - _GrassScaleRandomness: 0.349
     - _Metallic: 0
-    - _MirrorOnBack: 0
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
-    - _Rotation: 0
+    - _RandomNormal: 0
+    - _ReceiveShadows: 1
+    - _ShadowAmbientDarkness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _SunDisk: 2
-    - _SunSize: 0.022
-    - _SunSizeConvergence: 7.12
+    - _TextureCount: 1
     - _UVSec: 0
+    - _WindStrength: 5.8
     - _ZWrite: 1
     m_Colors:
+    - _AOColor: {r: 0, g: 0.32971445, b: 0.4433962, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _GroundColor: {r: 0.823, g: 0.99410003, b: 1, a: 1}
-    - _SkyTint: {r: 0.4716981, g: 0.4716981, b: 0.4716981, a: 1}
-    - _Tint: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
+    - _ColorA: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorB: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
+    - _WindScroll: {r: -0.02, g: -0.02, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
