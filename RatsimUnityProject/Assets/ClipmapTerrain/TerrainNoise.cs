@@ -346,12 +346,10 @@ namespace ClipmapTerrain
             h = Smax(h, 10f, 10f);
             h = Smin(h, _heightMax, _pd);
             return h;
-
         }
 
         public static float GetTerrainHeight(Vector2 worldXZ)
         {
-            UpdateTextureCache();
             float flattenAmount1 = GetTextureFlattenAmount(worldXZ, _cachedTerrainTexture1, _terrainTexture1Bounds, 5.0f, 20.0f);
             float flattenAmount2 = GetTextureFlattenAmount(worldXZ, _cachedTerrainTexture2, _terrainTexture2Bounds, 0.0f, 100.0f);
             

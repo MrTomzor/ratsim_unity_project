@@ -85,8 +85,8 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _GrassScale: 3.78
-    - _GrassScaleRandomness: 0.349
+    - _GrassScale: 0.75
+    - _GrassScaleRandomness: 0.122
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
@@ -99,7 +99,7 @@ Material:
     - _SrcBlend: 1
     - _TextureCount: 1
     - _UVSec: 0
-    - _WindStrength: 5.8
+    - _WindStrength: 0
     - _ZWrite: 1
     m_Colors:
     - _AOColor: {r: 0, g: 0.32971445, b: 0.4433962, a: 1}

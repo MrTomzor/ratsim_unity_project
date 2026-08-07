@@ -26,6 +26,7 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
     private int lastTextureHash = 0;
 
     [Header("Grass Properties")]
+    public bool castShadows = true;
     public float spacing = 0.5f;//Spacing between blades, Please don't make it too low
     public float drawDistance = 300;
     public float fullDensityDistance = 50;//After this distance, we start removing some blades of grass in sake of performance
@@ -66,6 +67,7 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
 
     private ComputeBuffer grassPositionsBuffer;
     private MaterialPropertyBlock propertyBlock;
+    private Material shadowMaterial;
 
     private RenderTexture heightRT;
     private RenderTexture maskRT;
@@ -73,6 +75,9 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
     private RenderTexture slopeRT;
     private Texture2D noiseTexture;
     private Texture activeMaskTexture;
+    
+    private CommandBuffer shadowGrabCommandBuffer;
+    private Light mainDirectionalLight;
 
     private Camera heightCamera;
     private Camera maskCamera;
@@ -108,6 +113,20 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
         if (maskCamera != null) { DestroyImmediate(maskCamera.gameObject); maskCamera = null; }
         if (colorCamera != null) { DestroyImmediate(colorCamera.gameObject); colorCamera = null; }
         if (slopeCamera != null) { DestroyImmediate(slopeCamera.gameObject); slopeCamera = null; }
+
+        if (shadowMaterial != null)
+        {
+            if (Application.isPlaying) Destroy(shadowMaterial);
+            else DestroyImmediate(shadowMaterial);
+            shadowMaterial = null;
+        }
+
+        if (mainDirectionalLight != null && shadowGrabCommandBuffer != null)
+        {
+            mainDirectionalLight.RemoveCommandBuffer(LightEvent.AfterShadowMap, shadowGrabCommandBuffer);
+            shadowGrabCommandBuffer.Release();
+            shadowGrabCommandBuffer = null;
+        }
     }
 
     private void OnDestroy()
@@ -166,6 +185,27 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
             propertyBlock.SetFloat("_TextureCount", 0);
         }
 
+        // Grab Shadow Map for Option A receiving
+        if (mainDirectionalLight == null || !mainDirectionalLight.isActiveAndEnabled)
+        {
+            foreach (Light l in FindObjectsOfType<Light>())
+            {
+                if (l.type == LightType.Directional && l.shadows != LightShadows.None && l.isActiveAndEnabled)
+                {
+                    mainDirectionalLight = l;
+                    break;
+                }
+            }
+        }
+        
+        if (mainDirectionalLight != null && shadowGrabCommandBuffer == null)
+        {
+            shadowGrabCommandBuffer = new UnityEngine.Rendering.CommandBuffer();
+            shadowGrabCommandBuffer.name = "Grab Directional Shadow Map";
+            shadowGrabCommandBuffer.SetGlobalTexture("_GlobalShadowMap", new UnityEngine.Rendering.RenderTargetIdentifier(UnityEngine.Rendering.BuiltinRenderTextureType.CurrentActive));
+            mainDirectionalLight.AddCommandBuffer(UnityEngine.Rendering.LightEvent.AfterShadowMap, shadowGrabCommandBuffer);
+        }
+
         //Material Setup ------------------------------------------------------------
         propertyBlock.SetVector("_CenterPos", float.IsNaN(activeCenterPos.x) ? centerPos : activeCenterPos);
         propertyBlock.SetFloat("_DrawDistance", drawDistance);
@@ -176,7 +216,36 @@ public class InfiniteGrassAssetRenderer : MonoBehaviour
         if (grassPositionsBuffer != null) propertyBlock.SetBuffer("_GrassPositions", grassPositionsBuffer);
 
         //Big Draw Call -------------------------------------------------------------
-        Graphics.DrawMeshInstancedIndirect(grassMesh, 0, grassMaterial, cameraBounds, argsBuffer, 0, propertyBlock);
+        Graphics.DrawMeshInstancedIndirect(grassMesh, 0, grassMaterial, cameraBounds, argsBuffer, 0, propertyBlock, ShadowCastingMode.Off, true);
+
+        //Shadow-Only Draw Call -----------------------------------------------------
+        if (castShadows)
+        {
+            if (shadowMaterial == null)
+            {
+                Shader shadowShader = Shader.Find("InfiniteGrassAsset/GrassShadowCaster");
+                if (shadowShader != null)
+                    shadowMaterial = new Material(shadowShader);
+            }
+            if (shadowMaterial != null)
+            {
+                // Sync properties from grassMaterial so shadow geometry matches visible geometry
+                shadowMaterial.SetFloat("_GrassScale", grassMaterial.GetFloat("_GrassScale"));
+                shadowMaterial.SetFloat("_GrassScaleRandomness", grassMaterial.GetFloat("_GrassScaleRandomness"));
+                shadowMaterial.SetFloat("_DistanceScaleMultiplier", grassMaterial.GetFloat("_DistanceScaleMultiplier"));
+                shadowMaterial.SetFloat("_WindStrength", grassMaterial.GetFloat("_WindStrength"));
+                shadowMaterial.SetVector("_WindScroll", grassMaterial.GetVector("_WindScroll"));
+                shadowMaterial.SetFloat("_AlphaCutoff", grassMaterial.GetFloat("_AlphaCutoff"));
+                shadowMaterial.SetFloat("_Cull", grassMaterial.GetFloat("_Cull"));
+                if (grassMaterial.HasProperty("_WindTexture"))
+                    shadowMaterial.SetTexture("_WindTexture", grassMaterial.GetTexture("_WindTexture"));
+
+                // Pass main camera position so distance-based scaling matches the visible pass
+                propertyBlock.SetVector("_MainCameraPosition", Camera.main.transform.position);
+
+                Graphics.DrawMeshInstancedIndirect(grassMesh, 0, shadowMaterial, cameraBounds, argsBuffer, 0, propertyBlock, ShadowCastingMode.ShadowsOnly, false);
+            }
+        }
     }
 
     void CreateNoiseTexture()

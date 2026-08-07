@@ -1,0 +1,323 @@
+#pragma kernel CSMain
+
+float _Spacing;
+float _DrawDistance;
+float _FullDensityDistance;
+float _ForceSpawnDistance;
+float _FrustumBuffer;
+int _AlignToTerrainMesh;
+float _TerrainBaseScale;
+int _TerrainGridResolution;
+float _HeightFadeStart;
+float _HeightFadeEnd;
+int _UseNearPlanes;
+float _NearPlaneStart;
+float _NearPlaneEnd;
+
+int2 _GridStartIndex;
+int2 _GridSize;
+float3 _CameraPosition;
+float3 _BoundsMin;
+float3 _BoundsMax;
+int _AllowedBiomes;
+
+float4x4 _VPMatrix;
+
+SamplerState linearClampSampler;
+
+StructuredBuffer<float> _BiomeCumulativeWeights;
+int _TextureCount;
+
+Texture2D<float> _CustomTerrainHeightmap;
+float4 _CustomTerrainHeightmap_Bounds;
+float4 _CustomTerrainHeightmap_TexelSize;
+float _CustomTerrainHeightmap_Multiplier;
+
+Texture2D<float> _GlobalBiomeMap;
+float4 _GlobalBiomeMap_Bounds;
+float4 _GlobalBiomeMap_TexelSize;
+
+struct InstanceData
+{
+    float3 position;
+    float3 normal;
+    float texIndex;
+};
+
+AppendStructuredBuffer<InstanceData> _InstancePositions;
+
+uint murmurHash3(int input) {
+    uint h = abs(input);
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae3d;
+    h ^= h >> 16;
+    return h;
+}
+
+float random(int index)
+{
+    return murmurHash3(index) / 4294967295.0;
+}
+
+float SampleBicubicBSpline(float2 uv)
+{
+    float2 texSize = _CustomTerrainHeightmap_TexelSize.zw;
+    float2 invTexSize = _CustomTerrainHeightmap_TexelSize.xy;
+    
+    uv = uv * texSize - 0.5;
+    
+    float2 f = frac(uv);
+    float2 i = floor(uv);
+    
+    float2 f2 = f * f;
+    float2 f3 = f2 * f;
+    
+    float2 w0 = (1.0/6.0) * (1.0 - f) * (1.0 - f) * (1.0 - f);
+    float2 w1 = (1.0/6.0) * (3.0 * f3 - 6.0 * f2 + 4.0);
+    float2 w2 = (1.0/6.0) * (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0);
+    float2 w3 = (1.0/6.0) * f3;
+    
+    float2 g0 = w0 + w1;
+    float2 g1 = w2 + w3;
+    
+    float2 h0 = (w1 / g0) - 1.0;
+    float2 h1 = (w3 / g1) + 1.0;
+    
+    float2 p0 = (i + h0 + 0.5) * invTexSize;
+    float2 p1 = (i + h1 + 0.5) * invTexSize;
+    
+    float result = 
+        g0.y * (g0.x * _CustomTerrainHeightmap.SampleLevel(linearClampSampler, float2(p0.x, p0.y), 0) +
+                g1.x * _CustomTerrainHeightmap.SampleLevel(linearClampSampler, float2(p1.x, p0.y), 0)) +
+        g1.y * (g0.x * _CustomTerrainHeightmap.SampleLevel(linearClampSampler, float2(p0.x, p1.y), 0) +
+                g1.x * _CustomTerrainHeightmap.SampleLevel(linearClampSampler, float2(p1.x, p1.y), 0));
+                
+    return result;
+}
+
+float GetTerrainHeight(float2 worldXZ)
+{
+    float h = 0.0;
+    if (_CustomTerrainHeightmap_Bounds.z > 0.0) 
+    {
+        float2 center = _CustomTerrainHeightmap_Bounds.xy;
+        float2 size = _CustomTerrainHeightmap_Bounds.zw;
+        float2 uv = (worldXZ - center) / size + 0.5;
+        h = SampleBicubicBSpline(uv) * _CustomTerrainHeightmap_Multiplier;
+    }
+    return h;
+}
+
+float GetTriangulatedHeightAtScale(float2 worldXZ, float scale)
+{
+    float result = 0;
+    if (scale <= 0.001) 
+    {
+        result = GetTerrainHeight(worldXZ);
+    }
+    else
+    {
+        float gridX = floor(worldXZ.x / scale) * scale;
+        float gridZ = floor(worldXZ.y / scale) * scale;
+        
+        float hA = GetTerrainHeight(float2(gridX, gridZ));
+        float hB = GetTerrainHeight(float2(gridX + scale, gridZ));
+        float hC = GetTerrainHeight(float2(gridX, gridZ + scale));
+        float hD = GetTerrainHeight(float2(gridX + scale, gridZ + scale));
+        
+        float fracX = (worldXZ.x - gridX) / scale;
+        float fracZ = (worldXZ.y - gridZ) / scale;
+        
+        if (fracX + fracZ < 1.0)
+            result = hA + fracX * (hB - hA) + fracZ * (hC - hA);
+        else
+            result = hD + (1.0 - fracX) * (hC - hD) + (1.0 - fracZ) * (hB - hD);
+    }
+    return result;
+}
+
+float GetClipmapHeight(float2 worldXZ)
+{
+    int bestLevel = 0;
+    float bestScale = _TerrainBaseScale;
+    
+    for (int i = 0; i < 10; i++)
+    {
+        float scale = _TerrainBaseScale * exp2(i);
+        float2 snappedCam = round(_CameraPosition.xz / scale) * scale;
+        float dist = max(abs(worldXZ.x - snappedCam.x), abs(worldXZ.y - snappedCam.y));
+        float maxDist = (float(_TerrainGridResolution) / 2.0) * scale;
+        
+        if (dist <= maxDist)
+        {
+            bestLevel = i;
+            bestScale = scale;
+            break;
+        }
+    }
+    
+    float h_fine = GetTriangulatedHeightAtScale(worldXZ, bestScale);
+    
+    float2 snappedCam = round(_CameraPosition.xz / bestScale) * bestScale;
+    float2 localPos = (worldXZ - snappedCam) / bestScale;
+    float maxAbs = max(abs(localPos.x), abs(localPos.y));
+    float halfRes = float(_TerrainGridResolution) / 2.0;
+    float d = maxAbs / halfRes;
+    
+    float t = saturate((d - 0.75) / 0.15625);
+    
+    float h_coarse = h_fine;
+    if (t > 0.0)
+    {
+        float coarseScale = bestScale * 2.0;
+        h_coarse = GetTriangulatedHeightAtScale(worldXZ, coarseScale);
+    }
+    
+    float h = lerp(h_fine, h_coarse, t);
+    return h - float(bestLevel) * 0.05;
+}
+
+float GetFinalHeight(float2 worldXZ)
+{
+    float result = 0;
+    if (_AlignToTerrainMesh == 1)
+        result = GetClipmapHeight(worldXZ);
+    else
+        result = GetTerrainHeight(worldXZ);
+    return result;
+}
+
+float3 GetTerrainNormal(float2 worldXZ)
+{
+    float offset = 1.0;
+    float hL = GetFinalHeight(worldXZ + float2(-offset, 0.0));
+    float hR = GetFinalHeight(worldXZ + float2(offset, 0.0));
+    float hD = GetFinalHeight(worldXZ + float2(0.0, -offset));
+    float hU = GetFinalHeight(worldXZ + float2(0.0, offset));
+    return normalize(float3(hL - hR, 2.0 * offset, hD - hU));
+}
+
+float GetBiomeValue(float2 worldXZ)
+{
+    float b = 0.0;
+    if (_GlobalBiomeMap_Bounds.z > 0.0)
+    {
+        float2 center = _GlobalBiomeMap_Bounds.xy;
+        float2 size = _GlobalBiomeMap_Bounds.zw;
+        float2 uv = (worldXZ - center) / size + 0.5;
+        
+        int2 pixelPos = int2(floor(uv * _GlobalBiomeMap_TexelSize.zw));
+        pixelPos = clamp(pixelPos, int2(0, 0), int2(_GlobalBiomeMap_TexelSize.z - 1, _GlobalBiomeMap_TexelSize.w - 1));
+        b = _GlobalBiomeMap.Load(int3(pixelPos, 0));
+    }
+    return b;
+}
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{   
+    int2 currentIndex = _GridStartIndex + id.xy;
+
+    float2 positionXZ = currentIndex * _Spacing;
+
+    float2 randomOffset = float2(random(currentIndex.x * 5542 + currentIndex.y), random(currentIndex.y * 9824 + currentIndex.x));
+    positionXZ += (randomOffset * 2 - 1) * _Spacing;
+    
+    // Sample height directly
+    float positionY = GetFinalHeight(positionXZ);
+    
+    // Sample biome for masking
+    float biomeVal = GetBiomeValue(positionXZ) * 255.0;
+    int biomeIndex = round(biomeVal);
+    
+    int bitIndex = -1;
+    if (biomeIndex == 10) bitIndex = 0;
+    else if (biomeIndex == 20) bitIndex = 1;
+    else if (biomeIndex == 30) bitIndex = 2;
+    else if (biomeIndex == 40) bitIndex = 3;
+    else if (biomeIndex == 50) bitIndex = 4;
+    else if (biomeIndex == 60) bitIndex = 5;
+    else if (biomeIndex == 70) bitIndex = 6;
+    else if (biomeIndex == 80) bitIndex = 7;
+    else if (biomeIndex == 90) bitIndex = 8;
+    else if (biomeIndex == 100) bitIndex = 9;
+    else if (biomeIndex == 110) bitIndex = 10;
+    else if (biomeIndex == 120) bitIndex = 11;
+    else if (biomeIndex == 130) bitIndex = 12;
+    else if (biomeIndex == 140) bitIndex = 13;
+    else if (biomeIndex == 150) bitIndex = 14;
+    else if (biomeIndex == 160) bitIndex = 15;
+    else if (biomeIndex == 170) bitIndex = 16;
+    else if (biomeIndex == 180) bitIndex = 17;
+    else if (biomeIndex == 190) bitIndex = 18;
+    else if (biomeIndex == 200) bitIndex = 19;
+    
+    bool inMask = false;
+    if (bitIndex >= 0) {
+        inMask = (_AllowedBiomes & (1 << bitIndex)) != 0;
+    }
+    
+    if (inMask)
+    {
+        // Height Fade
+        float heightFadeRatio = smoothstep(_HeightFadeStart, _HeightFadeEnd, positionY);
+        bool heightFadePass = saturate(random(currentIndex.x * 2314 + currentIndex.y) - 0.001) >= heightFadeRatio;
+
+        if (heightFadePass)
+        {
+            float3 positionWS = float3(positionXZ.x, positionY, positionXZ.y);
+
+            float distanceFromCamera = length(_CameraPosition - positionWS);
+            
+            float distanceRatio = max(0.0, (distanceFromCamera / _FullDensityDistance) - 1.0);
+            float targetDensity = exp2(-distanceRatio);
+            
+            bool insideDensityLevel = saturate(random(currentIndex.x * 7954 + currentIndex.y * 1234) - 0.001) < targetDensity;
+
+            if (_UseNearPlanes == 1)
+            {
+                float nearFadeRatio = smoothstep(_NearPlaneStart, _NearPlaneEnd, distanceFromCamera);
+                bool nearFadePass = saturate(random(currentIndex.x * 3142 + currentIndex.y * 7192) - 0.001) < nearFadeRatio;
+                insideDensityLevel = insideDensityLevel && nearFadePass;
+            }
+
+            if (insideDensityLevel)
+            {
+                float4 absPosCS = abs(mul(_VPMatrix, float4(positionWS, 1.0)));
+            
+                float boundsY = 1.5 + _FrustumBuffer;
+                float boundsX = 1.1 + _FrustumBuffer;
+                
+                bool inFrustum = absPosCS.z <= absPosCS.w && absPosCS.y <= absPosCS.w * boundsY && absPosCS.x <= absPosCS.w * boundsX && absPosCS.w <= _DrawDistance;
+                
+                float distanceFromCameraXZ = length(_CameraPosition.xz - positionXZ);
+
+                if (inFrustum || distanceFromCameraXZ < _ForceSpawnDistance)
+                {
+                    InstanceData data;
+                    data.position = positionWS;
+                    data.normal = GetTerrainNormal(positionXZ);
+                    
+                    float texIndex = 0;
+                    if (bitIndex >= 0 && _TextureCount > 0)
+                    {
+                        float randVal = random(currentIndex.x * 219.0 + currentIndex.y * 133.0);
+                        for (int j = 0; j < _TextureCount && j < 32; j++) 
+                        {
+                            if (randVal <= _BiomeCumulativeWeights[bitIndex * 32 + j]) 
+                            {
+                                texIndex = j;
+                                break;
+                            }
+                        }
+                    }
+                    data.texIndex = texIndex;
+                    
+                    _InstancePositions.Append(data);
+                }
+            }
+        }
+    }
+}

@@ -76,15 +76,17 @@ Material:
     m_Floats:
     - _AlphaCutoff: 0.204
     - _BumpScale: 1
+    - _Cull: 0
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DistanceScaleMultiplier: 1.04
     - _DstBlend: 0
+    - _EdgeCullThreshold: 0
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _GrassScale: 2.93
-    - _GrassScaleRandomness: 0.163
+    - _GrassScale: 1
+    - _GrassScaleRandomness: 0.299
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
@@ -97,7 +99,7 @@ Material:
     - _SrcBlend: 1
     - _TextureCount: 1
     - _UVSec: 0
-    - _WindStrength: 5.8
+    - _WindStrength: 0.38
     - _ZWrite: 1
     m_Colors:
     - _AOColor: {r: 0, g: 0.32971445, b: 0.4433962, a: 1}

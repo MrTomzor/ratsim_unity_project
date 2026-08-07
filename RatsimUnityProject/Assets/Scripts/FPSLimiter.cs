@@ -13,7 +13,18 @@ public class FPSLimiter : MonoBehaviour
     [Tooltip("Target frame rate when the limiter is active")]
     public int targetFPS = 60;
 
+    public bool onByDefault = true;
+
     private bool isLimited = false;
+
+    private void Start()
+    {
+        if (onByDefault)
+        {
+            isLimited = true;
+            Application.targetFrameRate = targetFPS;
+        } 
+    }
 
     private void Update()
     {

@@ -13,6 +13,8 @@ sampler2D _TerrainTexture1;
 float4 _TerrainTexture1_TexelSize;
 float4 _TerrainTexture1_Bounds;
 
+
+
 sampler2D _TerrainTexture2;
 float4 _TerrainTexture2_TexelSize;
 float4 _TerrainTexture2_Bounds;
@@ -174,6 +176,7 @@ float smin(float a, float b, float k)
 
 float GetTerrainHeightOriginal(float2 worldXZ)
 {
+
     float noiseScaleScaled = _NoiseScale / 100.0;
     float h = fbm(worldXZ * noiseScaleScaled) * _HeightMax - _Pe;
     h = smax(h, 10.0, 10.0);

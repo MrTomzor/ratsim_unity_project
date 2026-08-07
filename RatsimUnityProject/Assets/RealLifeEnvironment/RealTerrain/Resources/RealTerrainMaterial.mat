@@ -1,0 +1,239 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: RealTerrainMaterial
+  m_Shader: {fileID: 4800000, guid: 81033aefa1be1d645acbd2aa81b8ede2, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BiomeTex10:
+        m_Texture: {fileID: 2800000, guid: 0aa774c232ef4f344adf3ca2646ab765, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex100:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex110:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex120:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex130:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex140:
+        m_Texture: {fileID: 2800000, guid: a7ee4875adf98824187131327764283d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex150:
+        m_Texture: {fileID: 2800000, guid: 0aa774c232ef4f344adf3ca2646ab765, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex160:
+        m_Texture: {fileID: 2800000, guid: f13f3ef4789ec814f8ea87b8c9b1a5a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex170:
+        m_Texture: {fileID: 2800000, guid: f13f3ef4789ec814f8ea87b8c9b1a5a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex180:
+        m_Texture: {fileID: 2800000, guid: f13f3ef4789ec814f8ea87b8c9b1a5a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex190:
+        m_Texture: {fileID: 2800000, guid: f13f3ef4789ec814f8ea87b8c9b1a5a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex20:
+        m_Texture: {fileID: 2800000, guid: 0aa774c232ef4f344adf3ca2646ab765, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex200:
+        m_Texture: {fileID: 2800000, guid: 549d8f4f03b77c24db1195436fba6943, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex30:
+        m_Texture: {fileID: 2800000, guid: 0aa774c232ef4f344adf3ca2646ab765, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex40:
+        m_Texture: {fileID: 2800000, guid: f13f3ef4789ec814f8ea87b8c9b1a5a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex50:
+        m_Texture: {fileID: 2800000, guid: 7e237e0833f256f4680e95849852750d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex60:
+        m_Texture: {fileID: 2800000, guid: 0aa774c232ef4f344adf3ca2646ab765, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex70:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex80:
+        m_Texture: {fileID: 2800000, guid: 549d8f4f03b77c24db1195436fba6943, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BiomeTex90:
+        m_Texture: {fileID: 2800000, guid: 67b4fc0fdc28d7a46ba180bf714ac23b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BiomeDitherStrength: 0.0003
+    - _BiomeMetallic10: 0
+    - _BiomeMetallic100: 0
+    - _BiomeMetallic110: 0
+    - _BiomeMetallic120: 0
+    - _BiomeMetallic130: 0
+    - _BiomeMetallic140: 0
+    - _BiomeMetallic150: 0
+    - _BiomeMetallic160: 0
+    - _BiomeMetallic170: 0
+    - _BiomeMetallic180: 0
+    - _BiomeMetallic190: 0
+    - _BiomeMetallic20: 0
+    - _BiomeMetallic200: 1
+    - _BiomeMetallic30: 0
+    - _BiomeMetallic40: 0
+    - _BiomeMetallic50: 0
+    - _BiomeMetallic60: 0
+    - _BiomeMetallic70: 0
+    - _BiomeMetallic80: 1
+    - _BiomeMetallic90: 0.1
+    - _BiomeSmoothness10: 0
+    - _BiomeSmoothness100: 0
+    - _BiomeSmoothness110: 0
+    - _BiomeSmoothness120: 0
+    - _BiomeSmoothness130: 0
+    - _BiomeSmoothness140: 0
+    - _BiomeSmoothness150: 0.168
+    - _BiomeSmoothness160: 0
+    - _BiomeSmoothness170: 0
+    - _BiomeSmoothness180: 0
+    - _BiomeSmoothness190: 0
+    - _BiomeSmoothness20: 0
+    - _BiomeSmoothness200: 1
+    - _BiomeSmoothness30: 0
+    - _BiomeSmoothness40: 0
+    - _BiomeSmoothness50: 0
+    - _BiomeSmoothness60: 0.056
+    - _BiomeSmoothness70: 0
+    - _BiomeSmoothness80: 1
+    - _BiomeSmoothness90: 0.317
+    - _BiomeSpecularIntensity10: 1
+    - _BiomeSpecularIntensity100: 1
+    - _BiomeSpecularIntensity110: 1
+    - _BiomeSpecularIntensity120: 1
+    - _BiomeSpecularIntensity130: 1
+    - _BiomeSpecularIntensity140: 1
+    - _BiomeSpecularIntensity150: 0
+    - _BiomeSpecularIntensity160: 1
+    - _BiomeSpecularIntensity170: 1
+    - _BiomeSpecularIntensity180: 1
+    - _BiomeSpecularIntensity190: 1
+    - _BiomeSpecularIntensity20: 1
+    - _BiomeSpecularIntensity200: 1
+    - _BiomeSpecularIntensity30: 1
+    - _BiomeSpecularIntensity40: 1
+    - _BiomeSpecularIntensity50: 1
+    - _BiomeSpecularIntensity60: 0
+    - _BiomeSpecularIntensity70: 1
+    - _BiomeSpecularIntensity80: 1
+    - _BiomeSpecularIntensity90: 0.961
+    - _BiomeTiling: 0.01
+    - _BumpScale: 1
+    - _Cutoff: 0.5
+    - _DebugBiomeColors: 0
+    - _DetailNormalMapScale: 1
+    - _DstBlend: 0
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _HeightMax: 50
+    - _HeightMin: 0
+    - _Level: 0
+    - _Metallic: 0
+    - _Mode: 0
+    - _NoiseScale: 1
+    - _OcclusionStrength: 1
+    - _Pa: 1
+    - _Parallax: 0.02
+    - _Pb: 1
+    - _Pc: 1
+    - _Pd: 1
+    - _Pe: 1
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _UVSec: 0
+    - _ZWrite: 1
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorHigh: {r: 0.8, g: 0.8, b: 0.8, a: 1}
+    - _ColorLow: {r: 0.19999996, g: 0.39999998, b: 0.09999997, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _ShadowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

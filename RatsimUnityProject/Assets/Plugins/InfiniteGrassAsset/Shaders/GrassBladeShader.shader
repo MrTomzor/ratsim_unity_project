@@ -247,7 +247,7 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
                 OUT.viewDir = V;
                 OUT.mask = colorRTVal.a;
                 OUT.heightY = heightFactor;
-                OUT.worldPos = pivot;
+                OUT.worldPos = positionWS;
                 OUT.meshUV = v.uv;
                 
                 float randVal = random(pivot.x * 219.0 + pivot.z * 133.0);
@@ -266,7 +266,7 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
                 OUT.pos = UnityWorldToClipPos(pivot);
                 v.vertex = float4(pivot, 1.0);
                 
-                TRANSFER_SHADOW(OUT);
+                // (Manual shadow sampling used)
                 
                 // Restore the actual clip-space position for rendering the geometry in the correct spot
                 OUT.pos = actualPos;
@@ -276,13 +276,43 @@ Shader "InfiniteGrassAsset/GrassBladeShader"
                 return OUT;
             }
 
+            UNITY_DECLARE_SHADOWMAP(_GlobalShadowMap);
+
             fixed4 frag(v2f i, float facing : VFACE) : SV_Target
             {
-                half atten = 1.0;
-                #if defined(SHADOWS_SCREEN) || defined(SHADOWS_SHADOWMAP) || defined(SHADOWS_DEPTH) || defined(SHADOWS_CUBE)
-                    UNITY_LIGHT_ATTENUATION(shadowAtten, i, i.worldPos);
-                    atten = lerp(1.0, shadowAtten, _ReceiveShadows);
-                #endif
+                // Manual shadow cascade sampling (Option A)
+                float3 wpos = i.worldPos;
+                float3 fromCenter0 = wpos - unity_ShadowSplitSpheres[0].xyz;
+                float3 fromCenter1 = wpos - unity_ShadowSplitSpheres[1].xyz;
+                float3 fromCenter2 = wpos - unity_ShadowSplitSpheres[2].xyz;
+                float3 fromCenter3 = wpos - unity_ShadowSplitSpheres[3].xyz;
+                
+                float4 distances2 = float4(dot(fromCenter0, fromCenter0), 
+                                           dot(fromCenter1, fromCenter1), 
+                                           dot(fromCenter2, fromCenter2), 
+                                           dot(fromCenter3, fromCenter3));
+                                           
+                float4 weights = distances2 < float4(unity_ShadowSplitSpheres[0].w, 
+                                                     unity_ShadowSplitSpheres[1].w, 
+                                                     unity_ShadowSplitSpheres[2].w, 
+                                                     unity_ShadowSplitSpheres[3].w);
+                                                     
+                weights.yzw = saturate(weights.yzw - weights.xxx);
+                weights.zw = saturate(weights.zw - weights.yyy);
+                weights.w = saturate(weights.w - weights.zzz);
+
+                float4 shadowCoord = mul(unity_WorldToShadow[0], float4(wpos, 1.0)) * weights.x +
+                                     mul(unity_WorldToShadow[1], float4(wpos, 1.0)) * weights.y +
+                                     mul(unity_WorldToShadow[2], float4(wpos, 1.0)) * weights.z +
+                                     mul(unity_WorldToShadow[3], float4(wpos, 1.0)) * weights.w;
+
+                half shadowAtten = UNITY_SAMPLE_SHADOW(_GlobalShadowMap, shadowCoord.xyz);
+                
+                // Force fully lit if outside the shadow map cascade radius
+                half inCascade = saturate(dot(weights, float4(1.0, 1.0, 1.0, 1.0)));
+                shadowAtten = lerp(1.0, shadowAtten, inCascade);
+
+                half atten = lerp(1.0, shadowAtten, _ReceiveShadows);
 
                 half3 N = normalize(i.normal) * (facing > 0 ? 1.0 : -1.0);
                 half3 V = normalize(i.viewDir);

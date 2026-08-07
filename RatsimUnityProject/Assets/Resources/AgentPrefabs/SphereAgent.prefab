@@ -96,6 +96,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6529735708114265031}
   - component: {fileID: 6645319934695398768}
+  - component: {fileID: -759028483207049147}
   - component: {fileID: 441888008279963221}
   - component: {fileID: 7081735771137792426}
   - component: {fileID: 3783130376408787828}
@@ -165,7 +166,7 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 84
   m_CollisionDetection: 1
---- !u!114 &441888008279963221
+--- !u!114 &-759028483207049147
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -174,10 +175,47 @@ MonoBehaviour:
   m_GameObject: {fileID: 1675505943394758802}
   m_Enabled: 1
   m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a86953b95a5b573409028219e9f77040, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxLinearVelocity: 100
+  maxAngularVelocity: 0.5
+  maxLinearAcceleration: 0.5
+  maxAngularAcceleration: 0.2
+  velCmdTopic: /cmd_vel
+  accelCmdTopic: /cmd_accel
+  accelModeLinearDrag: 0.2
+  accelModeAngularDrag: 0.2
+  verbose: 0
+  steeringBias: 0
+  blockLeftTurn: 0
+  blockRightTurn: 0
+  humanControlTopic: /enable_human_control
+  humanControlEnabled: 1
+  humanControlMode: 0
+  mouseTurnSensitivity: 0.0015
+  scrollMultiplier: 1.5
+  mouseTurnSmoothness: 0.306
+  adaptiveSmoothing: 1
+  adaptiveSmoothnessFalloff: 0.1
+  lockCursor: 1
+  teleportUnitsForward: 4000
+  teleportEaseInAmount: 0.4
+  teleportEaseOutAmount: 0.4
+  teleportEaseDistanceFraction: 0.6
+--- !u!114 &441888008279963221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f723204076dfa8b46ae18beefb5939cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxLinearVelocity: 9.9
+  maxLinearVelocity: 139.22
   maxAngularVelocity: 0.5
   maxLinearAcceleration: 5
   maxAngularAcceleration: 2
@@ -454,7 +492,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aeb87cf0c3b19ab4da03dd3f653536f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hoverHeight: 2
+  hoverHeight: 40
+  heightAdjustSpeed: 100
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0
