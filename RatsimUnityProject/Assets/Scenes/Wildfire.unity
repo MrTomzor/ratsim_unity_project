@@ -944,6 +944,7 @@ GameObject:
   - component: {fileID: 482559266}
   - component: {fileID: 482559265}
   - component: {fileID: 482559264}
+  - component: {fileID: 482559269}
   m_Layer: 7
   m_Name: CameraTopdownObserver
   m_TagString: MainCamera
@@ -980,7 +981,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   componentToToggle: {fileID: 482559267}
-  enableKey: 99
+  enableKey: 0
   switchTopic: /enable_human_control
 --- !u!81 &482559266
 AudioListener:
@@ -1056,6 +1057,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &482559269
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 482559263}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b052592a5ff18129fb09de07c4959da7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  viewerCamera: {fileID: 482559267}
+  topdownFollower: {fileID: 482559264}
+  eyeHeightOffset: 0.3
+  fieldOfView: 90
+  lockPitchAndRoll: 1
+  limitRangeWithFog: 1
+  fogStartFraction: 0.35
+  fogColor: {r: 0, g: 0, b: 0, a: 1}
+  farClipRangeMultiplier: 1.1
+  rangeOverride: 0
+  fallbackRange: 20
 --- !u!1 &627128690
 GameObject:
   m_ObjectHideFlags: 0
@@ -1438,6 +1462,7 @@ MonoBehaviour:
   allowedStructures: 
   seedKey: wells
   debugGizmo: 1
+  roomEdgeBuffer: 0
   arrivalRadius: 1
   dispenseDelaySteps: 25
   cooldownSteps: 50
@@ -1448,6 +1473,12 @@ MonoBehaviour:
   rewardSpawnMinDist: 0
   rewardSpawnMaxDist: 0
   rewardsPerDispense: 1
+  cueModeStr: none
+  cueDurationSteps: 30
+  cueChannel: cue
+  cueRange: 200
+  cueStrength: 1
+  cueFalloff: linear
 --- !u!4 &818132085
 Transform:
   m_ObjectHideFlags: 0
@@ -1660,14 +1691,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2edab4e64560847b997e16b7d4b87031, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  uiStyle: 2
   lidar2DVisualizer: {fileID: 790964576}
+  depthStripVisualizer: {fileID: 1614626333}
+  firstPersonView: {fileID: 482559269}
   compassVisualizer: {fileID: 322358336}
   headDirectionCellsVisualizer: {fileID: 1405812298}
   sectorSignalVisualizer: {fileID: 999517736}
   cameraBlocker: {fileID: 820140837}
   scoreVisualizer: {fileID: 1731951418}
+  observerCamera: {fileID: 482559267}
+  v1TopMargin: 50
+  v1BottomBarHeight: 220
+  v1BottomBarSideMargin: 110
   humanControlTopic: /enable_human_control
-  UIToggleKey: g
+  viewToggleKey: c
 --- !u!114 &945644408
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1749,6 +1787,7 @@ RectTransform:
   - {fileID: 1405812299}
   - {fileID: 1731951419}
   - {fileID: 999517737}
+  - {fileID: 1614626334}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -2361,6 +2400,74 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1614626332
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1614626334}
+  - component: {fileID: 1614626333}
+  m_Layer: 5
+  m_Name: DepthStrip
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1614626333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1614626332}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce9c936e023281fdfb8a23fa33cdd242, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  topMargin: 150
+  heightScale: 4
+  maxCellHeight: 0
+  cellGap: 3
+  framePadding: 4
+  frameColor: {r: 0.13, g: 0.13, b: 0.15, a: 1}
+  noHitColor: {r: 0, g: 0, b: 0, a: 1}
+  neutralColor: {r: 1, g: 1, b: 1, a: 1}
+  minBrightness: 0.12
+  brightnessGamma: 1
+  showForwardMarker: 1
+  forwardMarkerColor: {r: 1, g: 1, b: 1, a: 0.55}
+  forwardMarkerSize: 10
+  semanticTints:
+  - semanticName: reward_pickup
+    color: {r: 0.25, g: 1, b: 0.35, a: 1}
+  - semanticName: well
+    color: {r: 0.25, g: 0.85, b: 1, a: 1}
+  - semanticName: smoke
+    color: {r: 0.8, g: 0.55, b: 1, a: 1}
+--- !u!224 &1614626334
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1614626332}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 945644411}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -330.5, y: -279}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1656317689
 GameObject:
   m_ObjectHideFlags: 0
