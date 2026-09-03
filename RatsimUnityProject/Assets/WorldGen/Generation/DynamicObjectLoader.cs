@@ -102,7 +102,7 @@ public class DynamicObjectLoader : WorldDataProvider {
         // Destroy all tracked dynamic objects.
         for (int i = _objects.Count - 1; i >= 0; i--) {
             if (_objects[i] != null)
-                Destroy(_objects[i].gameObject);
+                WorldGenObjects.DestroyHidden(_objects[i].gameObject);
         }
         _objects.Clear();
         _structureSpawnSteps.Clear();

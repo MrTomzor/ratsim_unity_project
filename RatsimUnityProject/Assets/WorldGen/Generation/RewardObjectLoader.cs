@@ -420,7 +420,7 @@ public class RewardObjectLoader : WorldStructureProvider {
 
     public override void Clear() {
         foreach (var kvp in _chunkObjects)
-            if (kvp.Value != null) Destroy(kvp.Value);
+            WorldGenObjects.DestroyHidden(kvp.Value);
         _chunkObjects.Clear();
         _generatedChunks.Clear();
         // Structure containers are children of structure GOs — destroyed with them.

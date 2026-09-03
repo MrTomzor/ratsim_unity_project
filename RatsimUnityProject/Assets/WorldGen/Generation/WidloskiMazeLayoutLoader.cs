@@ -319,9 +319,10 @@ public class WidloskiMazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoo
         int usedAttempt = 0;
         for (int attempt = 0; attempt < _nTries; attempt++) {
             usedAttempt = attempt + 1;
-            // Fixed master seed → identical retry sequence; HashCode.Combine avoids the
-            // overlapping-coset problem plain XOR has across adjacent seeds.
-            System.Random rng = new System.Random(System.HashCode.Combine(baseSeed, attempt));
+            // Fixed master seed → identical retry sequence. SeedMix (not System.HashCode, which
+            // is re-salted on every process start / domain reload) avoids the overlapping-coset
+            // problem plain XOR has across adjacent seeds.
+            System.Random rng = new System.Random(SeedMix.Combine(baseSeed, attempt));
             HashSet<int> candidate = PickBarrierSubset(totalEdges, _nBarriers, rng);
             if (AllRoomsReachable(candidate)) { chosen = candidate; break; }
         }

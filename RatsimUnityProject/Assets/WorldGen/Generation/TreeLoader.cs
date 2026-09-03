@@ -107,7 +107,7 @@ public class TreeLoader : WorldDataProvider {
 
     public override void Clear() {
         foreach (var kvp in _chunkObjects)
-            if (kvp.Value != null) Destroy(kvp.Value);
+            WorldGenObjects.DestroyHidden(kvp.Value);
         _chunkObjects.Clear();
         _generatedChunks.Clear();
         _clearZones.Clear();

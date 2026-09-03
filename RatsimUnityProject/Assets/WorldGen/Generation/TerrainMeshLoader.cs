@@ -108,7 +108,7 @@ public class TerrainMeshLoader : WorldDataProvider, ITerrainMeshProvider {
 
     public override void Clear() {
         foreach (var kvp in _chunks)
-            if (kvp.Value.go != null) Destroy(kvp.Value.go);
+            WorldGenObjects.DestroyHidden(kvp.Value.go);
         _chunks.Clear();
         _chunkWidthInt = WorldLoadingController.GetParamInt("chunk_width", _chunkWidthInt);
     }

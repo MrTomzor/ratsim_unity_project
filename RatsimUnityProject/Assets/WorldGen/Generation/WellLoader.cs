@@ -220,7 +220,7 @@ public class WellLoader : WorldDataProvider, IWellProvider {
 
     public override void Clear() {
         foreach (Well w in _wells)
-            if (w != null) Destroy(w.gameObject);
+            if (w != null) WorldGenObjects.DestroyHidden(w.gameObject);
         _wells.Clear();
         _agent = null;
     }

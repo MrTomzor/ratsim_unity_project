@@ -153,7 +153,7 @@ public class ChaoticWalkersLoader : WorldDataProvider {
     public override void Clear() {
         foreach (var kvp in _chunkWalkers)
             foreach (var go in kvp.Value)
-                if (go != null) Destroy(go);
+                if (go != null) WorldGenObjects.DestroyHidden(go);
         _chunkWalkers.Clear();
         _spawnedChunks.Clear();
         _paramsLoaded = false;
