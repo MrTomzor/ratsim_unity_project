@@ -118,7 +118,8 @@ public class WorldLayoutLoader : WorldDataProvider, ILayoutProvider {
             // cosets across adjacent base seeds (e.g. seed=43,attempt=0 produces the same
             // rng seed as seed=42,attempt=1), causing seed bumps to converge to the same
             // world after retries.
-            System.Random rng = new System.Random(System.HashCode.Combine(baseSeed, attempt));
+            // SeedMix, not System.HashCode: HashCode is randomised per process/domain reload.
+            System.Random rng = new System.Random(SeedMix.Combine(baseSeed, attempt));
             structures = PlaceStructures(rng, worldW, worldH, margin, out placedByType);
 
             satisfied = true;

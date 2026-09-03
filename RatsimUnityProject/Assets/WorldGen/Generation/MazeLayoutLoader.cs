@@ -1108,7 +1108,8 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
             // seed=42,attempt=1), so a master-seed bump would converge to the same layout
             // after retries. Per-attempt fresh RNG also makes the result robust to
             // room_max_attempts changes (a failing attempt no longer shifts later ones).
-            System.Random attemptRng = new System.Random(System.HashCode.Combine(roomsBaseSeed, outer));
+            // SeedMix, not System.HashCode: HashCode is randomised per process/domain reload.
+            System.Random attemptRng = new System.Random(SeedMix.Combine(roomsBaseSeed, outer));
             List<RoomRect> attempt = SampleMemoryMazeRooms(maxRooms, rMin, rMax, roomMaxAttempts, attemptRng, out int innerRetries);
             totalInnerRetries += innerRetries;
             if (attempt.Count > rooms.Count) rooms = attempt;

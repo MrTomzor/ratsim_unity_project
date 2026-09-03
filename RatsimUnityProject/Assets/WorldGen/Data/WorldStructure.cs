@@ -28,14 +28,16 @@ public class WorldStructure : MonoBehaviour {
     private int _deterministicId;
 
     private int ComputeDeterministicId() {
+        // SeedMix, not System.HashCode: HashCode is seeded per process / domain reload, which
+        // made these ids (and everything ordered by them, e.g. the well roster) differ
+        // between Unity runs at the same world seed.
         Vector2 size = GetSize();
-        return HashCode.Combine(
-            structureType,
-            Mathf.RoundToInt(transform.position.x * 100),
-            Mathf.RoundToInt(transform.position.z * 100),
-            Mathf.RoundToInt(size.x * 100),
-            Mathf.RoundToInt(size.y * 100)
-        );
+        int h = SeedMix.StableStringHash(structureType);
+        h = SeedMix.Combine(h, Mathf.RoundToInt(transform.position.x * 100));
+        h = SeedMix.Combine(h, Mathf.RoundToInt(transform.position.z * 100));
+        h = SeedMix.Combine(h, Mathf.RoundToInt(size.x * 100));
+        h = SeedMix.Combine(h, Mathf.RoundToInt(size.y * 100));
+        return h;
     }
 
     private bool _registered = false;

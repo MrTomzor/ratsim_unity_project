@@ -3,14 +3,36 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// WorldStructureProvider that responds to city structures being loaded and fills them
-/// with procedurally placed house prefabs.
+/// WorldStructureProvider that fills the footprint of "container" structures with
+/// procedurally scattered prefabs — historically cities with houses, now any structure
+/// type listed in <c>city/parent_types</c> (e.g. the cells of a cell_grid maze, each
+/// getting one house). This is the generic "scatter inside an area" step of the
+/// generation-rules design (WORLDGEN_RULES_DESIGN.md §2.4 / §3.3).
 ///
 /// House prefabs are any WorldStructure prefabs in Resources/WorldGen/WorldStructurePrefabs/
-/// whose name starts with "house" (case-insensitive).
+/// whose name starts with "house" (case-insensitive); an explicitly allowed name that is
+/// not one of them is loaded from the same folder, so any WorldStructure prefab can be
+/// scattered.
 ///
-/// Houses are spawned as children of the city WorldStructure, so they are automatically
-/// destroyed when the city is destroyed at episode end.
+/// Children are spawned under the container WorldStructure, so they are automatically
+/// destroyed when the container is destroyed at episode end. Containers that exist at
+/// Generate() (top-level layout structures, maze rooms) are filled eagerly; containers
+/// that appear later (chunk-lazy) are filled when they load.
+///
+/// Config — every key below exists globally as <c>city/&lt;key&gt;</c> and per container
+/// type as <c>city/&lt;parent_type&gt;/&lt;key&gt;</c> (per-type wins):
+///   city/parent_types            -- CSV of structure types to fill, exact match (default "city")
+///   allowed_houses               -- CSV of prefab names ("" = every house* prefab)
+///   {prefab}/probability         -- relative weight per prefab (default 1, 0 disables)
+///   max_houses, max_attempts     -- count and per-house rejection budget
+///   house_spacing                -- min gap between siblings / other structures
+///   margin                       -- min distance from the container's footprint edge
+///                                   (default = house_spacing, the legacy behaviour)
+///   rotation                     -- steps90 (default; legacy: container rotation + k·90°, bounds
+///                                   from the UNROTATED footprint) | steps90_fit (same rotations,
+///                                   exact rotated extents kept inside the margin) | aligned
+///                                   (container rotation) | free (uniform 0–360°, exact extents)
+///   layout_mode                  -- random (default) | grid (city road grid; cities only)
 /// </summary>
 public class CityLoader : WorldStructureProvider {
 
@@ -37,6 +59,11 @@ public class CityLoader : WorldStructureProvider {
     // and start with "house"). Empty = use all discovered "house*" prefabs.
     public string allowedHousePrefabs = "";
 
+    [Header("Fill targets")]
+    // Comma list of structure types whose footprint gets filled (exact match). Overridden by
+    // city/parent_types. Cities are the legacy default; add e.g. "cell" for cell_grid rooms.
+    public string parentTypes = "city";
+
     private WorldStructure[]                 _housePrefabs;
     private readonly HashSet<WorldStructure> _processedCities = new HashSet<WorldStructure>();
 
@@ -44,7 +71,12 @@ public class CityLoader : WorldStructureProvider {
         public WorldStructure prefab;
         public float          weight;
     }
-    private readonly List<WeightedHouse> _activeHouseEntries = new List<WeightedHouse>();
+    // Per container type (from city/parent_types); "current" copies are swapped in per container
+    // so the grid-layout path and PickHouse keep their single-list shape.
+    private readonly Dictionary<string, List<WeightedHouse>> _entriesByParent = new Dictionary<string, List<WeightedHouse>>();
+    private readonly Dictionary<string, float>               _weightSumByParent = new Dictionary<string, float>();
+    private readonly List<string>                            _parentTypes = new List<string>();
+    private List<WeightedHouse> _activeHouseEntries = new List<WeightedHouse>();
     private float _houseWeightSum;
     private bool  _paramsLoaded;
 
@@ -71,11 +103,9 @@ public class CityLoader : WorldStructureProvider {
     // so house footprints are in WorldData before AgentLoader.Generate() needs them.
     // The _processedCities guard prevents double-processing via OnWorldStructureLoaded later.
     public override void Generate() {
-        if (_housePrefabs.Length == 0) return;
         if (!_paramsLoaded) LoadParams();
-        if (_activeHouseEntries.Count == 0) return;
         foreach (WorldStructure s in WorldData.GetStructures().ToList()) {
-            if (s.structureType != "city") continue;
+            if (!SelectParent(s)) continue;
             if (_processedCities.Contains(s)) continue;
             _processedCities.Add(s);
             GenerateCityHouses(s);
@@ -83,14 +113,24 @@ public class CityLoader : WorldStructureProvider {
     }
 
     public override void OnWorldStructureLoaded(WorldStructure s, int lod) {
-        if (s.structureType != "city") return;
-        if (_housePrefabs.Length == 0) return;
-        if (_processedCities.Contains(s)) return;
         if (!_paramsLoaded) LoadParams();
-        if (_activeHouseEntries.Count == 0) return;
+        if (!SelectParent(s)) return;
+        if (_processedCities.Contains(s)) return;
 
         _processedCities.Add(s);
         GenerateCityHouses(s);
+    }
+
+    /// <summary>
+    /// True if <paramref name="s"/> is a container type with at least one active prefab;
+    /// as a side effect makes that type's prefab list the current one for PickHouse.
+    /// </summary>
+    private bool SelectParent(WorldStructure s) {
+        if (!_entriesByParent.TryGetValue(s.structureType, out List<WeightedHouse> entries)) return false;
+        if (entries.Count == 0) return false;
+        _activeHouseEntries = entries;
+        _houseWeightSum     = _weightSumByParent[s.structureType];
+        return true;
     }
 
     public override void OnWorldStructureUnloaded(WorldStructure s, int lod) {
@@ -101,11 +141,39 @@ public class CityLoader : WorldStructureProvider {
     }
 
     public override void Clear() {
-        // Houses are children of city GOs — destroyed when WorldLayoutLoader destroys cities.
+        // Houses are children of the container GOs — destroyed when the layout loader destroys those.
         _processedCities.Clear();
-        _activeHouseEntries.Clear();
+        _entriesByParent.Clear();
+        _weightSumByParent.Clear();
+        _parentTypes.Clear();
+        _activeHouseEntries = new List<WeightedHouse>();
         _houseWeightSum = 0f;
         _paramsLoaded   = false;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Per-container-type params: city/<parent>/<key> wins over city/<key>
+    // ─────────────────────────────────────────────
+
+    private const string Missing = "\u0001missing";
+
+    private static string ParentParamString(string parent, string key, string fallback) {
+        string v = WorldLoadingController.GetParamString($"city/{parent}/{key}", Missing);
+        if (v != Missing) return v;
+        return WorldLoadingController.GetParamString($"city/{key}", fallback);
+    }
+
+    private static float ParentParamFloat(string parent, string key, float fallback) {
+        string v = ParentParamString(parent, key, Missing);
+        if (v != Missing && float.TryParse(v, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float f)) return f;
+        return fallback;
+    }
+
+    private static int ParentParamInt(string parent, string key, int fallback) {
+        string v = ParentParamString(parent, key, Missing);
+        if (v != Missing && int.TryParse(v, out int i)) return i;
+        return fallback;
     }
 
     // ─────────────────────────────────────────────
@@ -113,44 +181,59 @@ public class CityLoader : WorldStructureProvider {
     // ─────────────────────────────────────────────
 
     private void LoadParams() {
-        _activeHouseEntries.Clear();
+        _entriesByParent.Clear();
+        _weightSumByParent.Clear();
+        _parentTypes.Clear();
+        _activeHouseEntries = new List<WeightedHouse>();
         _houseWeightSum = 0f;
-
-        string allowed = WorldLoadingController.GetParamString("city/allowed_houses", allowedHousePrefabs);
-
-        IEnumerable<WorldStructure> candidates;
-        if (string.IsNullOrWhiteSpace(allowed)) {
-            candidates = _housePrefabs;
-        } else {
-            List<WorldStructure> list = new List<WorldStructure>();
-            foreach (string raw in allowed.Split(',')) {
-                string name = raw.Trim();
-                if (string.IsNullOrEmpty(name)) continue;
-                WorldStructure prefab = _housePrefabs.FirstOrDefault(p => p.name == name);
-                if (prefab == null) {
-                    Debug.LogWarning($"CityLoader: house prefab '{name}' not found in Resources/{HousePrefabPath} (must start with '{HousePrefabPrefix}')");
-                    continue;
-                }
-                list.Add(prefab);
-            }
-            candidates = list;
-        }
-
-        foreach (WorldStructure prefab in candidates) {
-            float weight = WorldLoadingController.GetParamFloat($"city/{prefab.name}/probability", 1f);
-            if (weight <= 0f) continue;
-            _activeHouseEntries.Add(new WeightedHouse { prefab = prefab, weight = weight });
-            _houseWeightSum += weight;
-        }
-
         _paramsLoaded = true;
 
-        if (_activeHouseEntries.Count == 0) {
-            Debug.LogWarning("CityLoader: no active house prefabs after applying 'city/allowed_houses' / 'city/*/probability' filters — cities will be empty");
-        } else if (verbose) {
-            Debug.Log($"CityLoader: active house prefabs — " +
-                string.Join(", ", _activeHouseEntries.Select(e => $"{e.prefab.name}(w={e.weight:F2})")) +
-                $" (totalWeight={_houseWeightSum:F2})");
+        foreach (string raw in WorldLoadingController.GetParamString("city/parent_types", parentTypes).Split(',')) {
+            string t = raw.Trim();
+            if (t.Length > 0 && !_parentTypes.Contains(t)) _parentTypes.Add(t);
+        }
+
+        foreach (string parent in _parentTypes) {
+            List<WeightedHouse> entries = new List<WeightedHouse>();
+            float weightSum = 0f;
+
+            string allowed = ParentParamString(parent, "allowed_houses", allowedHousePrefabs);
+            IEnumerable<WorldStructure> candidates;
+            if (string.IsNullOrWhiteSpace(allowed)) {
+                candidates = _housePrefabs;
+            } else {
+                List<WorldStructure> list = new List<WorldStructure>();
+                foreach (string raw in allowed.Split(',')) {
+                    string name = raw.Trim();
+                    if (string.IsNullOrEmpty(name)) continue;
+                    WorldStructure prefab = _housePrefabs.FirstOrDefault(p => p.name == name)
+                                            ?? Resources.Load<WorldStructure>(HousePrefabPath + name);
+                    if (prefab == null) {
+                        Debug.LogWarning($"CityLoader: prefab '{name}' (for '{parent}') not found in Resources/{HousePrefabPath}");
+                        continue;
+                    }
+                    list.Add(prefab);
+                }
+                candidates = list;
+            }
+
+            foreach (WorldStructure prefab in candidates) {
+                float weight = ParentParamFloat(parent, $"{prefab.name}/probability", 1f);
+                if (weight <= 0f) continue;
+                entries.Add(new WeightedHouse { prefab = prefab, weight = weight });
+                weightSum += weight;
+            }
+
+            _entriesByParent[parent]   = entries;
+            _weightSumByParent[parent] = weightSum;
+
+            if (entries.Count == 0) {
+                Debug.LogWarning($"CityLoader: no active prefabs for '{parent}' after applying allowed_houses / */probability filters — it will stay empty");
+            } else if (verbose) {
+                Debug.Log($"CityLoader: '{parent}' prefabs — " +
+                    string.Join(", ", entries.Select(e => $"{e.prefab.name}(w={e.weight:F2})")) +
+                    $" (totalWeight={weightSum:F2})");
+            }
         }
     }
 
@@ -176,16 +259,21 @@ public class CityLoader : WorldStructureProvider {
 
         Bounds2D cityBounds = city.GetBoundingBox2D();
         float    cityRotCCW = city.GetRotationCCW();
+        string   parent     = city.structureType;
 
-        string layoutMode = WorldLoadingController.GetParamString("city/layout_mode", this.layoutMode);
+        // Grid layout (road grid + house rows) is a city thing; other containers scatter.
+        string layoutMode = ParentParamString(parent, "layout_mode", parent == "city" ? this.layoutMode : "random");
         if (layoutMode == "grid") {
             GenerateGridLayout(city, rng, cityBounds, cityRotCCW);
             return;
         }
 
-        float spacing  = WorldLoadingController.GetParamFloat("city/house_spacing",  houseSpacing);
-        int   maxCount = WorldLoadingController.GetParamInt  ("city/max_houses",     maxHouses);
-        int   maxTries = WorldLoadingController.GetParamInt  ("city/max_attempts",   maxPlacementAttempts);
+        float  spacing  = ParentParamFloat(parent, "house_spacing", houseSpacing);
+        float  margin   = ParentParamFloat(parent, "margin",        spacing);   // legacy: spacing doubles as edge margin
+        int    maxCount = ParentParamInt  (parent, "max_houses",    maxHouses);
+        int    maxTries = ParentParamInt  (parent, "max_attempts",  maxPlacementAttempts);
+        string rotMode  = ParentParamString(parent, "rotation", "steps90").ToLowerInvariant();
+        bool   exactExtents = rotMode != "steps90";   // legacy mode keeps its unrotated-footprint bounds
 
         // Snapshot global obstacles once to avoid repeated WorldData queries.
         List<Bounds2D> globalObstacles = WorldData.GetStructures()
@@ -201,12 +289,29 @@ public class CityLoader : WorldStructureProvider {
             Vector2        hSize  = GetPrefabSize(prefab);
             if (hSize.sqrMagnitude < 0.01f) continue;
 
-            float houseRotCCW = cityRotCCW + rng.Next(4) * 90f;
+            float houseRotCCW;
+            switch (rotMode) {
+                case "aligned": houseRotCCW = cityRotCCW; break;
+                case "free":    houseRotCCW = cityRotCCW + (float)(rng.NextDouble() * 360.0); break;
+                default:        houseRotCCW = cityRotCCW + rng.Next(4) * 90f; break;   // steps90 / steps90_fit
+            }
 
-            float halfW = cityBounds.size.x * 0.5f - hSize.x * 0.5f - spacing;
-            float halfH = cityBounds.size.y * 0.5f - hSize.y * 0.5f - spacing;
+            // Half-extents of the house footprint in the container's frame. Legacy steps90 uses
+            // the unrotated footprint (a 90°-turned house may poke past the edge by half the
+            // aspect difference — harmless for cities, kept for reproducibility). The other
+            // modes use the exact rotated AABB so the house stays inside the margin (fences!).
+            float ex = hSize.x * 0.5f, ez = hSize.y * 0.5f;
+            if (exactExtents) {
+                float rel = (houseRotCCW - cityRotCCW) * Mathf.Deg2Rad;
+                float c = Mathf.Abs(Mathf.Cos(rel)), sn = Mathf.Abs(Mathf.Sin(rel));
+                ex = hSize.x * 0.5f * c + hSize.y * 0.5f * sn;
+                ez = hSize.x * 0.5f * sn + hSize.y * 0.5f * c;
+            }
+            float halfW = cityBounds.size.x * 0.5f - ex - margin;
+            float halfH = cityBounds.size.y * 0.5f - ez - margin;
             if (halfW <= 0f || halfH <= 0f) {
-                Debug.LogWarning($"CityLoader: city '{city.name}' is too small for house prefab '{prefab.name}' with spacing {spacing}");
+                if (rotMode == "free") continue;   // another rotation may fit
+                Debug.LogWarning($"CityLoader: '{city.name}' ({parent}) is too small for prefab '{prefab.name}' with margin {margin}");
                 break;
             }
 
@@ -214,14 +319,20 @@ public class CityLoader : WorldStructureProvider {
             float   localZ   = (float)(rng.NextDouble() * 2.0 - 1.0) * halfH;
             Vector2 worldPos = CityLocalToWorld(new Vector2(localX, localZ), cityBounds);
 
+            // The sampled point is where the FOOTPRINT centre should go. Legacy steps90 puts the
+            // prefab root there (the footprint child may be offset — 1.5 m on house_basic,
+            // 8.9 m on house_mall — so the footprint lands off by that much); the exact modes
+            // move the root so the footprint really is at worldPos and stays inside the margin.
+            Vector2 rootPos = exactExtents ? worldPos - RotatedFootprintOffset(prefab, houseRotCCW) : worldPos;
+
             Bounds2D candidate = new Bounds2D(worldPos, hSize + Vector2.one * spacing * 2f, houseRotCCW);
 
             if (placedHouseBounds.Any(b => b.Overlaps(candidate))) continue;
             if (globalObstacles.Any(b => b.Overlaps(candidate))) continue;
 
-            // Spawn parented to city — auto-destroyed when city is cleared.
+            // Spawn parented to the container — auto-destroyed when it is cleared.
             WorldStructure house = WorldData.SpawnStructure(
-                prefab.name, worldPos, houseRotCCW, city.transform
+                prefab.name, rootPos, houseRotCCW, city.transform
             );
             if (house == null) continue;
 
@@ -489,6 +600,18 @@ public class CityLoader : WorldStructureProvider {
             localPos.x * sinR + localPos.y * cosR
         );
         return cityBounds.center + rot;
+    }
+
+    /// <summary>
+    /// XZ offset from the prefab root to its footprint centre, rotated into world space for a
+    /// structure spawned with <paramref name="rotCCW"/> (SpawnStructure uses euler Y = -rotCCW).
+    /// </summary>
+    private static Vector2 RotatedFootprintOffset(WorldStructure prefab, float rotCCW) {
+        if (prefab == null || prefab.footprintCollider == null) return Vector2.zero;
+        Vector3 local = prefab.transform.InverseTransformPoint(
+            prefab.footprintCollider.transform.TransformPoint(prefab.footprintCollider.center));
+        Vector3 world = Quaternion.Euler(0f, -rotCCW, 0f) * new Vector3(local.x, 0f, local.z);
+        return new Vector2(world.x, world.z);
     }
 
     private Vector2 GetPrefabSize(WorldStructure prefab) {
