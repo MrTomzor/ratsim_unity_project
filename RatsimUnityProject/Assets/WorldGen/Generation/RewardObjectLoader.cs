@@ -465,6 +465,26 @@ public class RewardObjectLoader : WorldStructureProvider {
         src.enabled  = true;
     }
 
+    /// <summary>
+    /// Every reward pickup this loader currently owns: uniform-mode objects under the live
+    /// chunk containers plus structure-mode objects under the container of each registered
+    /// structure. Authoritative for snapshots (WorldGenDump) — a scene-wide
+    /// FindObjectsByType would also return last episode's objects, which Clear() releases
+    /// with the deferred Destroy and which therefore still exist during the same frame.
+    /// </summary>
+    public List<Pickupable> GetLiveRewards() {
+        var result = new List<Pickupable>();
+        foreach (var kvp in _chunkObjects)
+            if (kvp.Value != null)
+                result.AddRange(kvp.Value.GetComponentsInChildren<Pickupable>(false));
+        foreach (WorldStructure s in WorldData.GetStructures()) {
+            if (s == null) continue;
+            Transform c = s.transform.Find(ContainerName);
+            if (c != null) result.AddRange(c.GetComponentsInChildren<Pickupable>(false));
+        }
+        return result;
+    }
+
     private static void DestroyContainer(WorldStructure s) {
         Transform existing = s.transform.Find(ContainerName);
         if (existing != null)

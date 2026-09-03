@@ -180,6 +180,14 @@ public class WorldLoadingController : MonoBehaviour {
         foreach (var provider in sorted)
             provider.Generate();
         Debug.Log("All world data providers initialized (Generate)");
+
+        // Optional verification snapshot (worldgen_dump/enabled). Taken one frame later:
+        // Clear() releases last episode's objects with a deferred Destroy, so during this
+        // frame their colliders still exist and would skew collision-checked spawns in the
+        // chunks the dump force-loads. Next frame the scene is exactly what the agent's
+        // requestor would stream in.
+        if (WorldGenDump.IsEnabled())
+            StartCoroutine(WorldGenDump.PublishNextFrame());
     }
 
     // ─────────────────────────────────────────────

@@ -38,7 +38,7 @@ using UnityEngine;
 ///
 /// Config params (all under "maze/" unless noted):
 ///   layout/mode                  -- "default" (disables this loader) or "maze" (default "default")
-///   maze/mode                    -- "rooms_and_corridors" (default) | "memory_maze"
+///   maze/mode                    -- "rooms_and_corridors" (default) | "memory_maze" | "cell_grid"
 ///   maze/cell_size               -- world units per mask cell (default 1)
 ///   maze/wall_height             -- Y scale of each block (default 3)
 ///   maze/n_rooms                 -- target room count (rooms_and_corridors) / max-rooms budget (memory_maze) (default 8)
@@ -64,6 +64,38 @@ using UnityEngine;
 ///                                   Force-disabled in memory_maze mode (4-connected cull would
 ///                                   drop diagonal corner walls and leak rays between regions).
 ///   maze/semantic_name           -- semantic name used for blocks (default "maze_wall")
+///
+/// Cell-grid mode (maze/mode = cell_grid) — "households + gardens": a regular cols×rows grid of
+/// equal rectangular cells separated by fences, each fence optionally pierced by a hole.
+/// Fences are ordinary wall cells in the mask, holes are carved cells, so everything
+/// downstream (room structures + labels + per-cell slots, chunked blocks, IRoomProvider,
+/// agent spawn, rewards/wells) is the shared machinery above. Every cell is a room; index
+/// is row-major (row*cols + col). Params (all under "maze/cell_grid/"):
+///   cols, rows                   -- grid size (default 3×3)
+///   cell_w_cells, cell_h_cells   -- interior cell size in mask cells (default 8×8)
+///   fence_cells                  -- fence thickness between neighbouring cells (default 1)
+///   outer_fence_cells            -- thickness of the fence ring around the whole grid (default = fence_cells)
+///   holes                        -- which fences get a hole:
+///                                     all            every neighbouring pair
+///                                     spanning_tree  random spanning tree over the cell graph (all cells
+///                                                    reachable, minimal holes) + extras (default)
+///                                     random         round(hole_fraction × n_fences) random fences,
+///                                                    reshuffled until connected (n_tries)
+///                                     none           no holes (isolated cells)
+///   extra_hole_probability       -- spanning_tree only: per non-tree fence chance of an extra hole (default 0)
+///   hole_fraction                -- random only: fraction of fences holed (default 0.5)
+///   n_tries                      -- random only: reshuffle attempts for connectivity (default 100)
+///   hole_position                -- "center" | "random" along the fence (default center)
+///   hole_cells                   -- hole width in cells along the fence (default 1; clamped to the cell side)
+///   margin_floor                 -- 0/1: carve the band between the grid block and the mask edge to floor,
+///                                   and treat that ring as one extra graph node (perimeter routing around the
+///                                   grid, like the Widloski margin). Outer-fence holes then follow `holes`
+///                                   too. Default 0 (band stays solid wall).
+///   The grid block is centred in the mask; it must fit (cols·cell_w + (cols−1)·fence + 2·outer ≤ mask
+///   width, same for rows) or a WorldGenStatus error is raised and cols/rows are reduced to fit.
+///   Fence thickness, hole width and hole offset are quantised to maze/cell_size — that is the price of
+///   the raster; cell_size 1–2 m with 1-cell fences is cheap, 0.3 m Widloski-style fences are not.
+///   Hole selection draws from the derived seed "maze" like the other modes.
 ///
 /// Sectored mode (rooms_and_corridors only — memory_maze ignores these for now):
 ///   maze/sectors/style -- "none" (default; sectors disabled), "quadrants" or "orthogonal".
@@ -239,6 +271,9 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
                 break;
             case "memory_maze":
                 GenerateMemoryMaze(rng);
+                break;
+            case "cell_grid":
+                GenerateCellGrid(rng);
                 break;
             default:
                 Debug.LogWarning($"MazeLayoutLoader: unknown maze/mode '{mazeMode}', falling back to rooms_and_corridors");
@@ -1247,6 +1282,217 @@ public class MazeLayoutLoader : WorldDataProvider, ILayoutProvider, IRoomProvide
     private static long PairKey(int a, int b) {
         int lo = Mathf.Min(a, b), hi = Mathf.Max(a, b);
         return ((long)lo << 32) | (uint)hi;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Mask generation: cell grid (fenced cells with holes)
+    // ─────────────────────────────────────────────
+
+    /// <summary>One fence between two graph nodes. Cells are 0..n-1, the margin ring is n.</summary>
+    private struct GridFence {
+        public int a, b;          // graph nodes
+        public bool vertical;     // true: fence runs along Z (separates horizontally adjacent cells)
+        public int x0, z0;        // fence rect origin in mask cells
+        public int w, h;          // fence rect size in mask cells
+    }
+
+    private void GenerateCellGrid(System.Random rng) {
+        _mask = new bool[_maskW, _maskH];
+        for (int i = 0; i < _maskW; i++)
+            for (int j = 0; j < _maskH; j++)
+                _mask[i, j] = true; // start all wall
+
+        const string P = "maze/cell_grid/";
+        int   cols        = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "cols", 3));
+        int   rows        = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "rows", 3));
+        int   cellW       = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "cell_w_cells", 8));
+        int   cellH       = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "cell_h_cells", 8));
+        int   fence       = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "fence_cells", 1));
+        int   outer       = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "outer_fence_cells", fence));
+        string holes      = WorldLoadingController.GetParamString(P + "holes", "spanning_tree").ToLowerInvariant();
+        float extraProb   = Mathf.Clamp01(WorldLoadingController.GetParamFloat(P + "extra_hole_probability", 0f));
+        float holeFrac    = Mathf.Clamp01(WorldLoadingController.GetParamFloat(P + "hole_fraction", 0.5f));
+        int   nTries      = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "n_tries", 100));
+        string holePos    = WorldLoadingController.GetParamString(P + "hole_position", "center").ToLowerInvariant();
+        int   holeCells   = Mathf.Max(1, WorldLoadingController.GetParamInt(P + "hole_cells", 1));
+        bool  marginFloor = WorldLoadingController.GetParamInt(P + "margin_floor", 0) != 0;
+        int   border      = borderWalls ? 1 : 0;
+
+        // Fit check: shrink cols/rows (loudly) rather than generate nothing.
+        int Need(int n, int cell) => n * cell + (n - 1) * fence + 2 * outer;
+        int availW = _maskW - 2 * border, availH = _maskH - 2 * border;
+        int cols0 = cols, rows0 = rows;
+        while (cols > 1 && Need(cols, cellW) > availW) cols--;
+        while (rows > 1 && Need(rows, cellH) > availH) rows--;
+        if (Need(cols, cellW) > availW || Need(rows, cellH) > availH) {
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"cell_grid: a single {cellW}x{cellH} cell with fence {fence}/outer {outer} does not fit the " +
+                $"{_maskW}x{_maskH} mask (world_bounds / maze/cell_size). Nothing generated.");
+            return;
+        }
+        if (cols != cols0 || rows != rows0)
+            WorldGenStatus.Error("MazeLayoutLoader",
+                $"cell_grid: {cols0}x{rows0} cells of {cellW}x{cellH} (+fence {fence}, outer {outer}) do not fit the " +
+                $"{_maskW}x{_maskH} mask; reduced to {cols}x{rows}. Grow world_bounds or shrink the cells.");
+        holeCells = Mathf.Min(holeCells, Mathf.Min(cellW, cellH));
+
+        // Grid block, centred in the mask.
+        int gridW = Need(cols, cellW), gridH = Need(rows, cellH);
+        int gx0 = (_maskW - gridW) / 2, gz0 = (_maskH - gridH) / 2;
+
+        if (marginFloor) {
+            for (int i = border; i < _maskW - border; i++)
+                for (int j = border; j < _maskH - border; j++)
+                    _mask[i, j] = false;
+            for (int i = gx0; i < gx0 + gridW; i++)
+                for (int j = gz0; j < gz0 + gridH; j++)
+                    _mask[i, j] = true;
+        }
+
+        // Cells (rooms), row-major.
+        List<RoomRect> rooms = new List<RoomRect>(cols * rows);
+        int CellX(int c) => gx0 + outer + c * (cellW + fence);
+        int CellZ(int r) => gz0 + outer + r * (cellH + fence);
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++) {
+                RoomRect rect = new RoomRect { x0 = CellX(c), z0 = CellZ(r), w = cellW, h = cellH };
+                CarveRect(rect.x0, rect.z0, rect.w, rect.h);
+                rooms.Add(rect);
+            }
+
+        // Fences between neighbouring cells (+ outer fences to the ring node when margin_floor).
+        int nCells = cols * rows, ring = nCells;
+        List<GridFence> fences = new List<GridFence>();
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++) {
+                int me = r * cols + c;
+                if (c + 1 < cols)
+                    fences.Add(new GridFence { a = me, b = me + 1, vertical = true,
+                        x0 = CellX(c) + cellW, z0 = CellZ(r), w = fence, h = cellH });
+                if (r + 1 < rows)
+                    fences.Add(new GridFence { a = me, b = me + cols, vertical = false,
+                        x0 = CellX(c), z0 = CellZ(r) + cellH, w = cellW, h = fence });
+                if (marginFloor) {
+                    if (c == 0)        fences.Add(new GridFence { a = me, b = ring, vertical = true,  x0 = gx0, z0 = CellZ(r), w = outer, h = cellH });
+                    if (c == cols - 1) fences.Add(new GridFence { a = me, b = ring, vertical = true,  x0 = CellX(c) + cellW, z0 = CellZ(r), w = outer, h = cellH });
+                    if (r == 0)        fences.Add(new GridFence { a = me, b = ring, vertical = false, x0 = CellX(c), z0 = gz0, w = cellW, h = outer });
+                    if (r == rows - 1) fences.Add(new GridFence { a = me, b = ring, vertical = false, x0 = CellX(c), z0 = CellZ(r) + cellH, w = cellW, h = outer });
+                }
+            }
+        int nNodes = marginFloor ? nCells + 1 : nCells;
+
+        // Pick which fences get a hole.
+        bool[] holed = new bool[fences.Count];
+        switch (holes) {
+            case "all":
+                for (int k = 0; k < holed.Length; k++) holed[k] = true;
+                break;
+            case "none":
+                break;
+            case "random": {
+                int nHoles = Mathf.Clamp(Mathf.RoundToInt(holeFrac * fences.Count), 0, fences.Count);
+                bool connected = false;
+                for (int t = 0; t < nTries && !connected; t++) {
+                    System.Array.Clear(holed, 0, holed.Length);
+                    int[] order = ShuffledIndices(fences.Count, rng);
+                    for (int k = 0; k < nHoles; k++) holed[order[k]] = true;
+                    connected = AllReachable(fences, holed, nNodes);
+                }
+                if (!connected)
+                    WorldGenStatus.Error("MazeLayoutLoader",
+                        $"cell_grid: holes=random with hole_fraction={holeFrac:F2} ({nHoles}/{fences.Count}) left some cells " +
+                        $"unreachable after {nTries} tries; using the last draw. Raise hole_fraction or n_tries.");
+                break;
+            }
+            case "spanning_tree":
+            default: {
+                if (holes != "spanning_tree")
+                    Debug.LogWarning($"MazeLayoutLoader: unknown maze/cell_grid/holes '{holes}', using spanning_tree");
+                // Randomised Kruskal: shuffle fences, union-find, tree fences get holes.
+                int[] parent = new int[nNodes];
+                for (int k = 0; k < nNodes; k++) parent[k] = k;
+                int Find(int x) { while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+                foreach (int k in ShuffledIndices(fences.Count, rng)) {
+                    int ra = Find(fences[k].a), rb = Find(fences[k].b);
+                    if (ra == rb) continue;
+                    parent[ra] = rb;
+                    holed[k] = true;
+                }
+                if (extraProb > 0f)
+                    for (int k = 0; k < holed.Length; k++)
+                        if (!holed[k] && rng.NextDouble() < extraProb) holed[k] = true;
+                break;
+            }
+        }
+
+        // Carve the holes.
+        int nHoled = 0;
+        for (int k = 0; k < fences.Count; k++) {
+            if (!holed[k]) continue;
+            nHoled++;
+            GridFence f = fences[k];
+            int along = f.vertical ? f.h : f.w;      // fence length along its run
+            int span = Mathf.Min(holeCells, along);
+            int start = holePos == "random" ? rng.Next(0, along - span + 1) : (along - span) / 2;
+            if (f.vertical) CarveRect(f.x0, f.z0 + start, f.w, span);
+            else            CarveRect(f.x0 + start, f.z0, span, f.h);
+        }
+
+        // Store room bounds for IRoomProvider / structures (same as the other modes).
+        _rooms.Clear();
+        _roomRects.Clear();
+        _roomSectorIds.Clear();
+        foreach (RoomRect r in rooms) {
+            Vector2 center = new Vector2(
+                _originX + (r.x0 + r.w * 0.5f) * _cellSize,
+                _originZ + (r.z0 + r.h * 0.5f) * _cellSize
+            );
+            Vector2 size = new Vector2(r.w * _cellSize, r.h * _cellSize);
+            _rooms.Add(new Bounds2D(center, size, 0f));
+            _roomRects.Add(r);
+            _roomSectorIds.Add(-1);
+        }
+        _chamberRoomIndex = -1;
+
+        if (verbose)
+            Debug.Log($"MazeLayoutLoader.cell_grid: {cols}x{rows} cells of {cellW}x{cellH} (fence {fence}, outer {outer}) " +
+                      $"in {_maskW}x{_maskH} mask; holes={holes}: {nHoled}/{fences.Count} fences holed, " +
+                      $"hole {holeCells} cells @{holePos}, margin_floor={marginFloor}");
+    }
+
+    private static int[] ShuffledIndices(int n, System.Random rng) {
+        int[] idx = new int[n];
+        for (int i = 0; i < n; i++) idx[i] = i;
+        for (int i = n - 1; i > 0; i--) {
+            int j = rng.Next(i + 1);
+            (idx[i], idx[j]) = (idx[j], idx[i]);
+        }
+        return idx;
+    }
+
+    /// <summary>BFS over the cell graph using only holed fences; true if every node is reachable from node 0.</summary>
+    private static bool AllReachable(List<GridFence> fences, bool[] holed, int nNodes) {
+        if (nNodes <= 1) return true;
+        List<int>[] adj = new List<int>[nNodes];
+        for (int k = 0; k < nNodes; k++) adj[k] = new List<int>();
+        for (int k = 0; k < fences.Count; k++) {
+            if (!holed[k]) continue;
+            adj[fences[k].a].Add(fences[k].b);
+            adj[fences[k].b].Add(fences[k].a);
+        }
+        bool[] seen = new bool[nNodes];
+        Queue<int> q = new Queue<int>();
+        q.Enqueue(0); seen[0] = true;
+        int count = 1;
+        while (q.Count > 0) {
+            int u = q.Dequeue();
+            foreach (int v in adj[u]) {
+                if (seen[v]) continue;
+                seen[v] = true; count++;
+                q.Enqueue(v);
+            }
+        }
+        return count == nNodes;
     }
 
     // ─────────────────────────────────────────────
