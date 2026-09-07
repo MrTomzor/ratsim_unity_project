@@ -22,6 +22,11 @@ using System.Collections.Generic;
 ///   enable_roofs                — 0 or 1 (default 1)
 ///   chance_wall_broken          — 0.0–1.0 per breakable wall (default 0)
 ///   rubble_prefab               — prefab name for wall rubble replacement
+///   rubble_mass                 — mass of every rubble piece (default 0.2)
+///   rubble_mass_multipliers     — comma list, e.g. "1,1000". Shuffled per house and drawn
+///                                 without replacement, one per broken wall; every piece of
+///                                 that wall gets rubble_mass * multiplier. Walls beyond the
+///                                 list length get 1. Empty (default) = all walls 1.
 ///   clutter_density             — 0.0–1.0, fraction of clutter objects enabled (default 1)
 ///   allowed_car_prefabs         — comma list of car prefab names in Resources/WorldGen/HouseModulePrefabs/
 ///   car_spawn_chance            — 0.0–1.0 per car spawn position (default 0)
@@ -55,6 +60,8 @@ public class HouseLoader : WorldStructureProvider {
     public float chanceWallBroken = 0f;
     public string rubblePrefabName = "";
     public float rubbleMass = 0.2f;
+    public string rubbleMassMultipliers = "";
+    private readonly List<float> _rubbleMassMultipliers = new List<float>();
 
     [Header("Clutter")]
     [Range(0f, 1f)]
@@ -135,6 +142,19 @@ public class HouseLoader : WorldStructureProvider {
         // Rubble
         rubblePrefabName = WorldLoadingController.GetParamString("house/rubble_prefab", rubblePrefabName);
         rubbleMass = WorldLoadingController.GetParamFloat("house/rubble_mass", rubbleMass);
+        rubbleMassMultipliers = WorldLoadingController.GetParamString("house/rubble_mass_multipliers", rubbleMassMultipliers);
+        _rubbleMassMultipliers.Clear();
+        if (!string.IsNullOrEmpty(rubbleMassMultipliers)) {
+            foreach (string raw in rubbleMassMultipliers.Split(',')) {
+                string tok = raw.Trim();
+                if (string.IsNullOrEmpty(tok)) continue;
+                if (float.TryParse(tok, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out float m))
+                    _rubbleMassMultipliers.Add(m);
+                else
+                    Debug.LogWarning($"HouseLoader: bad rubble_mass_multipliers entry '{tok}' ignored");
+            }
+        }
         _rubblePrefab = string.IsNullOrEmpty(rubblePrefabName)
             ? null
             : Resources.Load<GameObject>(PrefabFolder + rubblePrefabName);
@@ -147,6 +167,7 @@ public class HouseLoader : WorldStructureProvider {
             $"roofs={(enableRoofs ? "on" : "off")}, " +
             $"wallBroken={chanceWallBroken:F2}, " +
             $"rubblePrefab={(_rubblePrefab != null ? _rubblePrefab.name : "none")}, " +
+            $"rubbleMass={rubbleMass:F2}x[{string.Join(",", _rubbleMassMultipliers)}], " +
             $"clutterDensity={clutterDensity:F2}");
     }
 
@@ -257,10 +278,20 @@ public class HouseLoader : WorldStructureProvider {
         Transform group = lodRoot.Find("breakableWalls");
         if (group == null) return;
 
+        // Per-house random assignment of mass multipliers: shuffle the configured list and
+        // hand one out per broken wall in order (Fisher-Yates on a copy, driven by the house rng
+        // so the heavy wall is deterministic per seed).
+        List<float> multipliers = new List<float>(_rubbleMassMultipliers);
+        for (int i = multipliers.Count - 1; i > 0; i--) {
+            int j = rng.Next(i + 1);
+            (multipliers[i], multipliers[j]) = (multipliers[j], multipliers[i]);
+        }
+
         int broken = 0;
         foreach (Transform wall in group) {
             if ((float)rng.NextDouble() >= chanceWallBroken) continue;
 
+            float wallMass = rubbleMass * (broken < multipliers.Count ? multipliers[broken] : 1f);
             wall.gameObject.SetActive(false);
             broken++;
 
@@ -273,13 +304,14 @@ public class HouseLoader : WorldStructureProvider {
                 rubble.transform.SetPositionAndRotation(wall.position, wall.rotation);
 
                 foreach (Rigidbody rb in rubble.GetComponentsInChildren<Rigidbody>(true)) {
-                    rb.mass = rubbleMass;
+                    rb.mass = wallMass;
                     if (rb.GetComponent<PersistentDynamicObject>() == null)
                         rb.gameObject.AddComponent<PersistentDynamicObject>();
                 }
 
                 rubble.transform.SetParent(container, worldPositionStays: true);
                 Destroy(scratch);
+                if (verbose) Debug.Log($"  wall '{wall.name}' -> rubble mass {wallMass:F2} per piece");
             }
         }
         if (verbose) Debug.Log($"  walls: {group.childCount} breakable, {broken} broken" +
