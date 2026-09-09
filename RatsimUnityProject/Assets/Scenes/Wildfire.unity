@@ -1528,8 +1528,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0.0017089844, y: -0.0017089844}
-  m_SizeDelta: {x: 526.67, y: 455.57}
+  m_AnchoredPosition: {x: -335.833, y: -169.71667}
+  m_SizeDelta: {x: 3073.5925, y: 2456.0999}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &820140839
 MonoBehaviour:
@@ -1691,7 +1691,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2edab4e64560847b997e16b7d4b87031, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  uiStyle: 2
+  uiStyle: 0
   lidar2DVisualizer: {fileID: 790964576}
   depthStripVisualizer: {fileID: 1614626333}
   firstPersonView: {fileID: 482559269}

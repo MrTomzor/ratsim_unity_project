@@ -16,10 +16,62 @@ using UnityEngine;
 /// it avoids agents, spawn position) are sampled from the chunk RNG so each chunk is
 /// reproducible independently.
 ///
+/// ── Centralised ticking ──
+/// This loader owns a SINGLE discrete timer for the whole walker population and decides
+/// which walkers to step each simulation step; individual walkers do not register their
+/// own timers. Two reasons:
+///
+///   * Cost. Stepping a walker is dominated by managed->native interop (the Rigidbody
+///     velocity read/write), not by any search or distance test, so the only lever that
+///     moves the needle is stepping fewer of them per step. `max_ticks_per_step` is a
+///     hard cap on that count: a wrapping cursor sweeps the population round-robin, so
+///     per-step cost is bounded no matter how many walkers are loaded, and each walker
+///     comes round once every ceil(population / max_ticks_per_step) steps.
+///   * Chunk unloads. One timer per walker meant every ClearChunk had to call
+///     RoslikeTCPServer.CleanupDestroyedTimersAndSubscribers(), which sweeps the entire
+///     timer list with a Unity-null check per entry. With a few hundred walkers that
+///     produced a visible stall every time the agent crossed a chunk boundary.
+///
+/// Correctness does not depend on the schedule being exact. Each walker records the step
+/// at which it last ticked and is advanced by the elapsed difference, so a walker that
+/// gets skipped (or visited twice) simply sees a larger (or zero) elapsed count and stays
+/// consistent. That is what makes the cursor free to use O(1) swap-removes and to ignore
+/// ordering entirely.
+///
+/// Walkers close enough to an agent to react are ticked every step regardless of the
+/// interval, so flee/chase latency is unaffected. Finding them does not scan the
+/// population: reaction radii are metres and chunks are tens of metres, so only the
+/// chunks around each agent are examined. That pass unions over every agent, so it is
+/// already correct for multi-agent missions — `RefreshAgentPositions` is the single
+/// place that needs to change when the world tracks more than one agent.
+///
 /// Config params (all under "chaotic_walkers/" prefix):
 ///   enabled                     -- 1 to enable, 0 to disable (default 0)
 ///   prefab_name                 -- prefab in Resources/WorldGen/WalkerPrefabs/ (default "walker_capsule")
 ///   density                     -- walkers per unit^2 (default 0)
+///   max_ticks_per_step          -- hard cap on how many walkers are ticked per
+///                                  simulation step (default 0 = unlimited, i.e. every
+///                                  walker every step). Lower values cut CPU roughly
+///                                  proportionally; walkers still move continuously
+///                                  because physics integrates their velocity every step,
+///                                  they just re-decide direction less often. Walkers
+///                                  near an agent are exempt and always tick.
+///                                  Note the revisit period is population/cap, so a leg
+///                                  shorter than that period can be skipped outright —
+///                                  that is a real behaviour change, by design.
+///   hot_radius_margin           -- extra metres added to reaction_radius when deciding
+///                                  who ticks every step, covering how far a walker may
+///                                  have drifted since its cached position was taken
+///                                  (default 0.5)
+///   sleep_distance              -- walkers further than this from EVERY agent are put to
+///                                  sleep: velocity zeroed, Rigidbody.Sleep(), phase
+///                                  machine frozen until an agent comes back (default 0 =
+///                                  never sleep). This is what reclaims the cost of a
+///                                  zero-friction material: without friction a walker
+///                                  never decelerates, so PhysX never sleeps it on its
+///                                  own and every walker stays awake forever. Keep this
+///                                  comfortably above the agent's lidar range or walkers
+///                                  will visibly freeze inside sensor view.
 ///   avoidance_probability       -- weight for "avoidant" mode (default 0.5)
 ///   aggression_probability      -- weight for "aggressive" mode (default 0)
 ///                                  Remaining weight (clamped so total ≤ 1) becomes "default".
@@ -50,6 +102,14 @@ public class ChaoticWalkersLoader : WorldDataProvider {
     public string prefabName = "walker_capsule";
     public float density = 0f;
 
+    [Header("Tick scheduling")]
+    [Tooltip("Hard cap on how many walkers are ticked per simulation step. 0 = unlimited (tick every walker every step).")]
+    public int maxTicksPerStep = 0;
+    [Tooltip("Extra metres on reaction_radius when selecting walkers that tick every step.")]
+    public float hotRadiusMargin = 0.5f;
+    [Tooltip("Walkers further than this from every agent are put to sleep. 0 = never sleep. Keep it above the agent's lidar range.")]
+    public float sleepDistance = 0f;
+
     [Header("Reaction to agent")]
     [Range(0f, 1f)] public float avoidanceProbability = 0.5f;
     [Range(0f, 1f)] public float aggressionProbability = 0f;
@@ -77,10 +137,23 @@ public class ChaoticWalkersLoader : WorldDataProvider {
     private float _chunkWidth;
     private bool _paramsLoaded;
 
-    // spawnChunk → list of walker GameObjects spawned there (GC'd when chunk unloads)
-    private readonly Dictionary<Vector2Int, List<GameObject>> _chunkWalkers = new Dictionary<Vector2Int, List<GameObject>>();
+    // spawnChunk → list of walkers spawned there (GC'd when chunk unloads)
+    private readonly Dictionary<Vector2Int, List<ChaoticWalker>> _chunkWalkers = new Dictionary<Vector2Int, List<ChaoticWalker>>();
     // Track reference count per chunk (LOD0 and LOD1 both trigger GenerateChunk).
     private readonly HashSet<Vector2Int> _spawnedChunks = new HashSet<Vector2Int>();
+
+    // ── Scheduler state ──
+    // Flat list of every live walker, in no particular order. The cursor sweeps it
+    // round-robin; swap-removes keep insertion/removal O(1) and the elapsed-step
+    // accounting on each walker makes the resulting reordering harmless.
+    private readonly List<ChaoticWalker> _walkers = new List<ChaoticWalker>();
+    private int _cursor;
+    private int _stepIndex;
+    private readonly List<Vector2> _agentsXZ = new List<Vector2>();
+    // Deliberately NOT reset by Clear(): the component outlives episodes, and the timer
+    // it registered on the server outlives them too. Re-registering per episode would
+    // stack duplicate timers and tick every walker several times per step.
+    private bool _timerRegistered;
 
     // ─────────────────────────────────────────────
 
@@ -91,6 +164,9 @@ public class ChaoticWalkersLoader : WorldDataProvider {
         walkersEnabled        = WorldLoadingController.GetParamInt("chaotic_walkers/enabled", walkersEnabled ? 1 : 0) != 0;
         prefabName            = WorldLoadingController.GetParamString("chaotic_walkers/prefab_name", prefabName);
         density               = WorldLoadingController.GetParamFloat("chaotic_walkers/density", density);
+        maxTicksPerStep       = WorldLoadingController.GetParamInt("chaotic_walkers/max_ticks_per_step", maxTicksPerStep);
+        hotRadiusMargin       = WorldLoadingController.GetParamFloat("chaotic_walkers/hot_radius_margin", hotRadiusMargin);
+        sleepDistance         = WorldLoadingController.GetParamFloat("chaotic_walkers/sleep_distance", sleepDistance);
         avoidanceProbability  = WorldLoadingController.GetParamFloat("chaotic_walkers/avoidance_probability", avoidanceProbability);
         aggressionProbability = WorldLoadingController.GetParamFloat("chaotic_walkers/aggression_probability", aggressionProbability);
         reactionRadius        = WorldLoadingController.GetParamFloat("chaotic_walkers/reaction_radius", reactionRadius);
@@ -105,6 +181,8 @@ public class ChaoticWalkersLoader : WorldDataProvider {
         boundRadius           = WorldLoadingController.GetParamFloat("chaotic_walkers/bound_radius", boundRadius);
         inwardBiasStrength    = WorldLoadingController.GetParamFloat("chaotic_walkers/inward_bias_strength", inwardBiasStrength);
 
+        if (maxTicksPerStep < 0) maxTicksPerStep = 0;
+
         _prefab = walkersEnabled ? Resources.Load<GameObject>(PrefabFolder + prefabName) : null;
         if (walkersEnabled && _prefab == null)
             Debug.LogWarning($"ChaoticWalkersLoader: prefab not found at Resources/{PrefabFolder}{prefabName}");
@@ -112,7 +190,8 @@ public class ChaoticWalkersLoader : WorldDataProvider {
         _paramsLoaded = true;
 
         Debug.Log($"ChaoticWalkersLoader: params loaded — enabled={walkersEnabled}, " +
-            $"prefab={prefabName}, density={density:F4}, " +
+            $"prefab={prefabName}, density={density:F4}, max_ticks_per_step={maxTicksPerStep}, " +
+            $"hot_radius_margin={hotRadiusMargin:F2}, sleep_distance={sleepDistance:F1}, " +
             $"avoid_p={avoidanceProbability:F2}, aggro_p={aggressionProbability:F2}, reaction_r={reactionRadius:F1}, reaction_v={reactionVelocity:F2}, " +
             $"velocity=[{minVelocity:F2},{maxVelocity:F2}], " +
             $"walk=[{walkDurationMinSec:F1},{walkDurationMaxSec:F1}]s, " +
@@ -120,14 +199,28 @@ public class ChaoticWalkersLoader : WorldDataProvider {
             $"bounded={bounded} r={boundRadius:F1} bias={inwardBiasStrength:F1}");
     }
 
+    /// <summary>
+    /// Register the one timer that drives every walker. Called from Generate/GenerateChunk
+    /// rather than Start() because the server singleton may not exist yet at Start().
+    /// </summary>
+    private void EnsureTimerRegistered() {
+        if (_timerRegistered) return;
+        var server = RoslikeTCPServer.GetInstance();
+        if (server == null) return;
+        server.RegisterTimerDiscrete((ev) => TickAll(), 1);
+        _timerRegistered = true;
+    }
+
     // ─────────────────────────────────────────────
 
     public override void Generate() {
         if (!_paramsLoaded) LoadParams();
+        EnsureTimerRegistered();
     }
 
     public override void GenerateChunk(int cx, int cz, int lod) {
         if (!_paramsLoaded) LoadParams();
+        EnsureTimerRegistered();
         if (!walkersEnabled || _prefab == null || density <= 0f) return;
 
         Vector2Int key = new Vector2Int(cx, cz);
@@ -142,22 +235,184 @@ public class ChaoticWalkersLoader : WorldDataProvider {
         if (!_spawnedChunks.Remove(key)) return;
 
         if (_chunkWalkers.TryGetValue(key, out var list)) {
-            foreach (var go in list)
-                if (go != null) Destroy(go);
+            foreach (var w in list) {
+                if (w == null) continue;
+                RemoveFromScheduler(w);
+                Destroy(w.gameObject);
+            }
             _chunkWalkers.Remove(key);
         }
-        // Purge any stale timer callbacks registered by the destroyed walkers.
-        RoslikeTCPServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
+        // No CleanupDestroyedTimersAndSubscribers() here any more: walkers no longer
+        // register per-instance timers, so there is nothing stale to purge. That call
+        // swept the whole timer list with a Unity-null check per entry and ran once per
+        // unloaded chunk, which is what made chunk-boundary crossings stall.
     }
 
     public override void Clear() {
         foreach (var kvp in _chunkWalkers)
-            foreach (var go in kvp.Value)
-                if (go != null) WorldGenObjects.DestroyHidden(go);
+            foreach (var w in kvp.Value)
+                if (w != null) WorldGenObjects.DestroyHidden(w.gameObject);
         _chunkWalkers.Clear();
         _spawnedChunks.Clear();
+        _walkers.Clear();
+        _cursor = 0;
         _paramsLoaded = false;
         RoslikeTCPServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
+    }
+
+    // ─────────────────────────────────────────────
+    //  Scheduling
+    // ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Drives the whole walker population for one simulation step: everyone near an
+    /// agent, plus the next slice of the round-robin sweep.
+    /// </summary>
+    private void TickAll() {
+        _stepIndex++;
+        if (!_paramsLoaded || !walkersEnabled) return;
+
+        int count = _walkers.Count;
+        if (count == 0) return;
+
+        RefreshAgentPositions();
+        TickReactionCandidates();
+
+        // Round-robin sweep, capped at max_ticks_per_step. The cursor advances by
+        // `budget` every step and wraps, so each walker comes round once every
+        // ceil(count / budget) steps.
+        int budget = maxTicksPerStep <= 0 ? count : Mathf.Min(count, maxTicksPerStep);
+        for (int k = 0; k < budget; k++) {
+            if (_walkers.Count == 0) break;
+            if (_cursor >= _walkers.Count) _cursor = 0;
+            var w = _walkers[_cursor++];
+            if (w == null) continue;
+            TickWalker(w, false, Vector2.zero);
+        }
+    }
+
+    /// <summary>
+    /// Tick every walker that could react to an agent this step, so flee/chase stays
+    /// responsive no matter how long the tick interval is. Only the chunks around each
+    /// agent are examined — a reaction radius of a few metres cannot reach out of the
+    /// neighbouring chunk when chunks are tens of metres wide.
+    /// </summary>
+    private void TickReactionCandidates() {
+        if (_agentsXZ.Count == 0) return;
+        if (avoidanceProbability <= 0f && aggressionProbability <= 0f) return; // all Default mode
+        if (_chunkWidth <= 0f) return;
+
+        // A cold walker's cached position is as old as one trip round the sweep, so
+        // widen the radius by how far it could have travelled in that time. Derived from
+        // the live population rather than configured directly: with a fixed tick budget
+        // the revisit period is count/budget, which moves as chunks load and unload.
+        // Agent positions are re-read every step, so only walker drift needs covering.
+        int revisitSteps = maxTicksPerStep <= 0
+            ? 1
+            : Mathf.Max(1, Mathf.CeilToInt(_walkers.Count / (float)maxTicksPerStep));
+        float drift = Mathf.Max(maxVelocity, reactionVelocity) * revisitSteps / StepsPerSecond;
+        float hotRadius = reactionRadius + hotRadiusMargin + drift;
+        float hotRadiusSq = hotRadius * hotRadius;
+
+        for (int a = 0; a < _agentsXZ.Count; a++) {
+            Vector2 agentXZ = _agentsXZ[a];
+            Vector2Int centre = WorldToChunk(agentXZ);
+
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (!_chunkWalkers.TryGetValue(new Vector2Int(centre.x + dx, centre.y + dz), out var list))
+                        continue;
+
+                    for (int i = 0; i < list.Count; i++) {
+                        var w = list[i];
+                        if (w == null || w.mode == ChaoticWalker.Mode.Default) continue;
+                        if ((w.PosXZ - agentXZ).sqrMagnitude > hotRadiusSq) continue;
+                        TickWalker(w, true, agentXZ);
+                    }
+                }
+            }
+        }
+    }
+
+    private void TickWalker(ChaoticWalker w, bool hasReactionAgent, Vector2 reactionAgentXZ) {
+        int elapsed = _stepIndex - w.lastTickStep;
+        if (elapsed <= 0) return; // already ticked this step (reaction pass got there first)
+        // Stamped before the sleep branch on purpose: a sleeping walker keeps its stamp
+        // current, so `elapsed` never accumulates while parked and waking up can't
+        // trigger a huge phase-machine catch-up.
+        w.lastTickStep = _stepIndex;
+
+        // A sleeping walker cannot have moved, so its cached position is still exact and
+        // there is no need to pay the transform read.
+        if (!w.IsAsleep) w.RefreshPosition();
+
+        if (sleepDistance > 0f && _agentsXZ.Count > 0) {
+            if (NearestAgentDistSq(w.PosXZ) > sleepDistance * sleepDistance) {
+                w.SetSleeping(true);
+                return; // parked: no velocity write, no phase advance
+            }
+            w.SetSleeping(false);
+        }
+
+        w.Tick(elapsed, hasReactionAgent, reactionAgentXZ);
+    }
+
+    /// <summary>Squared distance from a point to the closest agent. Multi-agent by construction.</summary>
+    private float NearestAgentDistSq(Vector2 posXZ) {
+        float best = float.MaxValue;
+        for (int i = 0; i < _agentsXZ.Count; i++) {
+            float d = (posXZ - _agentsXZ[i]).sqrMagnitude;
+            if (d < best) best = d;
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Cache agent positions for this step — one interop read per agent instead of one
+    /// per walker. MULTI-AGENT: this is the only place that needs to change; everything
+    /// downstream already unions over the whole list.
+    /// </summary>
+    private void RefreshAgentPositions() {
+        _agentsXZ.Clear();
+        var controller = WorldLoadingController.instance;
+        if (controller == null) return;
+        var agent = controller.agentObject;
+        if (agent == null) return;
+        Vector3 p = agent.transform.position;
+        _agentsXZ.Add(new Vector2(p.x, p.z));
+    }
+
+    private Vector2Int WorldToChunk(Vector2 posXZ) {
+        return new Vector2Int(
+            Mathf.FloorToInt(posXZ.x / _chunkWidth),
+            Mathf.FloorToInt(posXZ.y / _chunkWidth));
+    }
+
+    private void AddToScheduler(ChaoticWalker w) {
+        w.schedulerIndex = _walkers.Count;
+        w.lastTickStep = _stepIndex; // so its first tick sees elapsed=1, not the whole run
+        _walkers.Add(w);
+    }
+
+    /// <summary>
+    /// O(1) removal: move the last walker into the freed slot. Order is irrelevant —
+    /// each walker advances by its own elapsed-step count, so being swept out of turn
+    /// costs nothing.
+    /// </summary>
+    private void RemoveFromScheduler(ChaoticWalker w) {
+        int idx = w.schedulerIndex;
+        if (idx < 0 || idx >= _walkers.Count || _walkers[idx] != w) return;
+
+        int last = _walkers.Count - 1;
+        if (idx != last) {
+            var moved = _walkers[last];
+            _walkers[idx] = moved;
+            if (moved != null) moved.schedulerIndex = idx;
+        }
+        _walkers.RemoveAt(last);
+        w.schedulerIndex = -1;
+
+        if (_cursor > _walkers.Count) _cursor = 0;
     }
 
     // ─────────────────────────────────────────────
@@ -177,7 +432,7 @@ public class ChaoticWalkersLoader : WorldDataProvider {
         int pauseMinSteps = Mathf.Max(1, Mathf.RoundToInt(pauseDurationMinSec * StepsPerSecond));
         int pauseMaxSteps = Mathf.Max(pauseMinSteps, Mathf.RoundToInt(pauseDurationMaxSec * StepsPerSecond));
 
-        var list = new List<GameObject>(count);
+        var list = new List<ChaoticWalker>(count);
         _chunkWalkers[chunkID] = list;
 
         var heightProvider = WorldServices.Get<IHeightProvider>();
@@ -211,11 +466,13 @@ public class ChaoticWalkersLoader : WorldDataProvider {
             walker.inwardBiasStrength = inwardBiasStrength;
             walker.Init(walkerSeed);
 
-            list.Add(go);
+            AddToScheduler(walker);
+            list.Add(walker);
         }
 
         if (verbose)
-            Debug.Log($"ChaoticWalkersLoader: chunk ({chunkID.x},{chunkID.y}) spawned {count} walkers");
+            Debug.Log($"ChaoticWalkersLoader: chunk ({chunkID.x},{chunkID.y}) spawned {count} walkers " +
+                      $"(population now {_walkers.Count})");
     }
 
     /// <summary>

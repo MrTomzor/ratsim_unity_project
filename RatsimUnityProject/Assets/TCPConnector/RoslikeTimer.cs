@@ -12,6 +12,13 @@ public class TimerEvent
 
 public class RoslikeTimer
 {
+    // TimerEvent carries no data, so one shared instance serves every tick of every
+    // timer. This used to allocate a fresh TimerEvent per tick; with a few hundred
+    // registered timers that was hundreds of throwaway objects every simulation step,
+    // for an object no callback reads. Safe to share as long as TimerEvent stays
+    // stateless — if it ever gains fields, go back to allocating (or pool per timer).
+    private static readonly TimerEvent SharedEvent = new TimerEvent();
+
     public RoslikeTimer(Action<TimerEvent> callback, bool discreteStepMode, float tickDelta)
     {
         this.callback = callback;
@@ -41,7 +48,7 @@ public class RoslikeTimer
             while (stepsPassed >= stepsPerTick)
             {
                 stepsPassed -= stepsPerTick;
-                callback(new TimerEvent());
+                callback(SharedEvent);
             }
         }
         else
@@ -50,7 +57,7 @@ public class RoslikeTimer
             while (secondsPassed >= secondsPerTick)
             {
                 secondsPassed -= secondsPerTick;
-                callback(new TimerEvent());
+                callback(SharedEvent);
             }
         }
     }
