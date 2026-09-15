@@ -235,7 +235,7 @@ MonoBehaviour:
   numRaysHorizontal: 400
   verticalFovStartDeg: -15
   verticalFovEndDeg: 15
-  numRaysVertical: 10
+  numRaysVertical: 20
   maxRange: 100
   topicName: /lidar3d
   lastRanges: []

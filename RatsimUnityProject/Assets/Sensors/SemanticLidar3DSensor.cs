@@ -35,6 +35,18 @@ public class SemanticLidar3DSensor : MonoBehaviour
     public bool useRawBinary = true;
     private byte[] rangesByteBuffer;
     private byte[] descByteBuffer;
+    private float[] rangesArray;
+    private float[] descriptorsArray;
+    private Vector3[] localRayDirs;
+
+    private struct CachedColliderInfo
+    {
+        public bool isStatic;
+        public float[] staticDesc;
+        public SemanticObject dynamicObj;
+    }
+
+    private Dictionary<int, CachedColliderInfo> colliderCache = new Dictionary<int, CachedColliderInfo>(2048);
 
     [Header("Faults")]
     public string occlusionRegion = "none";
@@ -46,6 +58,81 @@ public class SemanticLidar3DSensor : MonoBehaviour
     public int smokeRaymarchSteps = 16;
 
     ZmqUnityServer conn;
+
+    void PrecomputeLocalRayDirections(int totalRays)
+    {
+        localRayDirs = new Vector3[totalRays];
+        for (int v = 0; v < numRaysVertical; v++)
+        {
+            float vFraction = numRaysVertical > 1 ? (float)v / (numRaysVertical - 1) : 0.5f;
+            float pitch = Mathf.Lerp(verticalFovStartDeg, verticalFovEndDeg, vFraction);
+
+            for (int h = 0; h < numRaysHorizontal; h++)
+            {
+                float hFraction = numRaysHorizontal > 1 ? (float)h / (numRaysHorizontal - 1) : 0.5f;
+                float yaw = Mathf.Lerp(horizontalFovStartDeg, horizontalFovEndDeg, hFraction);
+
+                Vector3 localDir = Quaternion.Euler(-pitch, yaw, 0) * Vector3.forward;
+                int index = v * numRaysHorizontal + h;
+                localRayDirs[index] = localDir;
+            }
+        }
+    }
+
+    private CachedColliderInfo GetOrAddColliderInfo(Collider col)
+    {
+        int id = col.GetInstanceID();
+        if (colliderCache.TryGetValue(id, out var cached))
+        {
+            return cached;
+        }
+
+        SemanticObject semObj = col.GetComponent<SemanticObject>();
+        CachedColliderInfo info;
+
+        if (semObj is NamedSemanticObject namedObj)
+        {
+            info.isStatic = true;
+            if (!string.IsNullOrEmpty(namedObj.semanticName) && SemanticLidarSensor.precomputedNamedDescriptors.TryGetValue(namedObj.semanticName, out var desc))
+            {
+                info.staticDesc = desc;
+            }
+            else
+            {
+                info.staticDesc = SemanticLidarSensor.defaultZeroDescriptor;
+            }
+            info.dynamicObj = null;
+        }
+        else if (semObj is ColorSemanticObject colorObj)
+        {
+            info.isStatic = true;
+            Color c = colorObj.color;
+            float[] desc = new float[descriptorDimension];
+            if (descriptorDimension >= 3)
+            {
+                desc[0] = c.r;
+                desc[1] = c.g;
+                desc[2] = c.b;
+            }
+            info.staticDesc = desc;
+            info.dynamicObj = null;
+        }
+        else if (semObj != null)
+        {
+            info.isStatic = false;
+            info.staticDesc = null;
+            info.dynamicObj = semObj;
+        }
+        else
+        {
+            info.isStatic = true;
+            info.staticDesc = SemanticLidarSensor.defaultZeroDescriptor;
+            info.dynamicObj = null;
+        }
+
+        colliderCache[id] = info;
+        return info;
+    }
 
     void InitializeSemanticSetData()
     {
@@ -65,6 +152,18 @@ public class SemanticLidar3DSensor : MonoBehaviour
 
         SemanticLidarSensor.descriptorDimension = (uint)SemanticLidarSensor.semanticNamesToIndices.Count;
         descriptorDimension = SemanticLidarSensor.descriptorDimension;
+
+        SemanticLidarSensor.defaultZeroDescriptor = new float[descriptorDimension];
+        SemanticLidarSensor.precomputedNamedDescriptors.Clear();
+        foreach (DictionaryEntry entry in SemanticLidarSensor.semanticNamesToIndices)
+        {
+            string name = (string)entry.Key;
+            int idx = (int)entry.Value;
+            float[] desc = new float[descriptorDimension];
+            desc[idx] = 1.0f;
+            SemanticLidarSensor.precomputedNamedDescriptors[name] = desc;
+        }
+
         Debug.Log("3D Lidar Initialized Semantic Set with " + descriptorDimension + " semantic classes.");
     }
 
@@ -83,6 +182,15 @@ public class SemanticLidar3DSensor : MonoBehaviour
         {
             InitializeSemanticSetData();
         }
+
+        int totalRays = numRaysHorizontal * numRaysVertical;
+        rangesArray = new float[totalRays];
+        descriptorsArray = new float[totalRays * descriptorDimension];
+
+        rangesByteBuffer = new byte[totalRays * sizeof(float)];
+        descByteBuffer = new byte[totalRays * descriptorDimension * sizeof(float)];
+
+        PrecomputeLocalRayDirections(totalRays);
 
         if (enableVolumetricSmoke && smokeSampler == null)
         {
@@ -103,19 +211,9 @@ public class SemanticLidar3DSensor : MonoBehaviour
         var timestart = Time.realtimeSinceStartup;
 
         int totalRays = numRaysHorizontal * numRaysVertical;
-        Lidar3DMessage msg = new Lidar3DMessage();
-        msg.horizontalFovStart = horizontalFovStartDeg;
-        msg.horizontalFovEnd = horizontalFovEndDeg;
-        msg.verticalFovStart = verticalFovStartDeg;
-        msg.verticalFovEnd = verticalFovEndDeg;
-        msg.numRaysHorizontal = numRaysHorizontal;
-        msg.numRaysVertical = numRaysVertical;
-        msg.maxRange = maxRange;
+        int dim = (int)descriptorDimension;
 
-        msg.ranges = new float[totalRays];
-        msg.descriptors = new float[totalRays * descriptorDimension];
-
-        // 1. Prepare RaycastCommands
+        // 1. Prepare RaycastCommands using precomputed directions
         NativeArray<RaycastCommand> commands = new NativeArray<RaycastCommand>(totalRays, Allocator.TempJob);
         NativeArray<RaycastHit> results = new NativeArray<RaycastHit>(totalRays, Allocator.TempJob);
 
@@ -125,48 +223,54 @@ public class SemanticLidar3DSensor : MonoBehaviour
         Vector3 startPos = transform.position;
         Quaternion sensorRot = transform.rotation;
 
-        for (int v = 0; v < numRaysVertical; v++)
+        for (int i = 0; i < totalRays; i++)
         {
-            float vFraction = numRaysVertical > 1 ? (float)v / (numRaysVertical - 1) : 0.5f;
-            float pitch = Mathf.Lerp(verticalFovStartDeg, verticalFovEndDeg, vFraction);
-
-            for (int h = 0; h < numRaysHorizontal; h++)
-            {
-                float hFraction = numRaysHorizontal > 1 ? (float)h / (numRaysHorizontal - 1) : 0.5f;
-                float yaw = Mathf.Lerp(horizontalFovStartDeg, horizontalFovEndDeg, hFraction);
-
-                // Unity rotation: Yaw is around Y axis, Pitch is around X axis.
-                // Note: Spherical coordinates might need adjustments based on exact convention,
-                // but this covers the required FOV arcs.
-                Vector3 localDir = Quaternion.Euler(-pitch, yaw, 0) * Vector3.forward;
-                Vector3 worldDir = sensorRot * localDir;
-
-                int index = v * numRaysHorizontal + h;
-                
-                commands[index] = new RaycastCommand(startPos, worldDir, queryParams, maxRange);
-            }
+            Vector3 worldDir = sensorRot * localRayDirs[i];
+            commands[i] = new RaycastCommand(startPos, worldDir, queryParams, maxRange);
         }
 
-        // 2. Schedule and wait
-        JobHandle handle = RaycastCommand.ScheduleBatch(commands, results, 64, default(JobHandle));
+        // 2. Schedule in chunks of 256 for optimal multi-threaded job dispatch
+        JobHandle handle = RaycastCommand.ScheduleBatch(commands, results, 256, default(JobHandle));
         handle.Complete();
 
-        // 3. Process results
-        float[] defaultDescriptor = new float[descriptorDimension];
+        // 3. Process results with collider cache
         for (int i = 0; i < totalRays; i++)
         {
             RaycastHit hit = results[i];
+            Collider col = hit.collider;
+            int descOffset = i * dim;
 
-            if (hit.collider != null)
+            if (col != null)
             {
-                msg.ranges[i] = hit.distance;
+                rangesArray[i] = hit.distance;
 
-                SemanticObject semanticObject = hit.collider.GetComponent<SemanticObject>();
-                float[] desc = semanticObject != null ? semanticObject.GetDescriptor(hit.point) : defaultDescriptor;
-
-                for (int d = 0; d < descriptorDimension; d++)
+                int colId = col.GetInstanceID();
+                if (!colliderCache.TryGetValue(colId, out var info))
                 {
-                    msg.descriptors[i * descriptorDimension + d] = desc[d];
+                    info = GetOrAddColliderInfo(col);
+                }
+
+                float[] desc = info.isStatic ? info.staticDesc : (info.dynamicObj != null ? info.dynamicObj.GetDescriptor(hit.point) : SemanticLidarSensor.defaultZeroDescriptor);
+
+                if (desc != null && desc.Length == dim)
+                {
+                    Array.Copy(desc, 0, descriptorsArray, descOffset, dim);
+                }
+                else if (desc != null)
+                {
+                    int copyCount = Math.Min(dim, desc.Length);
+                    Array.Copy(desc, 0, descriptorsArray, descOffset, copyCount);
+                    for (int d = copyCount; d < dim; d++)
+                    {
+                        descriptorsArray[descOffset + d] = 0f;
+                    }
+                }
+                else
+                {
+                    for (int d = 0; d < dim; d++)
+                    {
+                        descriptorsArray[descOffset + d] = 0f;
+                    }
                 }
 
                 if (debugDrawRays)
@@ -176,10 +280,10 @@ public class SemanticLidar3DSensor : MonoBehaviour
             }
             else
             {
-                msg.ranges[i] = -1f; // No hit
-                for (int d = 0; d < descriptorDimension; d++)
+                rangesArray[i] = -1f; // No hit
+                for (int d = 0; d < dim; d++)
                 {
-                    msg.descriptors[i * descriptorDimension + d] = 0f;
+                    descriptorsArray[descOffset + d] = 0f;
                 }
 
                 if (debugDrawRays)
@@ -189,61 +293,41 @@ public class SemanticLidar3DSensor : MonoBehaviour
             }
         }
 
-        // We will dispose commands and results later, as we need commands[i].direction for raymarching
-
-        // 3.5 Apply Volumetric Smoke Raymarching
-        if (enableVolumetricSmoke && smokeSampler != null)
+        // 3.5 Apply Volumetric Smoke Raymarching via Job System
+        if (enableVolumetricSmoke && smokeSampler != null && smokeSampler.IsSmokeActive)
         {
-            float[] smokeDescriptor = SemanticLidarSensor.GetNamedSemanticObjectDescriptor("smoke");
-            if (smokeDescriptor == null || smokeDescriptor.Length != descriptorDimension)
+            float[] smokeDescManaged = SemanticLidarSensor.GetNamedSemanticObjectDescriptor("smoke");
+            if (smokeDescManaged == null || smokeDescManaged.Length != dim)
             {
-                smokeDescriptor = new float[descriptorDimension]; // fallback zeroes
+                smokeDescManaged = new float[dim];
             }
 
-            int stepSeed = Time.frameCount * 31;
-            System.Random rng = new System.Random(stepSeed);
+            NativeArray<float> smokeDescNative = new NativeArray<float>(smokeDescManaged, Allocator.TempJob);
+            NativeArray<float> rangesNative = new NativeArray<float>(rangesArray, Allocator.TempJob);
+            NativeArray<float> descriptorsNative = new NativeArray<float>(descriptorsArray, Allocator.TempJob);
 
-            for (int i = 0; i < totalRays; i++)
+            var smokeJob = new SmokeRaymarchJob
             {
-                // Only raymarch up to the physical hit or maxRange
-                float rayMaxDist = msg.ranges[i] > 0 ? msg.ranges[i] : maxRange;
-                if (rayMaxDist <= 0.001f) continue;
-                
-                // Exponential stochastic sampling
-                double targetOpticalDepth = -Math.Log(1.0 - rng.NextDouble());
-                double currentOpticalDepth = 0.0;
-                
-                float stepSize = rayMaxDist / Mathf.Max(1, smokeRaymarchSteps);
-                Vector3 worldDir = commands[i].direction;
+                ranges = rangesNative,
+                descriptors = descriptorsNative,
+                commands = commands,
+                smokeDescriptor = smokeDescNative,
+                smokeJobData = smokeSampler.GetJobData(),
+                maxRange = maxRange,
+                smokeRaymarchSteps = smokeRaymarchSteps,
+                descriptorDimension = dim,
+                baseSeed = (uint)(Time.frameCount * 31)
+            };
 
-                for (int step = 0; step < smokeRaymarchSteps; step++)
-                {
-                    // Sample at the center of the step
-                    float currentDist = step * stepSize + (stepSize * 0.5f);
-                    Vector3 samplePos = startPos + worldDir * currentDist;
-                    
-                    float density = smokeSampler.SampleDensity(samplePos);
-                    if (density > 0)
-                    {
-                        double stepOpticalDepth = density * stepSize;
-                        if (currentOpticalDepth + stepOpticalDepth >= targetOpticalDepth)
-                        {
-                            // Corrupted by smoke within this step!
-                            // Continuous hit distance using exact fraction
-                            double fraction = (targetOpticalDepth - currentOpticalDepth) / stepOpticalDepth;
-                            float hitDist = (float)(step * stepSize + fraction * stepSize);
-                            
-                            msg.ranges[i] = hitDist;
-                            for (int d = 0; d < descriptorDimension; d++)
-                            {
-                                msg.descriptors[i * descriptorDimension + d] = smokeDescriptor[d];
-                            }
-                            break;
-                        }
-                        currentOpticalDepth += stepOpticalDepth;
-                    }
-                }
-            }
+            JobHandle smokeHandle = smokeJob.Schedule(totalRays, 64);
+            smokeHandle.Complete();
+
+            rangesNative.CopyTo(rangesArray);
+            descriptorsNative.CopyTo(descriptorsArray);
+
+            rangesNative.Dispose();
+            descriptorsNative.Dispose();
+            smokeDescNative.Dispose();
         }
 
         commands.Dispose();
@@ -268,19 +352,19 @@ public class SemanticLidar3DSensor : MonoBehaviour
                     for (int h = startIdx; h < endIdx; h++)
                     {
                         int index = v * numRaysHorizontal + h;
-                        msg.ranges[index] = occlusionDistance;
-                        for (int d = 0; d < descriptorDimension; d++)
+                        rangesArray[index] = occlusionDistance;
+                        for (int d = 0; d < dim; d++)
                         {
-                            msg.descriptors[index * descriptorDimension + d] = 0f;
+                            descriptorsArray[index * dim + d] = 0f;
                         }
                     }
                 }
             }
         }
 
-        lastRanges = msg.ranges;
-        lastDescriptors = msg.descriptors;
-        
+        lastRanges = rangesArray;
+        lastDescriptors = descriptorsArray;
+
         if (sendMessageToPython && conn != null)
         {
             if (useRawBinary)
@@ -288,7 +372,7 @@ public class SemanticLidar3DSensor : MonoBehaviour
                 var rawMsg = new RawLidarMessage
                 {
                     numRays = totalRays,
-                    descriptorDimension = (int)descriptorDimension,
+                    descriptorDimension = dim,
                     horizontalFovStart = horizontalFovStartDeg,
                     horizontalFovEnd = horizontalFovEndDeg,
                     verticalFovStart = verticalFovStartDeg,
@@ -296,23 +380,25 @@ public class SemanticLidar3DSensor : MonoBehaviour
                     maxRange = maxRange
                 };
 
-                if (rangesByteBuffer == null || rangesByteBuffer.Length != totalRays * sizeof(float))
-                {
-                    rangesByteBuffer = new byte[totalRays * sizeof(float)];
-                }
-                int descCount = totalRays * (int)descriptorDimension;
-                if (descByteBuffer == null || descByteBuffer.Length != descCount * sizeof(float))
-                {
-                    descByteBuffer = new byte[descCount * sizeof(float)];
-                }
-
-                Buffer.BlockCopy(msg.ranges, 0, rangesByteBuffer, 0, rangesByteBuffer.Length);
-                Buffer.BlockCopy(msg.descriptors, 0, descByteBuffer, 0, descByteBuffer.Length);
+                Buffer.BlockCopy(rangesArray, 0, rangesByteBuffer, 0, rangesByteBuffer.Length);
+                Buffer.BlockCopy(descriptorsArray, 0, descByteBuffer, 0, descByteBuffer.Length);
 
                 conn.PublishBinaryDual(topicName, rawMsg, rangesByteBuffer, descByteBuffer);
             }
             else
             {
+                Lidar3DMessage msg = new Lidar3DMessage
+                {
+                    horizontalFovStart = horizontalFovStartDeg,
+                    horizontalFovEnd = horizontalFovEndDeg,
+                    verticalFovStart = verticalFovStartDeg,
+                    verticalFovEnd = verticalFovEndDeg,
+                    numRaysHorizontal = numRaysHorizontal,
+                    numRaysVertical = numRaysVertical,
+                    maxRange = maxRange,
+                    ranges = rangesArray,
+                    descriptors = descriptorsArray
+                };
                 conn.Publish(topicName, msg);
             }
         }
@@ -320,6 +406,75 @@ public class SemanticLidar3DSensor : MonoBehaviour
         if (verbose)
         {
             Debug.Log($"3D Lidar SenseAndPublish time: {1000f * (Time.realtimeSinceStartup - timestart):F2} ms for {totalRays} rays.");
+        }
+    }
+}
+
+
+public struct SmokeRaymarchJob : IJobParallelFor
+{
+    public NativeArray<float> ranges;
+    [NativeDisableParallelForRestriction] public NativeArray<float> descriptors;
+
+    [ReadOnly] public NativeArray<RaycastCommand> commands;
+    [ReadOnly] public NativeArray<float> smokeDescriptor;
+
+    public SmokeDensityJobData smokeJobData;
+
+    public float maxRange;
+    public int smokeRaymarchSteps;
+    public int descriptorDimension;
+    public uint baseSeed;
+
+    private float Random(int index)
+    {
+        // Xorshift32 PRNG: Fast, deterministic, and thread-safe
+        uint state = baseSeed + (uint)index * 2654435761u;
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+
+        // Uniform float in (0, 1] to avoid Log(0)
+        float rnd = ((state & 0x00FFFFFF) + 1.0f) / 16777217.0f;
+        return rnd;
+    }
+
+    public void Execute(int index)
+    {
+        float rayMaxDist = ranges[index] > 0 ? ranges[index] : maxRange;
+        if (rayMaxDist <= 0.001f) return;
+
+        float targetOpticalDepth = -Mathf.Log(1.0f - Random(index));
+        float currentOpticalDepth = 0.0f;
+
+        float stepSize = rayMaxDist / Mathf.Max(1, smokeRaymarchSteps);
+        Vector3 startPos = commands[index].from;
+        Vector3 worldDir = commands[index].direction;
+
+        for (int step = 0; step < smokeRaymarchSteps; step++)
+        {
+            float currentDist = step * stepSize + (stepSize * 0.5f);
+            Vector3 samplePos = startPos + worldDir * currentDist;
+
+            float density = smokeJobData.SampleDensity(samplePos);
+            if (density > 0f)
+            {
+                float stepOpticalDepth = density * stepSize;
+                if (currentOpticalDepth + stepOpticalDepth >= targetOpticalDepth)
+                {
+                    float fraction = (targetOpticalDepth - currentOpticalDepth) / stepOpticalDepth;
+                    float hitDist = step * stepSize + fraction * stepSize;
+
+                    ranges[index] = hitDist;
+                    int descOffset = index * descriptorDimension;
+                    for (int d = 0; d < descriptorDimension; d++)
+                    {
+                        descriptors[descOffset + d] = smokeDescriptor[d];
+                    }
+                    break;
+                }
+                currentOpticalDepth += stepOpticalDepth;
+            }
         }
     }
 }
