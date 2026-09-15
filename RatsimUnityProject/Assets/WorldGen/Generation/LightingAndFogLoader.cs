@@ -92,7 +92,7 @@ public class LightingAndFogLoader : WorldDataProvider {
 
     private void Start() {
         _originalSkybox = RenderSettings.skybox;
-        RoslikeTCPServer.GetInstance().RegisterTimerContinuous(OnTimerTick, TimerPeriod);
+        ZmqUnityServer.GetInstance().RegisterTimerContinuous(OnTimerTick, TimerPeriod);
     }
 
     // ─────────────────────────────────────────────
@@ -121,7 +121,7 @@ public class LightingAndFogLoader : WorldDataProvider {
     //  Timer callback
     // ─────────────────────────────────────────────
 
-    private void OnTimerTick(TimerEvent ev) {
+    private void OnTimerTick(ZmqTimerEvent ev) {
         if (!_advanceTime) return;
         _currentTimeOfDay = (_currentTimeOfDay + _timeAdvanceRate * TimerPeriod) % 24f;
         ApplyLighting();

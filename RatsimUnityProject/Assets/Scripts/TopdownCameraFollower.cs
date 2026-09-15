@@ -16,6 +16,8 @@ public class TopdownCameraFollower : CameraFollowerParent
     // Update is called once per frame
     void Update()
     {
+        if (RealLifeEnvironment.WorldStateCapturer.IsCapturing) return;
+
         if (target != null)
         {
             Vector3 targetPosition = target.transform.position;

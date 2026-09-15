@@ -116,3 +116,16 @@ public class MapGenTemplate2D : Message
     public int[] forbiddenMask{ get; set; }
     public int[] growableMask{ get; set; }
 }
+
+public class Lidar3DMessage : Message
+{
+    public float[] ranges { get; set; }
+    public float[] descriptors { get; set; }
+    public int numRaysHorizontal { get; set; }
+    public int numRaysVertical { get; set; }
+    public float horizontalFovStart { get; set; }
+    public float horizontalFovEnd { get; set; }
+    public float verticalFovStart { get; set; }
+    public float verticalFovEnd { get; set; }
+    public float maxRange { get; set; }
+}

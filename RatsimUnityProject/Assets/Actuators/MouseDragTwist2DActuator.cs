@@ -3,7 +3,7 @@ using UnityEngine.InputSystem;
 
 public class MouseDragTwist2DActuator : MonoBehaviour
 {
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
     public float maxLinearVelocity = 1f;
     public float maxAngularVelocity = .5f;
 
@@ -66,7 +66,7 @@ public class MouseDragTwist2DActuator : MonoBehaviour
 
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.Subscribe<TwistMessage>(velCmdTopic, OnVelTwistMessage);
         conn.Subscribe<TwistMessage>(accelCmdTopic, OnAccelTwistMessage);
         conn.Subscribe<BoolMessage>(humanControlTopic, OnHumanControlToggle);
@@ -205,7 +205,7 @@ public class MouseDragTwist2DActuator : MonoBehaviour
         }
     }
 
-    private void OnPhysicsTick(TimerEvent ev)
+    private void OnPhysicsTick(ZmqTimerEvent ev)
     {
         if (!humanControlEnabled) return;
 

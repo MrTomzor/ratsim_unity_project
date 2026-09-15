@@ -5,6 +5,15 @@ Shader "RealLifeEnvironment/GPUInstancerShadowCaster"
         _BaseColorTextureArray("BaseColor Texture Array", 2DArray) = "" {}
         _TextureCount("Texture Count", Float) = 1
         _AlphaCutoff("Alpha Cutoff", Range(0, 1)) = 0.5
+        [Toggle(_DITHERED_TRANSPARENCY)] _DitherTransparency("Use Dithered Transparency", Float) = 0
+        [Toggle(_USE_DITHER_TEXTURE)] _UseDitherTexture("Use Dither Texture", Float) = 0
+        _DitherTexture("Dither Texture (Blue Noise)", 2D) = "white" {}
+        _DitherTextureScale("Dither Texture Scale", Float) = 64.0
+        _DitherMeshUVInfluence("Dither Mesh UV Influence", Float) = 0.0
+        _DitherInstanceInfluence("Dither Instance XYZ Influence", Float) = 0.0
+        _DitherAnimationSpeed("Dither Animation Speed", Float) = 0.0
+        _DitherSolidThreshold("Solid Alpha Threshold", Range(0, 1)) = 1.0
+        _GlobalAlphaMultiplier("Global Alpha Multiplier", Float) = 1.0
 
         [Header(Shape)][Space]
         _BaseScale("Base Scale (X=Width/Depth, Y=Height)", Vector) = (1, 1, 0, 0)
@@ -43,6 +52,8 @@ Shader "RealLifeEnvironment/GPUInstancerShadowCaster"
             #pragma target 4.5
             #pragma multi_compile_shadowcaster
             #pragma multi_compile_instancing
+            #pragma shader_feature_local _DITHERED_TRANSPARENCY
+            #pragma shader_feature_local _USE_DITHER_TEXTURE
 
             #include "UnityCG.cginc"
 
@@ -63,6 +74,7 @@ Shader "RealLifeEnvironment/GPUInstancerShadowCaster"
                 float3 lightVec : TEXCOORD2;
                 #endif
                 float3 worldPos : TEXCOORD3;
+                float ditherOffset : TEXCOORD4;
             };
 
             float4 _BaseScale;
@@ -98,6 +110,13 @@ Shader "RealLifeEnvironment/GPUInstancerShadowCaster"
             float4 _BaseColorTextureArray_ST;
             float _TextureCount;
             sampler2D _WindTexture;
+            sampler2D _DitherTexture;
+            float _DitherTextureScale;
+            float _DitherMeshUVInfluence;
+            float _DitherInstanceInfluence;
+            float _DitherAnimationSpeed;
+            float _DitherSolidThreshold;
+            float _GlobalAlphaMultiplier;
 
             uint murmurHash3(float input) {
                 uint h = abs(input);
@@ -167,6 +186,7 @@ Shader "RealLifeEnvironment/GPUInstancerShadowCaster"
 
                 OUT.texIndex = _InstancePositions[instanceID].texIndex;
                 OUT.meshUV = v.uv;
+                OUT.ditherOffset = pivot.x + pivot.y + pivot.z;
 
                 return OUT;
             }
@@ -214,7 +234,34 @@ Shader "RealLifeEnvironment/GPUInstancerShadowCaster"
 
                 float3 uvArray = float3(i.meshUV * _BaseColorTextureArray_ST.xy + _BaseColorTextureArray_ST.zw, i.texIndex);
                 half4 texSample = UNITY_SAMPLE_TEX2DARRAY(_BaseColorTextureArray, uvArray);
-                clip(texSample.a - _AlphaCutoff);
+                texSample.a = saturate(texSample.a * _GlobalAlphaMultiplier);
+                
+                #if _DITHERED_TRANSPARENCY
+                    float2 ditherPixel = i.pos.xy;
+                    ditherPixel += i.meshUV * _DitherMeshUVInfluence * _DitherTextureScale;
+                    ditherPixel += i.ditherOffset * _DitherInstanceInfluence * _DitherTextureScale;
+                    ditherPixel += floor(_Time.y * _DitherAnimationSpeed);
+
+                    #if _USE_DITHER_TEXTURE
+                        float2 ditherUV = ditherPixel / _DitherTextureScale;
+                        float ditherThreshold = tex2D(_DitherTexture, ditherUV).r;
+                    #else
+                        float4x4 ditherMatrix = float4x4(
+                            1.0 / 17.0,  9.0 / 17.0,  3.0 / 17.0, 11.0 / 17.0,
+                            13.0 / 17.0,  5.0 / 17.0, 15.0 / 17.0,  7.0 / 17.0,
+                            4.0 / 17.0, 12.0 / 17.0,  2.0 / 17.0, 10.0 / 17.0,
+                            16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
+                        );
+                        uint x = (uint)abs(ditherPixel.x) % 4;
+                        uint y = (uint)abs(ditherPixel.y) % 4;
+                        float ditherThreshold = ditherMatrix[x][y];
+                    #endif
+                    if (texSample.a <= _DitherSolidThreshold) {
+                        clip(texSample.a - ditherThreshold);
+                    }
+                #else
+                    clip(texSample.a - _AlphaCutoff);
+                #endif
 
                 #if defined(SHADOWS_CUBE) && !defined(SHADOWS_CUBE_IN_DEPTH_TEX)
                     return UnityEncodeCubeShadowDepth(

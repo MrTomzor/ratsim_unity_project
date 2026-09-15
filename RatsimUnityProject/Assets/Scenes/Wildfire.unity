@@ -15,13 +15,13 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.47058827, g: 0.54901963, b: 0.70980394, a: 1}
+  m_FogColor: {r: 0.28627452, g: 0.4039216, b: 0.5411765, a: 1}
   m_FogMode: 3
   m_FogDensity: 0.00015
   m_LinearFogStart: 1000
   m_LinearFogEnd: 10000
-  m_AmbientSkyColor: {r: 0.9999647, g: 0.9999698, b: 0.99997926, a: 1}
-  m_AmbientEquatorColor: {r: 0.5649158, g: 0.6918081, b: 0.9307964, a: 1}
+  m_AmbientSkyColor: {r: 0.31209093, g: 0.2744345, b: 0.5190122, a: 1}
+  m_AmbientEquatorColor: {r: 0.33420205, g: 0.3054828, b: 0.55250657, a: 1}
   m_AmbientGroundColor: {r: 0.050099958, g: 0.045167305, b: 0.066037714, a: 1}
   m_AmbientIntensity: 1
   m_AmbientMode: 1
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 64
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 1
+  m_ReflectionIntensity: 0.60982436
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
   m_UseRadianceAmbientProbe: 0
@@ -119,6 +119,82 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &2116775
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2116776}
+  - component: {fileID: 2116777}
+  m_Layer: 0
+  m_Name: Smoke
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &2116776
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2116775}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1007520618}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2116777
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2116775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe3c1c3a6cc6d194f9e9f2b946563aa8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  instanceMaterial: {fileID: 2100000, guid: ca664df5ef177a04eb148f6ee96ce393, type: 2}
+  instanceMesh: {fileID: -462981019419857548, guid: 02b3944a327e3f14883f037b5de7fe70, type: 3}
+  instanceTextures:
+  - {fileID: 2800000, guid: 2facaaae5407de944a33d4304af13838, type: 3}
+  - {fileID: 2800000, guid: 3eaecb3e3d7f09d4a89878bd8c3c3f91, type: 3}
+  textureRotation: 0
+  defaultTextureWeights: []
+  biomeTextureWeightsOverrides: []
+  textureTilingX: 1
+  textureTilingY: 1
+  castShadows: 1
+  pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
+  spacing: 150
+  drawDistance: 1000
+  fullDensityDistance: 1000
+  forceSpawnDistance: 200
+  allowedBiomes: -1
+  frustumBuffer: 1
+  alignToTerrainMesh: 0
+  terrainBaseScale: 1
+  terrainGridResolution: 128
+  heightFadeStart: 10000
+  heightFadeEnd: 100000
+  useNearPlanes: 0
+  nearPlaneStart: 0
+  nearPlaneEnd: 10
+  maxBufferCount: 1
+  previewVisibleInstanceCount: 0
+  showInDepthMap: 1
+  instanceStats: "Places Considered: 25\_935 (Grid: 195x133)"
+  computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &25131558
 GameObject:
   m_ObjectHideFlags: 0
@@ -565,6 +641,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 60
   drawDistance: 10000
   fullDensityDistance: 6000
@@ -581,6 +658,7 @@ MonoBehaviour:
   nearPlaneEnd: 2500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 58\_136 (Grid: 344x169)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &124227783
@@ -675,6 +753,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 60
   drawDistance: 10000
   fullDensityDistance: 6000
@@ -691,6 +770,7 @@ MonoBehaviour:
   nearPlaneEnd: 2500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 58\_136 (Grid: 344x169)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &145190411
@@ -785,6 +865,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 12
   drawDistance: 2500
   fullDensityDistance: 2500
@@ -801,8 +882,75 @@ MonoBehaviour:
   nearPlaneEnd: 500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 91\_160 (Grid: 430x212)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+--- !u!1 &146586842
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 146586843}
+  - component: {fileID: 146586844}
+  m_Layer: 0
+  m_Name: Buildings
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &146586843
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 146586842}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 861001279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &146586844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 146586842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb22bf124a3b8f843b3fe082abc8bbcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colliderPrefabs:
+  - {fileID: 1246635773868939770, guid: 1441f9947fc528d40bf600513ad00625, type: 3}
+  defaultPrefabWeights:
+  - 1
+  prefabRotation: 0
+  computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+  baseScale: {x: 19.89, y: 17.36}
+  instanceScaleRandomness: 0.805
+  scaleMultiplierA: {x: 1, y: 1}
+  terrainAlignment: 0.488
+  spacing: 63
+  spawnDistance: 400
+  fullDensityDistance: 400
+  allowedBiomes: 16
+  alignToTerrainMesh: 0
+  terrainBaseScale: 1
+  terrainGridResolution: 128
+  heightFadeStart: 10000
+  heightFadeEnd: 120000
+  updateInterval: 0.25
+  spawnsPerFrame: 100
+  debugStats: Updating...ddddd
 --- !u!1 &156434153
 GameObject:
   m_ObjectHideFlags: 0
@@ -1003,6 +1151,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 2.3
   drawDistance: 500
   fullDensityDistance: 353.2
@@ -1019,6 +1168,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 102\_152 (Grid: 452x226)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &180398909
@@ -1066,7 +1216,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   instanceMaterial: {fileID: 2100000, guid: d4cd572d00342b54b89342b9f0578746, type: 2}
-  instanceMesh: {fileID: 4300000, guid: 87b46df08d4ca834494fc1b093f8b79c, type: 2}
+  instanceMesh: {fileID: 4300000, guid: 3c6a6b5cd68095c4a8b92c9eb624a124, type: 2}
   instanceTextures:
   - {fileID: 2800000, guid: d5884fa5eb166044a89b049dff76ecda, type: 3}
   - {fileID: 2800000, guid: 8481be59d3dc64d4fa084f606012dccc, type: 3}
@@ -1077,6 +1227,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 30
   drawDistance: 3000
   fullDensityDistance: 2000
@@ -1093,6 +1244,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 63\_954 (Grid: 306x209)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &192860916
@@ -1536,7 +1688,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &320573518
 Transform:
   m_ObjectHideFlags: 0
@@ -1612,6 +1764,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 1.42
   drawDistance: 100
   fullDensityDistance: 34
@@ -1628,6 +1781,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 12\_616 (Grid: 152x83)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &322358335
@@ -1753,7 +1907,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &370963390
 Transform:
   m_ObjectHideFlags: 0
@@ -1829,6 +1983,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 1.42
   drawDistance: 100
   fullDensityDistance: 34
@@ -1845,6 +2000,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 12\_616 (Grid: 152x83)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &374086240
@@ -1863,7 +2019,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &374086241
 Transform:
   m_ObjectHideFlags: 0
@@ -1939,6 +2095,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 1.42
   drawDistance: 100
   fullDensityDistance: 34
@@ -1955,6 +2112,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 12\_616 (Grid: 152x83)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &378722680
@@ -1974,8 +2132,11 @@ GameObject:
   - component: {fileID: 378722686}
   - component: {fileID: 378722688}
   - component: {fileID: 378722689}
+  - component: {fileID: 378722690}
+  - component: {fileID: 378722691}
+  - component: {fileID: 378722693}
   m_Layer: 7
-  m_Name: CameraAgentPovObserver
+  m_Name: CAMERA
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1998,7 +2159,7 @@ MonoBehaviour:
   lockHeight: 0
   rotationAngle: 0
   rotationAngle2: 0
-  positionOffset: {x: 0, y: 40, z: -0.82}
+  positionOffset: {x: 0, y: 2, z: -0.82}
   mouseSensitivity: 1.32
   maxLookAngle: 80
 --- !u!114 &378722682
@@ -2008,7 +2169,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 378722680}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 96aa82e9df7034a3a986ced71eb0ccc3, type: 3}
   m_Name: 
@@ -2108,12 +2269,12 @@ MonoBehaviour:
     m_Bits: 2048
   stopNaNPropagation: 1
   finalBlitToCameraTarget: 0
-  antialiasingMode: 2
+  antialiasingMode: 3
   temporalAntialiasing:
-    jitterSpread: 0.75
+    jitterSpread: 1
     sharpness: 0.25
-    stationaryBlending: 0.95
-    motionBlending: 0.85
+    stationaryBlending: 0.649
+    motionBlending: 0.532
   subpixelMorphologicalAntialiasing:
     quality: 2
   fastApproximateAntialiasing:
@@ -2150,6 +2311,8 @@ MonoBehaviour:
   m_BeforeTransparentBundles:
   - assemblyQualifiedName: SkyboxFog, Assembly-CSharp, Version=0.0.0.0, Culture=neutral,
       PublicKeyToken=null
+  - assemblyQualifiedName: VolumetricSmokeEffect, Assembly-CSharp, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
   m_BeforeStackBundles: []
   m_AfterStackBundles: []
 --- !u!114 &378722687
@@ -2205,7 +2368,99 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bf4c3a85304e8b45aae1a4db654d416, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  logFilePath: camera_log.txt
+  loggingMode: 1
+  continuousInterval: 0.5
+  logFilePath: camera_log_experiment4.txt
+  logCircleAroundTarget: 0
+  circlePointsCount: 8
+  globalStartAngle: 0
+  raycastLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  showGizmo: 1
+  gizmoUpdateFrequency: 0.1
+--- !u!114 &378722690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 378722680}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55b28921ed65f4244bc2e984a36bddb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  toggleKey: 280
+  showDepth: 0
+  multiplyWithSceneColor: 0
+  colorMap: 0
+  flipColorMap: 0
+  customGradient:
+    serializedVersion: 2
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 1, g: 0.8644783, b: 0, a: 1}
+    key2: {r: 0.6565431, g: 0.16288905, b: 0.72955966, a: 0}
+    key3: {r: 0.48147446, g: 0, b: 0.93710685, a: 0}
+    key4: {r: 0, g: 0.20186658, b: 0.6037736, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 321
+    ctime2: 1109
+    ctime3: 1722
+    ctime4: 3153
+    ctime5: 7707
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 6
+    m_NumAlphaKeys: 2
+  depthMode: 1
+  nearDistance: 1.98
+  farDistance: 1000
+  depthMultiplier: 4.32
+  depthPower: 1.24
+  logCompression: -7.7
+  repeatColorMap: 0
+  repeatFrequency: 10
+  useRadialDistance: 1
+  normalizeOnScreen: 0
+--- !u!114 &378722691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 378722680}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a820454e49d0a904e841e7149cddb923, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &378722693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 378722680}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6991160ef1f010f4690a44994b7cc78b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  postProcessVolume: {fileID: 0}
 --- !u!1 &412673511
 GameObject:
   m_ObjectHideFlags: 0
@@ -2422,6 +2677,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 60
   drawDistance: 10000
   fullDensityDistance: 6000
@@ -2438,6 +2694,7 @@ MonoBehaviour:
   nearPlaneEnd: 2500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 58\_136 (Grid: 344x169)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &427020945
@@ -2694,8 +2951,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2dc18c54b38d1b745bbd926f623987fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  timeOfDay: 12
-  timeAdvanceRate: 0
+  timeOfDay: 16.6
+  timeAdvanceRate: 0.05
+  timeRange: {x: 16.6, y: 17.7}
   directionalLight: {fileID: 705507994}
   skyboxMaterial: {fileID: 2100000, guid: 1fce1fdb694e62b4884af52625410d7f, type: 2}
   sunColor:
@@ -3134,9 +3392,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   worldChanger: {fileID: 530714106}
   captureCamera: {fileID: 378722684}
-  resolutionWidth: 3840
-  resolutionHeight: 2160
-  saveFolder: Assets/WorldCaptures
+  resolutionWidth: 500
+  resolutionHeight: 300
+  saveFolder: WorldCaptures
+  captureKey: 278
+  captureFromLogKey: 279
+  cameraLogFilePath: camera_log_experiment2.txt
   statesToCapture:
   - captureName: morning
     timeOfDay: 7.2
@@ -3359,6 +3620,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 63
   drawDistance: 4000
   fullDensityDistance: 4000
@@ -3375,6 +3637,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 25\_935 (Grid: 195x133)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &622685196
@@ -3544,8 +3807,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 1.0322888
+  m_Color: {r: 1, g: 0.5605813, b: 0.2851349, a: 1}
+  m_Intensity: 0.89793766
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -3607,7 +3870,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 705507993}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.67038965, y: 0.22489487, z: -0.22489487, w: 0.67038965}
+  m_LocalRotation: {x: 0.9321986, y: 0.057959896, z: -0.3127236, w: 0.1727728}
   m_LocalPosition: {x: 4.23, y: 12.89, z: -7.32}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3789,6 +4052,42 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &861001278
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 861001279}
+  m_Layer: 0
+  m_Name: CPUInstancers
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &861001279
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 861001278}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -230.65431, y: 416.20392, z: 614.00757}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1386005248}
+  - {fileID: 1397584250}
+  - {fileID: 1112359322}
+  - {fileID: 146586843}
+  - {fileID: 1150580995}
+  m_Father: {fileID: 2018310811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &901289925
 GameObject:
   m_ObjectHideFlags: 0
@@ -3889,6 +4188,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 50
   drawDistance: 4000
   fullDensityDistance: 2000
@@ -3905,6 +4205,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 40\_836 (Grid: 246x166)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &915746485
@@ -3999,6 +4300,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 12
   drawDistance: 2500
   fullDensityDistance: 2500
@@ -4015,6 +4317,7 @@ MonoBehaviour:
   nearPlaneEnd: 500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 91\_160 (Grid: 430x212)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &918048130
@@ -4081,6 +4384,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 30
   drawDistance: 3000
   fullDensityDistance: 2000
@@ -4097,6 +4401,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 61\_812 (Grid: 306x202)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &945644406
@@ -4446,6 +4751,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1007520618}
+  - component: {fileID: 1007520619}
   m_Layer: 0
   m_Name: GPUInstancers
   m_TagString: Untagged
@@ -4477,10 +4783,24 @@ Transform:
   - {fileID: 907100255}
   - {fileID: 918048131}
   - {fileID: 561604018}
+  - {fileID: 2116776}
   - {fileID: 1265659176}
   - {fileID: 1231686074}
   m_Father: {fileID: 2018310811}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1007520619
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1007520617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 240b49f799c24dc41908b151cb85212f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cam: {fileID: 0}
 --- !u!1 &1025817538
 GameObject:
   m_ObjectHideFlags: 0
@@ -5244,6 +5564,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 2.3
   drawDistance: 500
   fullDensityDistance: 353.2
@@ -5260,6 +5581,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 102\_152 (Grid: 452x226)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1001 &1036030610
@@ -5416,7 +5738,8 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
-  spacing: 2.3
+  excludeRenderingAgainstSkybox: 0
+  spacing: 3
   drawDistance: 500
   fullDensityDistance: 353.2
   forceSpawnDistance: 0
@@ -5432,8 +5755,143 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 102\_152 (Grid: 452x226)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+--- !u!1 &1112359321
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1112359322}
+  - component: {fileID: 1112359323}
+  m_Layer: 0
+  m_Name: Bushes
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1112359322
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1112359321}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 861001279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1112359323
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1112359321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb22bf124a3b8f843b3fe082abc8bbcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colliderPrefabs:
+  - {fileID: 7423535192395093291, guid: a032fec3a0856f54fbb6edd0b2f8da0f, type: 3}
+  defaultPrefabWeights:
+  - 1
+  prefabRotation: 0
+  computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+  baseScale: {x: 2, y: 2}
+  instanceScaleRandomness: 0.188
+  scaleMultiplierA: {x: 1, y: 1}
+  terrainAlignment: 0.327
+  spacing: 50
+  spawnDistance: 400
+  fullDensityDistance: 400
+  allowedBiomes: 35
+  alignToTerrainMesh: 0
+  terrainBaseScale: 1
+  terrainGridResolution: 128
+  heightFadeStart: 10000
+  heightFadeEnd: 120000
+  updateInterval: 0.25
+  spawnsPerFrame: 100
+  debugStats: Updating...ddddd
+--- !u!1 &1150580994
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1150580995}
+  - component: {fileID: 1150580996}
+  m_Layer: 0
+  m_Name: TreesTall
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1150580995
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1150580994}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 861001279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1150580996
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1150580994}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb22bf124a3b8f843b3fe082abc8bbcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colliderPrefabs:
+  - {fileID: 7423535192395093291, guid: c37b5761b6413aa439e9175ad914f903, type: 3}
+  - {fileID: 7423535192395093291, guid: f201b8f4521eaeb44a86a19a0f18e769, type: 3}
+  defaultPrefabWeights:
+  - 1
+  - 1
+  prefabRotation: 1
+  computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+  baseScale: {x: 4.72, y: 3}
+  instanceScaleRandomness: 0.48
+  scaleMultiplierA: {x: 1, y: 1}
+  terrainAlignment: 0.327
+  spacing: 100
+  spawnDistance: 400
+  fullDensityDistance: 400
+  allowedBiomes: 1
+  alignToTerrainMesh: 0
+  terrainBaseScale: 1
+  terrainGridResolution: 128
+  heightFadeStart: 10000
+  heightFadeEnd: 120000
+  updateInterval: 0.25
+  spawnsPerFrame: 100
+  debugStats: Updating...ddddd
 --- !u!1 &1208620822
 GameObject:
   m_ObjectHideFlags: 0
@@ -5529,6 +5987,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 10
   drawDistance: 800
   fullDensityDistance: 250
@@ -5545,6 +6004,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 41\_328 (Grid: 246x168)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1265659175
@@ -5604,6 +6064,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 120
   drawDistance: 8000
   fullDensityDistance: 8000
@@ -5620,6 +6081,7 @@ MonoBehaviour:
   nearPlaneEnd: 4000
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 25\_935 (Grid: 195x133)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1289060171
@@ -5799,6 +6261,144 @@ MonoBehaviour:
   cullingMaterial: {fileID: 2100000, guid: a9566c62d193a074cacf163c4bf9d8e2, type: 2}
   cullingWidthExtension: 45
   globalTextureSetter: {fileID: 1330065009}
+--- !u!1 &1386005247
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1386005248}
+  - component: {fileID: 1386005249}
+  m_Layer: 0
+  m_Name: Trees
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1386005248
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1386005247}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 861001279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1386005249
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1386005247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb22bf124a3b8f843b3fe082abc8bbcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colliderPrefabs:
+  - {fileID: 7423535192395093291, guid: 9ef848ee0f4f1b74ba556c52ffd34c60, type: 3}
+  - {fileID: 7423535192395093291, guid: b0ce5e20d4386004c824b4b2f8667b9d, type: 3}
+  defaultPrefabWeights:
+  - 1
+  - 1
+  prefabRotation: 0
+  computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+  baseScale: {x: 1.22, y: 1.22}
+  instanceScaleRandomness: 0.092
+  scaleMultiplierA: {x: 1, y: 1}
+  terrainAlignment: 0.327
+  spacing: 30
+  spawnDistance: 400
+  fullDensityDistance: 400
+  allowedBiomes: 1
+  alignToTerrainMesh: 0
+  terrainBaseScale: 1
+  terrainGridResolution: 128
+  heightFadeStart: 10000
+  heightFadeEnd: 120000
+  updateInterval: 0.25
+  spawnsPerFrame: 100
+  debugStats: Updating...ddddd
+--- !u!1 &1397584249
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1397584250}
+  - component: {fileID: 1397584251}
+  m_Layer: 0
+  m_Name: Rocks
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1397584250
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1397584249}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 861001279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1397584251
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1397584249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb22bf124a3b8f843b3fe082abc8bbcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colliderPrefabs:
+  - {fileID: 7423535192395093291, guid: ea210378145431943b529d90f5efa99b, type: 3}
+  - {fileID: 7423535192395093291, guid: ea210378145431943b529d90f5efa99b, type: 3}
+  - {fileID: 7423535192395093291, guid: 7e8cc49b8a53d1f4480fa85372cbe774, type: 3}
+  - {fileID: 7423535192395093291, guid: e5d468ed27e583c4cae2b5d79bec1fc5, type: 3}
+  - {fileID: 7423535192395093291, guid: e2ac91484cf5ce24599105bb734259f8, type: 3}
+  - {fileID: 7423535192395093291, guid: a1e636b9e8336114f9766105baa37068, type: 3}
+  defaultPrefabWeights: []
+  prefabRotation: 0
+  computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+  baseScale: {x: 2, y: 2}
+  instanceScaleRandomness: 0.264
+  scaleMultiplierA: {x: 1, y: 1}
+  terrainAlignment: 1
+  spacing: 10
+  spawnDistance: 400
+  fullDensityDistance: 250
+  allowedBiomes: 524544
+  alignToTerrainMesh: 0
+  terrainBaseScale: 1
+  terrainGridResolution: 128
+  heightFadeStart: 10000
+  heightFadeEnd: 120000
+  updateInterval: 0.25
+  spawnsPerFrame: 100
+  debugStats: Updating...ddddd
 --- !u!1 &1405812297
 GameObject:
   m_ObjectHideFlags: 0
@@ -6169,7 +6769,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   instanceMaterial: {fileID: 2100000, guid: d43c159bcdcb52b4288fa89c4158f815, type: 2}
-  instanceMesh: {fileID: -462981019419857548, guid: 02b3944a327e3f14883f037b5de7fe70, type: 3}
+  instanceMesh: {fileID: 4300000, guid: ef76047039e072e4e95d1c2bf9046dc5, type: 2}
   instanceTextures:
   - {fileID: 2800000, guid: 904ef0559035d65448ba6e2c096a2196, type: 3}
   - {fileID: 2800000, guid: 226c6c5c00ecb8f4099d5da60035245c, type: 3}
@@ -6180,6 +6780,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 12
   drawDistance: 2500
   fullDensityDistance: 2500
@@ -6196,6 +6797,7 @@ MonoBehaviour:
   nearPlaneEnd: 500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 91\_160 (Grid: 430x212)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1579975558
@@ -6243,7 +6845,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   instanceMaterial: {fileID: 2100000, guid: 14c270b00277974439a96f1def2d5de1, type: 2}
-  instanceMesh: {fileID: -462981019419857548, guid: 02b3944a327e3f14883f037b5de7fe70, type: 3}
+  instanceMesh: {fileID: 4300000, guid: ef76047039e072e4e95d1c2bf9046dc5, type: 2}
   instanceTextures:
   - {fileID: 2800000, guid: 904ef0559035d65448ba6e2c096a2196, type: 3}
   - {fileID: 2800000, guid: 226c6c5c00ecb8f4099d5da60035245c, type: 3}
@@ -6254,6 +6856,7 @@ MonoBehaviour:
   textureTilingY: 2
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 60
   drawDistance: 10000
   fullDensityDistance: 6000
@@ -6270,6 +6873,7 @@ MonoBehaviour:
   nearPlaneEnd: 2500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 58\_136 (Grid: 344x169)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1595791622
@@ -6317,7 +6921,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   instanceMaterial: {fileID: 2100000, guid: b45989ab48c03e3409e4046e5bb6d488, type: 2}
-  instanceMesh: {fileID: -462981019419857548, guid: 02b3944a327e3f14883f037b5de7fe70, type: 3}
+  instanceMesh: {fileID: 4300000, guid: ef76047039e072e4e95d1c2bf9046dc5, type: 2}
   instanceTextures:
   - {fileID: 2800000, guid: 904ef0559035d65448ba6e2c096a2196, type: 3}
   - {fileID: 2800000, guid: 226c6c5c00ecb8f4099d5da60035245c, type: 3}
@@ -6328,7 +6932,8 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
-  spacing: 2.2
+  excludeRenderingAgainstSkybox: 0
+  spacing: 3
   drawDistance: 500
   fullDensityDistance: 272.7
   forceSpawnDistance: 0
@@ -6344,6 +6949,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 111\_392 (Grid: 472x236)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!4 &1601128700 stripped
@@ -6443,6 +7049,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 60
   drawDistance: 10000
   fullDensityDistance: 6000
@@ -6459,6 +7066,7 @@ MonoBehaviour:
   nearPlaneEnd: 2500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 58\_136 (Grid: 344x169)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1653767574
@@ -6477,7 +7085,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1653767575
 Transform:
   m_ObjectHideFlags: 0
@@ -6553,6 +7161,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 1.42
   drawDistance: 100
   fullDensityDistance: 34
@@ -6569,6 +7178,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 12\_616 (Grid: 152x83)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1656317689
@@ -6694,6 +7304,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 100
   drawDistance: 4000
   fullDensityDistance: 2000
@@ -6710,8 +7321,55 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 110\_160 (Grid: 408x270)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
+--- !u!1 &1705128800
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1705128801}
+  - component: {fileID: 1705128802}
+  m_Layer: 0
+  m_Name: SmokeDensitySampler
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1705128801
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1705128800}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 4153.0786, y: 884.54694, z: 7679.407}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2018310811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1705128802
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1705128800}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f09e80d13e3a3754c9398c3a4c8a6d50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  realTerrain: {fileID: 1876751610}
+  volume: {fileID: 2133626682}
 --- !u!1 &1710360969
 GameObject:
   m_ObjectHideFlags: 0
@@ -6804,6 +7462,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 2.3
   drawDistance: 500
   fullDensityDistance: 353.2
@@ -6820,6 +7479,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 102\_152 (Grid: 452x226)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1719611118
@@ -7145,6 +7805,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 12
   drawDistance: 2500
   fullDensityDistance: 2500
@@ -7161,6 +7822,7 @@ MonoBehaviour:
   nearPlaneEnd: 500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 91\_160 (Grid: 430x212)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1828303878
@@ -7388,7 +8050,7 @@ MonoBehaviour:
   levels: 10
   baseScale: 2
   heightmapTexture: {fileID: 2800000, guid: af0daa055ac03f543bd0af0af1c7a540, type: 2}
-  heightmapMultiplier: 2
+  heightmapMultiplier: 3
   biomeTexture: {fileID: 2800000, guid: 908a6dc51703767408900da0d38efcff, type: 2}
   roadMaskTexture: {fileID: 2800000, guid: e3c0393365344864ab388f600c7478e1, type: 3}
   roadMaskMappings:
@@ -7419,8 +8081,8 @@ MonoBehaviour:
   edgeDistanceUnits: 2
   waterDistanceTexture: {fileID: 2800000, guid: be5fa5bae42d93c4ca35aeefa66ef5ec, type: 3}
   center: {x: 0, y: 0}
-  sizeX: 46495
-  sizeZ: 55597
+  sizeX: 69742.5
+  sizeZ: 83395.5
   drawBoundsGizmo: 1
 --- !u!4 &1876751611
 Transform:
@@ -7444,15 +8106,16 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1876751608}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a100513d95588944094c4db144806129, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   player: {fileID: 378722685}
   terrainMaterial: {fileID: 2100000, guid: 08b16e9369a854443989276d01ba2659, type: 2}
+  size: 800
   resolution: 32
-  updateThreshold: 2
+  updateThreshold: 200
 --- !u!114 &1876751613
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7503,42 +8166,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0e2fa0939f601904eb521db3b76df852, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  grassMaterial: {fileID: 2100000, guid: f81ceda7ea9f3a64e941dd063a97d52d, type: 2}
-  grassMesh: {fileID: -462981019419857548, guid: 02b3944a327e3f14883f037b5de7fe70, type: 3}
-  grassTextures:
-  - {fileID: 2800000, guid: 08498694fcd19f0478edca2e564b3219, type: 3}
-  - {fileID: 2800000, guid: a9055989e2d3af444aecf0863756df5b, type: 3}
-  - {fileID: 2800000, guid: bd5f69e6e6d2c9b4293954fbd8830d83, type: 3}
-  - {fileID: 2800000, guid: c4453fb0f6ee3414c83c6e165044f1c0, type: 3}
-  textureWeights:
-  - 100
-  - 100
-  - 2
-  - 2
-  castShadows: 1
-  spacing: 0.44
-  drawDistance: 400
-  fullDensityDistance: 150
-  textureUpdateThreshold: 10
-  frustumBuffer: -0.05
-  heightFadeStart: 100
-  heightFadeEnd: 120
-  maxBufferCount: 2
-  previewVisibleGrassCount: 0
-  previewMaskTexture: 0
-  overrideMaskWithNoise: 0
-  heightMapLayer:
-    serializedVersion: 2
-    m_Bits: 512
-  maskMapLayer:
-    serializedVersion: 2
-    m_Bits: 4096
-  heightMapMat: {fileID: 2100000, guid: fa10e95c681b53644aecbc5076ebaad5, type: 2}
-  computeShader: {fileID: 7200000, guid: d86386c1588801c478880e0691cc81b1, type: 3}
-  cacheHeightmap: 1
-  enableMaskPass: 1
-  enableColorPass: 0
-  enableSlopePass: 0
 --- !u!4 &1900166941
 Transform:
   m_ObjectHideFlags: 0
@@ -7725,6 +8352,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 0
   pixelAccurateBiomeClipping: 1
+  excludeRenderingAgainstSkybox: 1
   spacing: 12
   drawDistance: 2500
   fullDensityDistance: 2500
@@ -7741,6 +8369,7 @@ MonoBehaviour:
   nearPlaneEnd: 500
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 0
   instanceStats: "Places Considered: 91\_160 (Grid: 430x212)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &1951256139
@@ -7788,7 +8417,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   instanceMaterial: {fileID: 2100000, guid: d987617ef2920a54dbe047beadd34ad7, type: 2}
-  instanceMesh: {fileID: 4300000, guid: 87b46df08d4ca834494fc1b093f8b79c, type: 2}
+  instanceMesh: {fileID: 4300000, guid: 3c6a6b5cd68095c4a8b92c9eb624a124, type: 2}
   instanceTextures:
   - {fileID: 2800000, guid: d5884fa5eb166044a89b049dff76ecda, type: 3}
   - {fileID: 2800000, guid: 8481be59d3dc64d4fa084f606012dccc, type: 3}
@@ -7799,6 +8428,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 80
   drawDistance: 6000
   fullDensityDistance: 6000
@@ -7815,6 +8445,7 @@ MonoBehaviour:
   nearPlaneEnd: 3000
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 35\_650 (Grid: 230x155)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &2018310810
@@ -7846,8 +8477,10 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1705128801}
   - {fileID: 1876751611}
   - {fileID: 1007520618}
+  - {fileID: 861001279}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2020301620
@@ -8096,7 +8729,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2095563425
 Transform:
   m_ObjectHideFlags: 0
@@ -8125,7 +8758,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   instanceMaterial: {fileID: 2100000, guid: 64598bd69c72281448fbd39dd910a784, type: 2}
-  instanceMesh: {fileID: -462981019419857548, guid: 02b3944a327e3f14883f037b5de7fe70, type: 3}
+  instanceMesh: {fileID: 4300000, guid: ef76047039e072e4e95d1c2bf9046dc5, type: 2}
   instanceTextures:
   - {fileID: 2800000, guid: 904ef0559035d65448ba6e2c096a2196, type: 3}
   - {fileID: 2800000, guid: 226c6c5c00ecb8f4099d5da60035245c, type: 3}
@@ -8136,6 +8769,7 @@ MonoBehaviour:
   textureTilingY: 1
   castShadows: 1
   pixelAccurateBiomeClipping: 0
+  excludeRenderingAgainstSkybox: 0
   spacing: 1.42
   drawDistance: 100
   fullDensityDistance: 34
@@ -8152,6 +8786,7 @@ MonoBehaviour:
   nearPlaneEnd: 10
   maxBufferCount: 1
   previewVisibleInstanceCount: 0
+  showInDepthMap: 1
   instanceStats: "Places Considered: 12\_616 (Grid: 152x83)"
   computeShader: {fileID: 7200000, guid: 02c87726fd396d946bad8a56797c6cf1, type: 3}
 --- !u!1 &2111254467
@@ -8183,38 +8818,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0e2fa0939f601904eb521db3b76df852, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  grassMaterial: {fileID: 2100000, guid: 37fb3ca2aeb43af4a86a00ff5acdd1ad, type: 2}
-  grassMesh: {fileID: 4300000, guid: fe769f7397da85d419b985e505f84835, type: 2}
-  grassTextures:
-  - {fileID: 2800000, guid: f9912e985bfa3744782eff13f50b0364, type: 3}
-  - {fileID: 2800000, guid: 5093f69c879657e4cbe7664da14aa8f7, type: 3}
-  textureWeights:
-  - 1
-  - 1
-  castShadows: 1
-  spacing: 18
-  drawDistance: 1000
-  fullDensityDistance: 1000
-  textureUpdateThreshold: 100
-  frustumBuffer: -0.05
-  heightFadeStart: 100
-  heightFadeEnd: 120
-  maxBufferCount: 2
-  previewVisibleGrassCount: 0
-  previewMaskTexture: 0
-  overrideMaskWithNoise: 0
-  heightMapLayer:
-    serializedVersion: 2
-    m_Bits: 512
-  maskMapLayer:
-    serializedVersion: 2
-    m_Bits: 4096
-  heightMapMat: {fileID: 2100000, guid: fa10e95c681b53644aecbc5076ebaad5, type: 2}
-  computeShader: {fileID: 7200000, guid: d86386c1588801c478880e0691cc81b1, type: 3}
-  cacheHeightmap: 1
-  enableMaskPass: 1
-  enableColorPass: 0
-  enableSlopePass: 0
 --- !u!4 &2111254469
 Transform:
   m_ObjectHideFlags: 0
@@ -8505,18 +9108,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: SERVER
       objectReference: {fileID: 0}
-    - target: {fileID: 4212666404655348582, guid: d6a031b061151653592091cb5443a330, type: 3}
-      propertyPath: verbose
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4212666404655348582, guid: d6a031b061151653592091cb5443a330, type: 3}
-      propertyPath: trackObject
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 4212666404655348582, guid: d6a031b061151653592091cb5443a330, type: 3}
-      propertyPath: physicsStepTime
-      value: 0.1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -8676,10 +9267,10 @@ SceneRoots:
   - {fileID: 627128692}
   - {fileID: 2060525579}
   - {fileID: 55667901}
-  - {fileID: 2133626683}
   - {fileID: 2046902789}
   - {fileID: 378722685}
   - {fileID: 429149254}
+  - {fileID: 2133626683}
   - {fileID: 2018310811}
   - {fileID: 530714107}
   - {fileID: 192860920}

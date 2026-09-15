@@ -25,7 +25,7 @@ public class Pickupable : MonoBehaviour
 
         depleted = true;
         Debug.Log("Pickupable collided with " + collision.gameObject.name);
-        RoslikeTCPServer conn = RoslikeTCPServer.GetInstance();
+        ZmqUnityServer conn = ZmqUnityServer.GetInstance();
         conn.Publish(topicName, new Int32Message { data = publishedNumber });
 
         // Notify the RewardObjectLoader that a reward was collected

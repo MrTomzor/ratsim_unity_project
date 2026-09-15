@@ -5,6 +5,15 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
         _BaseColorTextureArray("BaseColor Texture Array", 2DArray) = "" {}
         _TextureCount("Texture Count", Float) = 1
         _AlphaCutoff("Alpha Cutoff", Range(0, 1)) = 0.5
+        [Toggle(_DITHERED_TRANSPARENCY)] _DitherTransparency("Use Dithered Transparency", Float) = 0
+        [Toggle(_USE_DITHER_TEXTURE)] _UseDitherTexture("Use Dither Texture", Float) = 0
+        _DitherTexture("Dither Texture (Blue Noise)", 2D) = "white" {}
+        _DitherTextureScale("Dither Texture Scale", Float) = 64.0
+        _DitherMeshUVInfluence("Dither Mesh UV Influence", Float) = 0.0
+        _DitherInstanceInfluence("Dither Instance XYZ Influence", Float) = 0.0
+        _DitherAnimationSpeed("Dither Animation Speed", Float) = 0.0
+        _DitherSolidThreshold("Solid Alpha Threshold", Range(0, 1)) = 1.0
+        _GlobalAlphaMultiplier("Global Alpha Multiplier", Float) = 1.0
         _ColorA("ColorA", Color) = (0,0,0,1)
         _ColorB("ColorB", Color) = (1,1,1,1)
         _AOColor("AO Color", Color) = (0.5,0.5,0.5)
@@ -37,18 +46,20 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
         _Smoothness("Smoothness", Range(1, 256)) = 16.0
         _SpecularIntensity("Specular Intensity", Range(0, 1)) = 0.12
         _RandomNormal("Random Normal", Range(0, 1)) = 0.1
+        _NormalLightingInfluence("Normal Lighting Influence", Range(0, 1)) = 1.0
         [Toggle] _ReceiveShadows("Receive Shadows", Float) = 1
         _ShadowAmbientDarkness("Shadow Ambient Darkness", Range(0, 1)) = 0.5
         
         [Header(Rendering Options)][Space]
         [Enum(UnityEngine.Rendering.CullMode)] _Cull("Cull Mode (0=Off, 2=Back)", Float) = 0
         [Toggle] _UseBiomeClipping("Pixel Accurate Biome Clipping", Float) = 0
+        [Toggle] _ExcludeAgainstSkybox("Exclude Against Skybox", Float) = 0
         _EdgeCullThreshold("Edge Culling (0=Off)", Range(0, 1)) = 0.0
     }
 
     SubShader
     {
-        Tags { "RenderType" = "TransparentCutout" "Queue" = "Transparent" }
+        Tags { "RenderType" = "TransparentCutout" "Queue" = "AlphaTest" }
 
         Pass
         {
@@ -65,6 +76,8 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
             #pragma multi_compile_fwdbase
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
+            #pragma shader_feature_local _DITHERED_TRANSPARENCY
+            #pragma shader_feature_local _USE_DITHER_TEXTURE
 
             #include "UnityCG.cginc"
             #include "AutoLight.cginc"
@@ -89,6 +102,8 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
                 float3 worldPos : TEXCOORD1;
                 float2 meshUV : TEXCOORD8;
                 float texIndex : TEXCOORD9;
+                float ditherOffset : TEXCOORD10;
+                float4 screenPos : TEXCOORD11;
                 UNITY_FOG_COORDS(6)
                 UNITY_SHADOW_COORDS(7)
             };
@@ -115,6 +130,7 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
             half _SpecularIntensity;
 
             half _RandomNormal;
+            float _NormalLightingInfluence;
             float _ReceiveShadows;
             float _ShadowAmbientDarkness;
             float _AlphaCutoff;
@@ -124,6 +140,8 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
             float _DrawDistance;
 
             float _UseBiomeClipping;
+            float _ExcludeAgainstSkybox;
+            sampler2D _CameraDepthTexture;
             sampler2D _GlobalBiomeMap;
             float4 _GlobalBiomeMap_Bounds;
             float4 _GlobalBiomeMap_TexelSize;
@@ -149,6 +167,13 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
             UNITY_DECLARE_TEX2DARRAY(_BaseColorTextureArray);
             float _TextureCount;
             sampler2D _WindTexture;
+            sampler2D _DitherTexture;
+            float _DitherTextureScale;
+            float _DitherMeshUVInfluence;
+            float _DitherInstanceInfluence;
+            float _DitherAnimationSpeed;
+            float _DitherSolidThreshold;
+            float _GlobalAlphaMultiplier;
 
             uint murmurHash3(float input) {
                 uint h = abs(input);
@@ -188,17 +213,22 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
             half3 CalculateLighting(half3 albedo, half3 N, half3 V, half heightY, half atten)
             {
                 half ambientDarken = lerp(1.0 - _ShadowAmbientDarkness, 1.0, atten);
-                half3 ambient = ShadeSH9(half4(N, 1.0)) * albedo * ambientDarken;
+                
+                half3 flatN = half3(0, 1, 0);
+                half3 ambientN = normalize(lerp(flatN, N, _NormalLightingInfluence));
+                half3 ambient = ShadeSH9(half4(ambientN, 1.0)) * albedo * ambientDarken;
 
                 half3 lightDir = normalize(_WorldSpaceLightPos0.xyz);
                 half3 lightColor = _LightColor0.rgb;
 
                 half3 H = normalize(lightDir + V);
                 half directDiffuse = dot(N, lightDir) * 0.5 + 0.5;
+                directDiffuse = lerp(1.0, directDiffuse, _NormalLightingInfluence);
 
                 float directSpecular = saturate(dot(N, H));
                 directSpecular = pow(directSpecular, _Smoothness); 
                 directSpecular *= heightY * _SpecularIntensity;
+                directSpecular *= _NormalLightingInfluence;
 
                 half3 lightingColor = lightColor * atten;
                 half3 direct = (albedo * directDiffuse + directSpecular) * lightingColor;
@@ -271,11 +301,13 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
                 OUT.meshUV = v.uv;
                 
                 OUT.texIndex = _InstancePositions[instanceID].texIndex;
+                OUT.ditherOffset = pivot.x + pivot.y + pivot.z;
 
                 float4 actualPos = OUT.pos;
                 OUT.pos = UnityWorldToClipPos(pivot);
                 v.vertex = float4(pivot, 1.0);
                 OUT.pos = actualPos;
+                OUT.screenPos = ComputeScreenPos(OUT.pos);
 
                 UNITY_TRANSFER_FOG(OUT, OUT.pos);
 
@@ -327,6 +359,18 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
                     clip(inMask ? 1.0 : -1.0);
                 }
 
+                if (_ExcludeAgainstSkybox > 0.5)
+                {
+                    float2 screenUV = i.screenPos.xy / i.screenPos.w;
+                    float sceneDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, screenUV);
+                    #if UNITY_REVERSED_Z
+                        bool isSkybox = sceneDepth <= 0.00001 || Linear01Depth(sceneDepth) >= 0.9999;
+                    #else
+                        bool isSkybox = sceneDepth >= 0.99999 || Linear01Depth(sceneDepth) >= 0.9999;
+                    #endif
+                    clip(isSkybox ? -1.0 : 1.0);
+                }
+
                 float3 fromCenter0 = wpos - unity_ShadowSplitSpheres[0].xyz;
                 float3 fromCenter1 = wpos - unity_ShadowSplitSpheres[1].xyz;
                 float3 fromCenter2 = wpos - unity_ShadowSplitSpheres[2].xyz;
@@ -366,8 +410,34 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
 
                 float3 uvArray = float3(i.meshUV * _BaseColorTextureArray_ST.xy + _BaseColorTextureArray_ST.zw, i.texIndex);
                 half4 texSample = UNITY_SAMPLE_TEX2DARRAY(_BaseColorTextureArray, uvArray);
+                texSample.a = saturate(texSample.a * _GlobalAlphaMultiplier);
 
-                clip(texSample.a - _AlphaCutoff);
+                #if _DITHERED_TRANSPARENCY
+                    float2 ditherPixel = i.pos.xy;
+                    ditherPixel += i.meshUV * _DitherMeshUVInfluence * _DitherTextureScale;
+                    ditherPixel += i.ditherOffset * _DitherInstanceInfluence * _DitherTextureScale;
+                    ditherPixel += floor(_Time.y * _DitherAnimationSpeed);
+
+                    #if _USE_DITHER_TEXTURE
+                        float2 ditherUV = ditherPixel / _DitherTextureScale;
+                        float ditherThreshold = tex2D(_DitherTexture, ditherUV).r;
+                    #else
+                        float4x4 ditherMatrix = float4x4(
+                            1.0 / 17.0,  9.0 / 17.0,  3.0 / 17.0, 11.0 / 17.0,
+                            13.0 / 17.0,  5.0 / 17.0, 15.0 / 17.0,  7.0 / 17.0,
+                            4.0 / 17.0, 12.0 / 17.0,  2.0 / 17.0, 10.0 / 17.0,
+                            16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
+                        );
+                        uint x = (uint)abs(ditherPixel.x) % 4;
+                        uint y = (uint)abs(ditherPixel.y) % 4;
+                        float ditherThreshold = ditherMatrix[x][y];
+                    #endif
+                    if (texSample.a <= _DitherSolidThreshold) {
+                        clip(texSample.a - ditherThreshold);
+                    }
+                #else
+                    clip(texSample.a - _AlphaCutoff);
+                #endif
 
                 half3 finalAlbedo = i.albedo * texSample.rgb;
 
@@ -390,7 +460,8 @@ Shader "RealLifeEnvironment/GPUInstancerShader"
 
                 half3 lighting = CalculateLighting(finalAlbedo, N, V, i.heightY, atten);
 
-                UNITY_APPLY_FOG(i.fogCoord, lighting);
+                // In Queue = AlphaTest with Deferred Shading, Deferred Fog handles fogging via _CameraDepthTexture.
+                // UNITY_APPLY_FOG(i.fogCoord, lighting);
 
                 return half4(lighting, 1.0);
             }

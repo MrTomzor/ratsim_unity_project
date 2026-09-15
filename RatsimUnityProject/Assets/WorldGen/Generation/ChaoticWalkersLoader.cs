@@ -41,7 +41,7 @@ public class ChaoticWalkersLoader : WorldDataProvider {
     public override WorldDataType[] DependsOn => new[] { WorldDataType.Height, WorldDataType.StructureContent };
 
     private const string PrefabFolder = "WorldGen/WalkerPrefabs/";
-    private const float StepsPerSecond = 50f; // physics is 50Hz; see RoslikeTCPServer.SimulationMode
+    private const float StepsPerSecond = 50f; // physics is 50Hz; see ZmqUnityServer.SimulationMode
 
     public bool verbose = false;
 
@@ -147,7 +147,7 @@ public class ChaoticWalkersLoader : WorldDataProvider {
             _chunkWalkers.Remove(key);
         }
         // Purge any stale timer callbacks registered by the destroyed walkers.
-        RoslikeTCPServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
+        ZmqUnityServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
     }
 
     public override void Clear() {
@@ -157,7 +157,7 @@ public class ChaoticWalkersLoader : WorldDataProvider {
         _chunkWalkers.Clear();
         _spawnedChunks.Clear();
         _paramsLoaded = false;
-        RoslikeTCPServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
+        ZmqUnityServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
     }
 
     // ─────────────────────────────────────────────

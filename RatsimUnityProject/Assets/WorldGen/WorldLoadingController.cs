@@ -30,7 +30,7 @@ public class WorldLoadingController : MonoBehaviour {
     }
 
     void Start() {
-        var conn = RoslikeTCPServer.GetInstance();
+        var conn = ZmqUnityServer.GetInstance();
         conn.Subscribe<StringMessage>("/sim_control/world_config", (msg) => {
             LoadConfig(msg.data, verbose: true);
         });

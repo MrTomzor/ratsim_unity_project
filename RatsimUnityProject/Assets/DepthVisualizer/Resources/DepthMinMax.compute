@@ -1,0 +1,66 @@
+#pragma kernel CSMain
+
+Texture2D<float> _CameraDepthTexture;
+Texture2D<float> _GPUInstancerDepthTex;
+RWStructuredBuffer<uint> _MinMaxBuffer; // [0] = min, [1] = max
+
+float4x4 _CamProj;
+int _UseRadialDistance;
+float _DepthMultiplier;
+float _FarPlane;
+float4 _ZBufferParams;
+int _IsReversedZ;
+
+float Linear01Depth(float z)
+{
+    return 1.0 / (_ZBufferParams.x * z + _ZBufferParams.y);
+}
+
+[numthreads(8, 8, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    uint w, h;
+    _CameraDepthTexture.GetDimensions(w, h);
+    if (id.x >= w || id.y >= h) return;
+
+    float sceneDepth = _CameraDepthTexture[id.xy];
+    float gpuDepth = _GPUInstancerDepthTex[id.xy];
+
+    float depth = 0;
+    bool isSkybox = false;
+    
+    if (_IsReversedZ > 0)
+    {
+        depth = max(sceneDepth, gpuDepth);
+        if (depth == 0.0) isSkybox = true;
+    }
+    else
+    {
+        depth = min(sceneDepth, gpuDepth);
+        if (depth == 1.0) isSkybox = true;
+    }
+
+    if (isSkybox) return; // Skip background so skybox doesn't skew normalization
+
+    float linearDepth = Linear01Depth(depth);
+
+    if (_UseRadialDistance > 0)
+    {
+        float2 uv = (float2(id.xy) + 0.5) / float2(w, h);
+        float x = (uv.x * 2.0 - 1.0 - _CamProj[0][2]) / _CamProj[0][0];
+        float y = (uv.y * 2.0 - 1.0 - _CamProj[1][2]) / _CamProj[1][1];
+        float3 viewRay = float3(x, y, 1.0);
+        linearDepth *= length(viewRay);
+    }
+
+    float actualDist = linearDepth * _FarPlane;
+    float dist = max(0.001, actualDist);
+    
+    // Exact same base value calculated in the fragment shader
+    float val = _DepthMultiplier / dist;
+
+    // IEEE 754 positive floats have the same bitwise ordering as uints
+    uint uval = asuint(val);
+    InterlockedMin(_MinMaxBuffer[0], uval);
+    InterlockedMax(_MinMaxBuffer[1], uval);
+}

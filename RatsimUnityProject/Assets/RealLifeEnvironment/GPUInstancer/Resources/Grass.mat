@@ -29,9 +29,13 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _DitherTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _WindTexture:
-        m_Texture: {fileID: 2800000, guid: 538ddbbcf60210f4790c3eca26b4df98, type: 3}
-        m_Scale: {x: 0.005, y: 0.005}
+        m_Texture: {fileID: 2800000, guid: 8ad5704cb0c384541b069659e8246957, type: 3}
+        m_Scale: {x: 0.01, y: 0.01}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
@@ -40,13 +44,22 @@ Material:
     - _DistanceA: 10
     - _DistanceB: 250
     - _DistanceScaleMultiplier: 5.08
+    - _DitherAnimationSpeed: 0
+    - _DitherInstanceInfluence: 0
+    - _DitherMeshUVInfluence: 0
+    - _DitherSolidThreshold: 1
+    - _DitherTextureScale: 64
+    - _DitherTransparency: 0
     - _EdgeCullThreshold: 0
     - _EnableWaterInfluence: 1
+    - _ExcludeAgainstSkybox: 0
+    - _GlobalAlphaMultiplier: 1
     - _HueToChangeTo: 0.221
     - _InstanceScale: 1
     - _InstanceScaleRandomness: 0.153
     - _MaxDistFromWater: 100
     - _MinDistFromWater: 0
+    - _NormalLightingInfluence: 1
     - _RandomNormal: 1
     - _ReceiveShadows: 1
     - _SaturationToChangeTo: 0.822
@@ -57,14 +70,15 @@ Material:
     - _TextureCount: 1
     - _TransitionSmoothness: 133.7
     - _UseBiomeClipping: 0
+    - _UseDitherTexture: 0
     - _WindStrength: 0.3
     m_Colors:
     - _AOColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BaseScale: {r: 5.92, g: 0.7, b: 0, a: 0}
+    - _BaseScale: {r: 7.64, g: 1, b: 0, a: 0}
     - _ColorA: {r: 1, g: 1, b: 1, a: 1}
     - _ColorB: {r: 1, g: 1, b: 1, a: 1}
     - _ScaleMultiplierA: {r: 1, g: 1, b: 0, a: 0}
     - _ScaleMultiplierB: {r: 1.81, g: 1, b: 0, a: 0}
-    - _WindScroll: {r: -0.1, g: -0.1, b: 0, a: 0}
+    - _WindScroll: {r: 0.05, g: 0.05, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

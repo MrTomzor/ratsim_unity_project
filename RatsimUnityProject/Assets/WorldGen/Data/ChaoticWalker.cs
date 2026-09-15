@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Capsule-style NPC that wanders with a deterministic seeded RNG. Driven by the
-/// RoslikeTCPServer discrete timer so motion is lockstep with physics.
+/// ZmqUnityServer discrete timer so motion is lockstep with physics.
 ///
 /// Behaviour per tick:
 ///   1. If avoidant and an agent is within avoidanceDistance, set velocity radially
@@ -54,7 +54,7 @@ public class ChaoticWalker : MonoBehaviour {
         }
         StartWalkPhase();
 
-        RoslikeTCPServer.GetInstance().RegisterTimerDiscrete((ev) => Tick(), 1);
+        ZmqUnityServer.GetInstance().RegisterTimerDiscrete((ev) => Tick(), 1);
     }
 
     private void ResolveAgent() {

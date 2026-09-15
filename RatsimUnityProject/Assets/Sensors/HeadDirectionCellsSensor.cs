@@ -10,12 +10,12 @@ public class HeadDirectionCellsSensor : MonoBehaviour
     /// <summary>Latest cell activations [0..1]. Read by visualizer.</summary>
     [HideInInspector] public float[] lastActivations;
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
     float[] cellCenterAngles;
 
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
 
         lastActivations = new float[numCells];
         cellCenterAngles = new float[numCells];
@@ -29,7 +29,7 @@ public class HeadDirectionCellsSensor : MonoBehaviour
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         float eulerYDeg = transform.rotation.eulerAngles.y;
         float yawRad = -eulerYDeg * Mathf.Deg2Rad;

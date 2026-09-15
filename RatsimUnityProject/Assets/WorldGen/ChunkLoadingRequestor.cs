@@ -24,7 +24,7 @@ public class ChunkLoadingRequestor : MonoBehaviour {
 
     public void Start() {
         // Register timer to tick
-        RoslikeTCPServer.GetInstance().RegisterTimerDiscrete((ev) => Tick(), 1);
+        ZmqUnityServer.GetInstance().RegisterTimerDiscrete((ev) => Tick(), 1);
     }
 
     // --- Tick ---

@@ -43,21 +43,35 @@ float SampleBicubicBSpline(sampler2D tex, float4 texSizeData, float2 uv)
     return result;
 }
 
-float GetTerrainHeightOriginal(float2 worldXZ)
+//float GetTerrainHeightOriginal(float2 worldXZ)
+//{
+//    if (_CustomTerrainHeightmap_Bounds.z > 0.0) 
+//    {
+//        float2 center = _CustomTerrainHeightmap_Bounds.xy;
+//        float2 size = _CustomTerrainHeightmap_Bounds.zw;
+//        float2 uv = (worldXZ - center) / size + 0.5;
+//        return SampleBicubicBSpline(_CustomTerrainHeightmap, _CustomTerrainHeightmap_TexelSize, uv) * _CustomTerrainHeightmap_Multiplier;
+//    }
+//    return 0.0;
+//}
+
+float GetTerrainHeightCheap(float2 worldXZ)
 {
     if (_CustomTerrainHeightmap_Bounds.z > 0.0) 
     {
         float2 center = _CustomTerrainHeightmap_Bounds.xy;
         float2 size = _CustomTerrainHeightmap_Bounds.zw;
         float2 uv = (worldXZ - center) / size + 0.5;
-        return SampleBicubicBSpline(_CustomTerrainHeightmap, _CustomTerrainHeightmap_TexelSize, uv) * _CustomTerrainHeightmap_Multiplier;
+        // Single bilinear lookup instead of 4-tap bicubic
+        return tex2Dlod(_CustomTerrainHeightmap, float4(uv, 0, 0)).r * _CustomTerrainHeightmap_Multiplier;
     }
     return 0.0;
 }
 
 float GetTerrainHeight(float2 worldXZ)
 {
-    return GetTerrainHeightOriginal(worldXZ);
+    return GetTerrainHeightCheap(worldXZ);
+    //return GetTerrainHeightOriginal(worldXZ);
 }
 
 #endif // REAL_TERRAIN_HEIGHT_CGINC

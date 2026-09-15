@@ -4,16 +4,16 @@ public class AbsolutePose2DSensor : MonoBehaviour
 {
     public string topic;
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         var msg = new PoseMessage();
         CoordConversion.UnityToRos(transform.position, out float rx, out float ry, out float rz);

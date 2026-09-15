@@ -14,13 +14,13 @@ public class RGBDSensor : MonoBehaviour
     public int imageHeight = 480;
     public float depthImageMaxRange = 100.0f; // Maximum range for depth sensor
     public bool captureDepth = true; // If false, skip depth capture/encode and publish RGB only
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
         //cam = GetComponent<Camera>();
     }
@@ -39,7 +39,7 @@ public class RGBDSensor : MonoBehaviour
 }
 
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         // Capture RGB
         Texture2D rgbTex = CaptureCamera(cam);

@@ -8,7 +8,7 @@ public class PoseTeleportActuator : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        RoslikeTCPServer.GetInstance().Subscribe<PoseMessage>(topic, Teleport);
+        ZmqUnityServer.GetInstance().Subscribe<PoseMessage>(topic, Teleport);
     }
 
     // Update is called once per frame

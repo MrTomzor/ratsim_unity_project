@@ -11,7 +11,7 @@ public class Returner : MonoBehaviour
     void Start()
     {
         startingPosition = transform.position;
-        var conn = RoslikeTCPServer.GetInstance();
+        var conn = ZmqUnityServer.GetInstance();
         conn.Subscribe<StringMessage>(topicName, ReturnToStartPosition);
     }
 

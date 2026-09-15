@@ -13,7 +13,7 @@ public class ComponentEnablerSimple : MonoBehaviour
     {
         if (switchTopic != "")
         {
-            RoslikeTCPServer.GetInstance().Subscribe<BoolMessage>(switchTopic, OnSwitchMessage);
+            ZmqUnityServer.GetInstance().Subscribe<BoolMessage>(switchTopic, OnSwitchMessage);
         }
     }
 

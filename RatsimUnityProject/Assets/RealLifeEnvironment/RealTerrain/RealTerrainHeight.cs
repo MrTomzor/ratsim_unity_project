@@ -73,25 +73,40 @@ namespace RealLifeEnvironment
             return result;
         }
 
-        public static float GetTerrainHeightOriginal(Vector2 worldXZ)
+        //public static float GetTerrainHeightOriginal(Vector2 worldXZ)
+        //{
+        //    if (_customHeightmap != null && _customHeightmapBounds.z > 0.0f)
+        //    {
+        //        Vector2 center = new Vector2(_customHeightmapBounds.x, _customHeightmapBounds.y);
+        //        Vector2 size = new Vector2(_customHeightmapBounds.z, _customHeightmapBounds.w);
+        //        Vector2 uv = new Vector2(
+        //            (worldXZ.x - center.x) / size.x + 0.5f,
+        //            (worldXZ.y - center.y) / size.y + 0.5f
+        //        );
+        //        return SampleBicubicBSpline(_customHeightmap, uv) * _heightmapMultiplier;
+        //    }
+//
+        //    return 0f;
+        //}
+
+        public static float GetTerrainHeight(Vector2 worldXZ)
+        {
+            return GetTerrainHeightCheap(worldXZ);
+            //return GetTerrainHeightOriginal(worldXZ);
+        }
+
+        public static float GetTerrainHeightCheap(Vector2 worldXZ)
         {
             if (_customHeightmap != null && _customHeightmapBounds.z > 0.0f)
             {
                 Vector2 center = new Vector2(_customHeightmapBounds.x, _customHeightmapBounds.y);
                 Vector2 size = new Vector2(_customHeightmapBounds.z, _customHeightmapBounds.w);
-                Vector2 uv = new Vector2(
-                    (worldXZ.x - center.x) / size.x + 0.5f,
-                    (worldXZ.y - center.y) / size.y + 0.5f
-                );
-                return SampleBicubicBSpline(_customHeightmap, uv) * _heightmapMultiplier;
+                float u = (worldXZ.x - center.x) / size.x + 0.5f;
+                float v = (worldXZ.y - center.y) / size.y + 0.5f;
+                
+                return _customHeightmap.GetPixelBilinearAccurate(u, v).r * _heightmapMultiplier;
             }
-
             return 0f;
-        }
-
-        public static float GetTerrainHeight(Vector2 worldXZ)
-        {
-            return GetTerrainHeightOriginal(worldXZ);
         }
 
         // The terrain mesh uses triangle interpolation between integer coordinates, not continuous bicubic interpolation.
@@ -101,10 +116,10 @@ namespace RealLifeEnvironment
             float gridX = Mathf.Floor(worldXZ.x / gridSpacing) * gridSpacing;
             float gridZ = Mathf.Floor(worldXZ.y / gridSpacing) * gridSpacing;
             
-            float hA = GetTerrainHeightOriginal(new Vector2(gridX, gridZ));
-            float hB = GetTerrainHeightOriginal(new Vector2(gridX + gridSpacing, gridZ));
-            float hC = GetTerrainHeightOriginal(new Vector2(gridX, gridZ + gridSpacing));
-            float hD = GetTerrainHeightOriginal(new Vector2(gridX + gridSpacing, gridZ + gridSpacing));
+            float hA = GetTerrainHeight(new Vector2(gridX, gridZ));
+            float hB = GetTerrainHeight(new Vector2(gridX + gridSpacing, gridZ));
+            float hC = GetTerrainHeight(new Vector2(gridX, gridZ + gridSpacing));
+            float hD = GetTerrainHeight(new Vector2(gridX + gridSpacing, gridZ + gridSpacing));
             
             float fracX = (worldXZ.x - gridX) / gridSpacing;
             float fracZ = (worldXZ.y - gridZ) / gridSpacing;

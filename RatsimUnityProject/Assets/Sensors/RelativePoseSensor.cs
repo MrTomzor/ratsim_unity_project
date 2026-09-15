@@ -6,7 +6,7 @@ public class RelativePoseSensor : MonoBehaviour
 
     public bool considerOriginRotation = false;
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
     public Vector3 originPos;
     public Quaternion originRot;
@@ -20,11 +20,11 @@ public class RelativePoseSensor : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         var msg = new PoseMessage();
 

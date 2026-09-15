@@ -10,6 +10,8 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 /[Rr]ecordings/
+/[Aa]ssets/[Rr]eal[Ll]ife[Ee]nvironment/[Tt]errain[Tt]extures/
+/[Ww]orld[Cc]aptures[Ss]cenery/
 
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
@@ -82,3 +84,5 @@ crashlytics-build.properties
 
 # parkerhill unity project folder conventions
 /AssetBundles/
+
+# captures

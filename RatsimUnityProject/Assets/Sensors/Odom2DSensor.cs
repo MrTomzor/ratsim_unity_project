@@ -4,7 +4,7 @@ public class Odom2DSensor : MonoBehaviour
 {
     public string topic;
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
     Vector3 lastPos;
     Quaternion lastRot;
     public bool verbose = false;
@@ -14,14 +14,14 @@ public class Odom2DSensor : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
 
         lastPos = transform.position;
         lastRot = transform.rotation;
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         Quaternion deltaRot = Quaternion.Inverse(lastRot) * transform.rotation;
 

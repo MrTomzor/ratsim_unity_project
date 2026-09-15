@@ -22,7 +22,7 @@ public class SpawnerBasic : MonoBehaviour
             spawnArea.enabled = false; // Disable the collider to prevent physics interactions
         }*/
 
-        var conn = RoslikeTCPServer.GetInstance();
+        var conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(HandleObjectSpawning, 1);
         conn.Subscribe<StringMessage>(resetTopicName, ResetObjectsCallback);
 
@@ -47,7 +47,7 @@ public class SpawnerBasic : MonoBehaviour
         HandleObjectSpawning(null);
     }
 
-    public void HandleObjectSpawning(TimerEvent ev)
+    public void HandleObjectSpawning(ZmqTimerEvent ev)
     {
         //Remove destroyed objects from the list
         spawnedObjects.RemoveAll(obj => obj == null);

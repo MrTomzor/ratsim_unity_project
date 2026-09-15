@@ -18,7 +18,7 @@ public class CarSpawner : MonoBehaviour
 
     List<GameObject> spawnedCars = new List<GameObject>();
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
     public bool spawningEnabled = true;
     
@@ -26,7 +26,7 @@ public class CarSpawner : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
        
         conn.RegisterTimerDiscrete(MainLoop, 1);
     }
@@ -66,7 +66,7 @@ public class CarSpawner : MonoBehaviour
         }
     }
 
-    public void MainLoop(TimerEvent ev)
+    public void MainLoop(ZmqTimerEvent ev)
     {
         if(!spawningEnabled)
         {

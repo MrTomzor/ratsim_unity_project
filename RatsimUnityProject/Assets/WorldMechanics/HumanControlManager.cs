@@ -27,8 +27,8 @@ public class HumanControlManager : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        RoslikeTCPServer.GetInstance().RegisterTimerDiscrete(MainTimer, 1);
-        RoslikeTCPServer.GetInstance().Subscribe<BoolMessage>(enableTopic, SetHumanControlEnabled);
+        ZmqUnityServer.GetInstance().RegisterTimerDiscrete(MainTimer, 1);
+        ZmqUnityServer.GetInstance().Subscribe<BoolMessage>(enableTopic, SetHumanControlEnabled);
     }
 
     // Update is called once per frame
@@ -37,7 +37,7 @@ public class HumanControlManager : MonoBehaviour
 
     }
 
-    public void MainTimer(TimerEvent ev)
+    public void MainTimer(ZmqTimerEvent ev)
     {
         if (humanControlEnabled)
         {

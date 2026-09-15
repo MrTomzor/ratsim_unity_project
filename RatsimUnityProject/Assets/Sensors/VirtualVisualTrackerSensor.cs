@@ -8,7 +8,7 @@ public class VirtualVisualTrackerSensor : MonoBehaviour
     public bool verbose = false;
     public float maxRange = 100f; // Maximum range of the sensor
                                   // Start is called once before the first execution of Update after the MonoBehaviour is created
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
     public string topicName = "/visual_point_track_pcl";
 
@@ -24,11 +24,11 @@ public class VirtualVisualTrackerSensor : MonoBehaviour
 
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         VisualPointTrackerMessage msg = new VisualPointTrackerMessage();
 

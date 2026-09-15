@@ -19,6 +19,8 @@ public class AgentPOVCameraFollower : CameraFollowerParent
 
     void Update()
     {
+        if (RealLifeEnvironment.WorldStateCapturer.IsCapturing) return;
+
         if (!lockRotation)
         {
             float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
@@ -30,6 +32,8 @@ public class AgentPOVCameraFollower : CameraFollowerParent
     // LateUpdate is called after all Update functions have been called
     void LateUpdate()
     {
+        if (RealLifeEnvironment.WorldStateCapturer.IsCapturing) return;
+
         if (target != null)
         {
             // Calculate the offset in world coordinates relative to the target's local orientation

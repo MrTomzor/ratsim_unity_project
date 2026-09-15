@@ -73,7 +73,7 @@ public class WildfireWorldManager : MonoBehaviour
     public GameObject rewardPickupPrefab;
     public GameObject arenaWallPrefab;
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
     // FLAGS
     public bool worldgenRequested = false;
@@ -88,7 +88,7 @@ public class WildfireWorldManager : MonoBehaviour
         
         defaultHeight = this.transform.position.y;
 
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         //conn.Subscribe<WildfireWorldGenMessage>(mapGenMsgTopic, GenerateMsgCallback);
         conn.RegisterTimerDiscrete(MainLoop, 1);
 
@@ -162,7 +162,7 @@ public class WildfireWorldManager : MonoBehaviour
         });
     }
 
-    public void MainLoop(TimerEvent ev)
+    public void MainLoop(ZmqTimerEvent ev)
     {
         if(worldgenRequested)
         {

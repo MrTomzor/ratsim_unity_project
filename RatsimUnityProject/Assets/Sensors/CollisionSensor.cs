@@ -4,7 +4,7 @@ using UnityEngine;
 public class CollisionSensor : MonoBehaviour
 {
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public bool hasCollided = false;
     public float collisionVel = 0;
@@ -19,11 +19,11 @@ public class CollisionSensor : MonoBehaviour
     
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(MainTimer, 1);
     }
 
-    public void MainTimer(TimerEvent ev)
+    public void MainTimer(ZmqTimerEvent ev)
     {
         internalStep++;
         if (hasCollided)

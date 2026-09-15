@@ -40,7 +40,7 @@ public class PersistentDynamicObject : MonoBehaviour {
         }
 
         originStructureId = parentStructure.DeterministicId;
-        uint currentStep = RoslikeTCPServer.GetInstance().stepIndex;
+        uint currentStep = ZmqUnityServer.GetInstance().stepIndex;
 
         if (loader.IsStructureRespawn(originStructureId, currentStep)) {
             // This structure already has living persistent objects from a previous load.

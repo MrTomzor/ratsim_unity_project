@@ -225,7 +225,7 @@ public class RewardObjectLoader : WorldStructureProvider {
 
         if (_totalCollected >= _totalSpawned) {
             _allCollectedPublished = true;
-            RoslikeTCPServer conn = RoslikeTCPServer.GetInstance();
+            ZmqUnityServer conn = ZmqUnityServer.GetInstance();
             conn.Publish(AllCollectedTopic, new BoolMessage { data = true });
             Debug.Log($"RewardObjectLoader: ALL REWARDS COLLECTED ({_totalCollected}/{_totalSpawned}) — published on {AllCollectedTopic}");
         }

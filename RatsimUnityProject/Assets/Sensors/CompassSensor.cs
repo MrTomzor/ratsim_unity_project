@@ -10,15 +10,15 @@ public class CompassSensor : MonoBehaviour
     /// <summary>Latest heading in radians [-pi, pi], ROS frame. Read by visualizer.</summary>
     [HideInInspector] public float lastYawRad;
 
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
 
     void Start()
     {
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         float eulerYDeg = transform.rotation.eulerAngles.y;
         float yawRad = -eulerYDeg * Mathf.Deg2Rad + biasRad;

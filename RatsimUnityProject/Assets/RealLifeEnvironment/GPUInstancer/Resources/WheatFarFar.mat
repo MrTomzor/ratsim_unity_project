@@ -11,7 +11,8 @@ Material:
   m_Shader: {fileID: 4800000, guid: 74e02d5c7b67c4c4d8e97100445600d4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _USE_DITHER_TEXTURE
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -27,9 +28,13 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _WindTexture:
-        m_Texture: {fileID: 2800000, guid: 538ddbbcf60210f4790c3eca26b4df98, type: 3}
+    - _DitherTexture:
+        m_Texture: {fileID: 2800000, guid: ae5e6f56907c3e14d9b84089259065e1, type: 3}
         m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WindTexture:
+        m_Texture: {fileID: 2800000, guid: 8ad5704cb0c384541b069659e8246957, type: 3}
+        m_Scale: {x: 0.01, y: 0.01}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
@@ -38,13 +43,22 @@ Material:
     - _DistanceA: 10
     - _DistanceB: 100
     - _DistanceScaleMultiplier: 47.35
+    - _DitherAnimationSpeed: 1000
+    - _DitherInstanceInfluence: 0
+    - _DitherMeshUVInfluence: 0
+    - _DitherSolidThreshold: 1
+    - _DitherTextureScale: 64
+    - _DitherTransparency: 0
     - _EdgeCullThreshold: 0
     - _EnableWaterInfluence: 0
+    - _ExcludeAgainstSkybox: 0
+    - _GlobalAlphaMultiplier: 1
     - _HueToChangeTo: 0.3
     - _InstanceScale: 5.63
     - _InstanceScaleRandomness: 0
     - _MaxDistFromWater: 50
     - _MinDistFromWater: 0
+    - _NormalLightingInfluence: 1
     - _RandomNormal: 0.736
     - _ReceiveShadows: 0
     - _SaturationToChangeTo: 0.8
@@ -55,6 +69,7 @@ Material:
     - _TextureCount: 1
     - _TransitionSmoothness: 10
     - _UseBiomeClipping: 0
+    - _UseDitherTexture: 1
     - _WindStrength: 0
     m_Colors:
     - _AOColor: {r: 1, g: 1, b: 1, a: 1}
@@ -63,6 +78,6 @@ Material:
     - _ColorB: {r: 1, g: 1, b: 1, a: 1}
     - _ScaleMultiplierA: {r: 1, g: 1, b: 0, a: 0}
     - _ScaleMultiplierB: {r: 1, g: 1, b: 0, a: 0}
-    - _WindScroll: {r: 0.1, g: 0.1, b: 0, a: 0}
+    - _WindScroll: {r: 0.05, g: 0.05, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

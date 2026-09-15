@@ -38,7 +38,7 @@ public class SensorVisualizationManager : MonoBehaviour
 
         SetAllVisualizersActive(false);
 
-        RoslikeTCPServer.GetInstance().Subscribe<BoolMessage>(humanControlTopic, OnHumanControlToggle);
+        ZmqUnityServer.GetInstance().Subscribe<BoolMessage>(humanControlTopic, OnHumanControlToggle);
     }
 
     void Update()

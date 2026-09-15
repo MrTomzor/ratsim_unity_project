@@ -31,7 +31,7 @@ public class SemanticLidarSensor : MonoBehaviour
     [HideInInspector] public float[] lastDescriptors;
 
     public int numRays;
-    RoslikeTCPServer conn;
+    ZmqUnityServer conn;
     public bool verbose = false;
     public bool enableSmokeCorruption = true;
     public bool checkIfInCollider = true;
@@ -46,20 +46,21 @@ public class SemanticLidarSensor : MonoBehaviour
     public string occlusionRegion = "none";
     public float occlusionDistance = 0.1f;
 
+    public static Dictionary<string, float[]> precomputedNamedDescriptors = new Dictionary<string, float[]>();
+    public static float[] defaultZeroDescriptor = null;
+
     public static float[] GetNamedSemanticObjectDescriptor(string semanticName)
     {
-        // One hot encoding based on the semantic name
-        if (semanticNamesToIndices.ContainsKey(semanticName))
+        if (precomputedNamedDescriptors != null && precomputedNamedDescriptors.TryGetValue(semanticName, out var desc))
         {
-            int index = (int)semanticNamesToIndices[semanticName];
-            float[] descriptor = new float[semanticNamesToIndices.Count];
-            descriptor[index] = 1.0f;
-            return descriptor;
+            return desc;
         }
-        else
+        if (defaultZeroDescriptor != null)
         {
-            return new float[semanticNamesToIndices.Count];
+            return defaultZeroDescriptor;
         }
+        int count = semanticNamesToIndices != null ? semanticNamesToIndices.Count : (int)descriptorDimension;
+        return new float[count];
     }
 
     void InitializeSemanticSetData()
@@ -79,6 +80,17 @@ public class SemanticLidarSensor : MonoBehaviour
         }
 
         descriptorDimension = (uint)semanticNamesToIndices.Count;
+        defaultZeroDescriptor = new float[descriptorDimension];
+        precomputedNamedDescriptors.Clear();
+        foreach (DictionaryEntry entry in semanticNamesToIndices)
+        {
+            string name = (string)entry.Key;
+            int idx = (int)entry.Value;
+            float[] desc = new float[descriptorDimension];
+            desc[idx] = 1.0f;
+            precomputedNamedDescriptors[name] = desc;
+        }
+
         Debug.Log("Initialized Semantic Set Hashtable with " + descriptorDimension + " semantic classes.");
         Debug.Log("Semantic classes:");
         foreach (DictionaryEntry entry in semanticNamesToIndices)
@@ -113,7 +125,7 @@ public class SemanticLidarSensor : MonoBehaviour
 
         numRays = 1 + (angleEndDeg - angleStartDeg) / angleIncrementDeg;
 
-        conn = RoslikeTCPServer.GetInstance();
+        conn = ZmqUnityServer.GetInstance();
         conn.RegisterTimerDiscrete(SenseAndPublish, 1);
         //SenseAndPublish(null); 
 
@@ -179,7 +191,7 @@ public class SemanticLidarSensor : MonoBehaviour
             sensed[i] = new Tuple<float, float[]>(occlusionDistance, defaultDescriptor);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         var timestart = Time.realtimeSinceStartup;
         Lidar2DMessage msg = new Lidar2DMessage();

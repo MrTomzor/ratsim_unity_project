@@ -1395,6 +1395,182 @@ MonoBehaviour:
   maxDensity:
     overrideState: 1
     value: 1
+--- !u!114 &-2570268429946245620
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36cceb607ce7f06468a871da5c5c55a1, type: 3}
+  m_Name: VolumetricSmokeSettings
+  m_EditorClassIdentifier: 
+  active: 1
+  enabled:
+    overrideState: 1
+    value: 1
+  downsample:
+    overrideState: 0
+    value: -253
+  useReferenceResolution:
+    overrideState: 0
+    value: 1
+  referenceResolution:
+    overrideState: 0
+    value: {x: 1920, y: 1080}
+  stepCount:
+    overrideState: 0
+    value: 32
+  preliminaryRayStep:
+    overrideState: 0
+    value: 0
+  useDither:
+    overrideState: 0
+    value: 1
+  minDensityByStepCurve:
+    overrideState: 0
+    value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0.00390625
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 128
+        value: 0.5
+        inSlope: 0.00390625
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  maxDrawDistance:
+    overrideState: 0
+    value: 100
+  stepCount2:
+    overrideState: 0
+    value: 16
+  maxDrawDistance2:
+    overrideState: 0
+    value: 300
+  phase2Shadows:
+    overrideState: 0
+    value: 1
+  smokeHeight:
+    overrideState: 0
+    value: 10
+  smokeHeightFade:
+    overrideState: 0
+    value: 2
+  densityFadeStart:
+    overrideState: 0
+    value: 800
+  densityFadeEnd:
+    overrideState: 0
+    value: 1000
+  maxWaterDistance:
+    overrideState: 0
+    value: 100
+  waterDistanceDensityCurve:
+    overrideState: 0
+    value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  globalDensityMultiplier:
+    overrideState: 0
+    value: 1
+  upsampleSamples:
+    overrideState: 0
+    value: 4
+  smokeColor:
+    overrideState: 0
+    value: {r: 0.8, g: 0.8, b: 0.8, a: 1}
+  smokeColorDistant:
+    overrideState: 0
+    value: {r: 0.6, g: 0.65, b: 0.75, a: 1}
+  smokeColorDistance:
+    overrideState: 0
+    value: 200
+  sunColorInfluence:
+    overrideState: 0
+    value: 0
+  shadowOversample:
+    overrideState: 0
+    value: 2
+  shadowOversampleStartStep:
+    overrideState: 0
+    value: 0
+  shadowJitter:
+    overrideState: 0
+    value: 0.5
+  shadowJitterSamples:
+    overrideState: 0
+    value: 1
+  shadowJitterMaxSteps:
+    overrideState: 0
+    value: 16
+  shadowThreshold:
+    overrideState: 0
+    value: 0.5
+  edgeShadowWeight:
+    overrideState: 0
+    value: 0.5
+  shadowColor:
+    overrideState: 0
+    value: {r: 0.1, g: 0.1, b: 0.1, a: 1}
+  shadowDensityMultiplier:
+    overrideState: 0
+    value: 1
+  smokeSelfShadow:
+    overrideState: 0
+    value: 0
+  selfShadowStepSize:
+    overrideState: 0
+    value: 10
+  selfShadowStepsPhase1:
+    overrideState: 0
+    value: 1
+  selfShadowStrengthPhase1:
+    overrideState: 0
+    value: 1
+  selfShadowStepsPhase2:
+    overrideState: 0
+    value: 1
+  selfShadowStrengthPhase2:
+    overrideState: 0
+    value: 1
 --- !u!114 &-2349158694331094690
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1432,6 +1608,201 @@ MonoBehaviour:
   speedDown:
     overrideState: 1
     value: 1
+--- !u!114 &-1274810481022745346
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43c3733dc8cdff1469bffa06d2559e1b, type: 3}
+  m_Name: InvertEffect
+  m_EditorClassIdentifier: 
+  active: 1
+  enabled:
+    overrideState: 1
+    value: 1
+  blend:
+    overrideState: 1
+    value: 1
+--- !u!114 &-883098848216954144
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36cceb607ce7f06468a871da5c5c55a1, type: 3}
+  m_Name: VolumetricSmokeSettings
+  m_EditorClassIdentifier: 
+  active: 1
+  enabled:
+    overrideState: 1
+    value: 1
+  downsample:
+    overrideState: 1
+    value: 3
+  useReferenceResolution:
+    overrideState: 1
+    value: 0
+  referenceResolution:
+    overrideState: 0
+    value: {x: 1920, y: 1080}
+  stepCount:
+    overrideState: 1
+    value: 10
+  preliminaryRayStep:
+    overrideState: 1
+    value: 3
+  useDither:
+    overrideState: 1
+    value: 1
+  minDensityByStepCurve:
+    overrideState: 0
+    value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0.00390625
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 128
+        value: 0.5
+        inSlope: 0.00390625
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  maxDrawDistance:
+    overrideState: 1
+    value: 300
+  stepCount2:
+    overrideState: 1
+    value: 96
+  maxDrawDistance2:
+    overrideState: 1
+    value: 10000
+  phase2Shadows:
+    overrideState: 1
+    value: 1
+  smokeHeight:
+    overrideState: 1
+    value: 67
+  smokeHeightFade:
+    overrideState: 1
+    value: 54
+  densityFadeStart:
+    overrideState: 1
+    value: 5000
+  densityFadeEnd:
+    overrideState: 1
+    value: 10000
+  maxWaterDistance:
+    overrideState: 1
+    value: 300
+  waterDistanceDensityCurve:
+    overrideState: 0
+    value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  globalDensityMultiplier:
+    overrideState: 1
+    value: 0.02
+  upsampleSamples:
+    overrideState: 1
+    value: 4
+  smokeColor:
+    overrideState: 1
+    value: {r: 0.8000001, g: 0.8000001, b: 0.8000001, a: 1}
+  smokeColorDistant:
+    overrideState: 1
+    value: {r: 0.30588236, g: 0.40784317, b: 0.5411765, a: 1}
+  smokeColorDistance:
+    overrideState: 1
+    value: 14903
+  sunColorInfluence:
+    overrideState: 1
+    value: 0.4
+  shadowOversample:
+    overrideState: 1
+    value: 3
+  shadowOversampleStartStep:
+    overrideState: 1
+    value: 1
+  shadowJitter:
+    overrideState: 1
+    value: 1.5
+  shadowJitterSamples:
+    overrideState: 1
+    value: 1
+  shadowJitterMaxSteps:
+    overrideState: 1
+    value: 6
+  shadowThreshold:
+    overrideState: 1
+    value: 0.5
+  edgeShadowWeight:
+    overrideState: 1
+    value: 0.4
+  shadowColor:
+    overrideState: 1
+    value: {r: 0.04705883, g: 0.043137256, b: 0.0627451, a: 1}
+  shadowDensityMultiplier:
+    overrideState: 1
+    value: 1
+  smokeSelfShadow:
+    overrideState: 1
+    value: 1
+  selfShadowStepSize:
+    overrideState: 1
+    value: 5
+  selfShadowStepsPhase1:
+    overrideState: 1
+    value: 1
+  selfShadowStrengthPhase1:
+    overrideState: 1
+    value: 1
+  selfShadowStepsPhase2:
+    overrideState: 1
+    value: 1
+  selfShadowStrengthPhase2:
+    overrideState: 1
+    value: 1
 --- !u!114 &-749206034468883051
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1444,7 +1815,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48a79b01ea5641d4aa6daa2e23605641, type: 3}
   m_Name: Bloom
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   enabled:
     overrideState: 1
     value: 1
@@ -1479,6 +1850,203 @@ MonoBehaviour:
   dirtIntensity:
     overrideState: 0
     value: 0
+--- !u!114 &-156062378115633001
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34204063a8218d34da8d4384a8192d8c, type: 3}
+  m_Name: VolumetricSmokeEffect
+  m_EditorClassIdentifier: 
+  active: 1
+  enabled:
+    overrideState: 1
+    value: 1
+  downsample:
+    overrideState: 0
+    value: 2
+  useReferenceResolution:
+    overrideState: 0
+    value: 0
+  referenceResolution:
+    overrideState: 0
+    value: {x: 1920, y: 1080}
+  stepCount:
+    overrideState: 1
+    value: 20
+  preliminaryRayStep:
+    overrideState: 0
+    value: 3
+  useDither:
+    overrideState: 0
+    value: 1
+  minDensityByStepCurve:
+    overrideState: 1
+    value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 10.152859
+        value: -0.00063960254
+        inSlope: 0.00390625
+        outSlope: 0.00390625
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
+      - serializedVersion: 3
+        time: 128
+        value: 0.5
+        inSlope: 0.00390625
+        outSlope: 0.00390625
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  maxDrawDistance:
+    overrideState: 0
+    value: 300
+  stepCount2:
+    overrideState: 1
+    value: 90
+  maxDrawDistance2:
+    overrideState: 0
+    value: 10000
+  phase2Shadows:
+    overrideState: 0
+    value: 1
+  smokeHeight:
+    overrideState: 1
+    value: 150
+  smokeHeightFade:
+    overrideState: 1
+    value: 150
+  densityFadeStart:
+    overrideState: 0
+    value: 5000
+  densityFadeEnd:
+    overrideState: 0
+    value: 10000
+  maxWaterDistance:
+    overrideState: 0
+    value: 300
+  waterDistanceDensityCurve:
+    overrideState: 1
+    value:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.51693493
+        value: 0.14350939
+        inSlope: -0.6345735
+        outSlope: -0.6345735
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.33333334
+        outWeight: 0.4002466
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -0.15168612
+        outSlope: -0.15168612
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0.19717917
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  globalDensityMultiplier:
+    overrideState: 1
+    value: 0.015
+  upsampleSamples:
+    overrideState: 0
+    value: 4
+  smokeColor:
+    overrideState: 0
+    value: {r: 1, g: 1, b: 1, a: 1}
+  smokeColorDistant:
+    overrideState: 0
+    value: {r: 0.415, g: 0.525, b: 0.678, a: 1}
+  smokeColorDistance:
+    overrideState: 0
+    value: 14903
+  sunColorInfluence:
+    overrideState: 0
+    value: 0.399
+  shadowOversample:
+    overrideState: 0
+    value: 1
+  shadowOversampleStartStep:
+    overrideState: 0
+    value: 1
+  shadowJitter:
+    overrideState: 0
+    value: 0.1
+  shadowJitterSamples:
+    overrideState: 0
+    value: 1
+  shadowJitterMaxSteps:
+    overrideState: 0
+    value: 0
+  shadowThreshold:
+    overrideState: 0
+    value: 0.5
+  edgeShadowWeight:
+    overrideState: 0
+    value: 0.411
+  shadowColor:
+    overrideState: 1
+    value: {r: 0.22012573, g: 0.22012573, b: 0.22012573, a: 1}
+  shadowDensityMultiplier:
+    overrideState: 0
+    value: 1
+  smokeSelfShadow:
+    overrideState: 0
+    value: 1
+  selfShadowStepSize:
+    overrideState: 0
+    value: 5
+  selfShadowStepsPhase1:
+    overrideState: 0
+    value: 1
+  selfShadowStrengthPhase1:
+    overrideState: 1
+    value: 0.69
+  selfShadowStepsPhase2:
+    overrideState: 0
+    value: 1
+  selfShadowStrengthPhase2:
+    overrideState: 1
+    value: 0.69
+  debugMode:
+    overrideState: 1
+    value: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1498,9 +2066,29 @@ MonoBehaviour:
   - {fileID: -5415845353373705095}
   - {fileID: -749206034468883051}
   - {fileID: -2349158694331094690}
-  - {fileID: 184521448358844014}
   - {fileID: -3785032619821698046}
---- !u!114 &184521448358844014
+  - {fileID: -156062378115633001}
+  - {fileID: 2152167211706266824}
+--- !u!114 &2131112471783051977
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b41016580d163f24b929222deaece9d7, type: 3}
+  m_Name: VolumetricSmokePPS
+  m_EditorClassIdentifier: 
+  active: 1
+  enabled:
+    overrideState: 1
+    value: 1
+  enableSmoke:
+    overrideState: 1
+    value: 1
+--- !u!114 &2152167211706266824
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1521,13 +2109,13 @@ MonoBehaviour:
     value: 1
   intensity:
     overrideState: 1
-    value: 0.218
+    value: 1
   size:
-    overrideState: 1
-    value: 0.3
-  lumContrib:
     overrideState: 0
     value: 1
+  lumContrib:
+    overrideState: 1
+    value: 0
 --- !u!114 &2199341434146266513
 MonoBehaviour:
   m_ObjectHideFlags: 3

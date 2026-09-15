@@ -20,6 +20,7 @@ public class AgentLoader : WorldDataProvider {
 
     private static readonly Dictionary<string, Type> SensorNameToType = new Dictionary<string, Type> {
         { "lidar2d",        typeof(SemanticLidarSensor) },
+        { "lidar3d",        typeof(SemanticLidar3DSensor) },
         { "rgbd",           typeof(RGBDSensor) },
         { "odom",           typeof(Odom2DSensor) },
         { "collision",      typeof(CollisionSensor) },
@@ -53,10 +54,10 @@ public class AgentLoader : WorldDataProvider {
         _spawnedAgents.Clear();
         _spawned = false;
 
-        // Sensors register timer callbacks with RoslikeTCPServer in Start().
+        // Sensors register timer callbacks with ZmqUnityServer in Start().
         // After destroying the agent, purge stale references so the server
         // doesn't invoke callbacks on destroyed components.
-        RoslikeTCPServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
+        ZmqUnityServer.GetInstance()?.CleanupDestroyedTimersAndSubscribers();
     }
 
     // ─────────────────────────────────────────────

@@ -96,10 +96,9 @@ GameObject:
   m_Component:
   - component: {fileID: 6529735708114265031}
   - component: {fileID: 6645319934695398768}
-  - component: {fileID: -759028483207049147}
-  - component: {fileID: 441888008279963221}
-  - component: {fileID: 7081735771137792426}
-  - component: {fileID: 3783130376408787828}
+  - component: {fileID: 8383230396870439503}
+  - component: {fileID: -3495035464953264496}
+  - component: {fileID: 717725142569106562}
   - component: {fileID: 1803348227048255791}
   - component: {fileID: 8404249312285438026}
   - component: {fileID: 9209674583849767778}
@@ -110,10 +109,11 @@ GameObject:
   - component: {fileID: -653628547537935938}
   - component: {fileID: 7141073898579080693}
   - component: {fileID: 5127488391532725983}
-  - component: {fileID: -8653734782038556784}
   - component: {fileID: -3201670612083729221}
   - component: {fileID: 8636935748284226829}
   - component: {fileID: 3826862030811725955}
+  - component: {fileID: 6562605661653669345}
+  - component: {fileID: -4602041183730603177}
   m_Layer: 7
   m_Name: SphereAgent
   m_TagString: Untagged
@@ -161,105 +161,12 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 0
+  m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
-  m_Constraints: 84
+  m_Constraints: 80
   m_CollisionDetection: 1
---- !u!114 &-759028483207049147
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675505943394758802}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a86953b95a5b573409028219e9f77040, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxLinearVelocity: 100
-  maxAngularVelocity: 0.5
-  maxLinearAcceleration: 0.5
-  maxAngularAcceleration: 0.2
-  velCmdTopic: /cmd_vel
-  accelCmdTopic: /cmd_accel
-  accelModeLinearDrag: 0.2
-  accelModeAngularDrag: 0.2
-  verbose: 0
-  steeringBias: 0
-  blockLeftTurn: 0
-  blockRightTurn: 0
-  humanControlTopic: /enable_human_control
-  humanControlEnabled: 1
-  humanControlMode: 0
-  mouseTurnSensitivity: 0.0015
-  scrollMultiplier: 1.5
-  mouseTurnSmoothness: 0.306
-  adaptiveSmoothing: 1
-  adaptiveSmoothnessFalloff: 0.1
-  lockCursor: 1
-  teleportUnitsForward: 4000
-  teleportEaseInAmount: 0.4
-  teleportEaseOutAmount: 0.4
-  teleportEaseDistanceFraction: 0.6
---- !u!114 &441888008279963221
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675505943394758802}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f723204076dfa8b46ae18beefb5939cb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxLinearVelocity: 139.22
-  maxAngularVelocity: 0.5
-  maxLinearAcceleration: 5
-  maxAngularAcceleration: 2
-  velCmdTopic: /cmd_vel
-  accelCmdTopic: /cmd_accel
-  accelModeLinearDrag: 0.3
-  accelModeAngularDrag: 0.3
-  verbose: 1
-  steeringBias: 0
-  blockLeftTurn: 0
-  blockRightTurn: 0
-  humanControlTopic: /enable_human_control
-  humanControlEnabled: 0
-  humanControlMode: 0
---- !u!114 &7081735771137792426
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675505943394758802}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 05267ae5d39a2f06cb04bb9c3ac108e4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  activeSemanticSet: {fileID: 11400000, guid: 129d887123c3c58369f3e0b00618fc5d, type: 2}
-  semanticSet: full_semantic_set
-  angleStartDeg: -90
-  angleEndDeg: 90
-  angleIncrementDeg: 10
-  maxRange: 20
-  topicName: /lidar2d
-  debugDrawRays: 1
-  lastRanges: []
-  lastDescriptors: []
-  numRays: 0
-  verbose: 1
-  enableSmokeCorruption: 1
-  checkIfInCollider: 1
-  inColliderCheckOffset: 0.02
-  occlusionRegion: none
-  occlusionDistance: 0.1
---- !u!135 &3783130376408787828
+--- !u!135 &8383230396870439503
 SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -280,6 +187,68 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-3495035464953264496
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3a08dc317341e84a934493cb96e99d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  walkSpeed: 100
+  runSpeed: 200
+  acceleration: 0.1
+  deceleration: 0
+  wallBounciness: 0.9
+  groundBounciness: 0.9
+  minBounceVelocity: 2
+  jumpForce: 30
+  groundCheckDistance: 5
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  velCmdTopic: /cmd_vel
+  humanControlTopic: /enable_human_control
+  humanControlEnabled: 1
+  mouseTurnSensitivity: 0.1
+  lockCursor: 1
+--- !u!114 &717725142569106562
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b8af686a0fa99642837fff61ea5df9c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  activeSemanticSet: {fileID: 0}
+  semanticSet: full_semantic_set
+  horizontalFovStartDeg: -180
+  horizontalFovEndDeg: 180
+  numRaysHorizontal: 400
+  verticalFovStartDeg: -15
+  verticalFovEndDeg: 15
+  numRaysVertical: 10
+  maxRange: 100
+  topicName: /lidar3d
+  lastRanges: []
+  lastDescriptors: []
+  debugDrawRays: 0
+  verbose: 0
+  sendMessageToPython: 1
+  useRawBinary: 1
+  occlusionRegion: none
+  occlusionDistance: 0.1
+  enableVolumetricSmoke: 1
+  smokeSampler: {fileID: 0}
+  smokeRaymarchSteps: 3
 --- !u!114 &1803348227048255791
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -435,22 +404,6 @@ MonoBehaviour:
   radius: 1
   longRangeRadius: 2
   verbose: 0
---- !u!114 &-8653734782038556784
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675505943394758802}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95abdbd500dab6686b79648f75ecd2af, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  showRays: 0
-  hitColor: {r: 1, g: 0, b: 0, a: 1}
-  missColor: {r: 1, g: 0, b: 0, a: 1}
-  toggleKey: 104
 --- !u!114 &-3201670612083729221
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -487,13 +440,53 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1675505943394758802}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aeb87cf0c3b19ab4da03dd3f653536f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   hoverHeight: 40
   heightAdjustSpeed: 100
+--- !u!114 &6562605661653669345
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cbd81dd99be9d44c9878669e7f4b7cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  showRays: 1
+  colorBySemantics: 1
+  hitColor: {r: 0, g: 0, b: 0, a: 1}
+  missColor: {r: 0, g: 0, b: 0, a: 0}
+  toggleKey: 104
+--- !u!114 &-4602041183730603177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675505943394758802}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5eb7c2c4e60176347a4e4dacbc5424df, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  activeSemanticSet: {fileID: 0}
+  semanticSet: full_semantic_set
+  horizontalFovStartDeg: -180
+  horizontalFovEndDeg: 180
+  numRaysHorizontal: 800
+  verticalFovStartDeg: -15
+  verticalFovEndDeg: 15
+  numRaysVertical: 10
+  maxRange: 100
+  topicName: /lidar3d
+  sendMessageToPython: 1
 --- !u!1 &1815150826476604271
 GameObject:
   m_ObjectHideFlags: 0

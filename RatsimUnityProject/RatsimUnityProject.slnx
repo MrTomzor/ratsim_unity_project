@@ -60,11 +60,9 @@
   <Project Path="Unity.ShaderGraph.Utilities.csproj" />
   <Project Path="Unity.VisualScripting.Shared.Editor.csproj" />
   <Project Path="Unity.Recorder.Base.csproj" />
-  <Project Path="Assembly-CSharp-firstpass.csproj" />
   <Project Path="Unity.EditorCoroutines.Editor.csproj" />
   <Project Path="Unity.USD.Core.csproj" />
   <Project Path="Unity.Bindings.OpenImageIO.Editor.csproj" />
-  <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
   <Project Path="Unity.Rendering.LightTransport.Editor.csproj" />
   <Project Path="Unity.InputSystem.DocCodeSamples.csproj" />
   <Project Path="Unity.RenderPipelines.Core.Runtime.Shared.csproj" />

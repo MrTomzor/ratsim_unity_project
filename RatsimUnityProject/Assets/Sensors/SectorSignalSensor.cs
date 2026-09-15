@@ -41,12 +41,12 @@ public class SectorSignalSensor : MonoBehaviour
     /// <summary>Channel names matching <see cref="lastValues"/>, in order. Read by UI visualizer.</summary>
     [HideInInspector] public string[] channelNames;
 
-    private RoslikeTCPServer _conn;
+    private ZmqUnityServer _conn;
     private string[] _perChannelTopics;
 
     void Start()
     {
-        _conn = RoslikeTCPServer.GetInstance();
+        _conn = ZmqUnityServer.GetInstance();
 
         // Parse channels
         var parsed = new List<string>();
@@ -73,7 +73,7 @@ public class SectorSignalSensor : MonoBehaviour
         _conn.RegisterTimerDiscrete(SenseAndPublish, 1);
     }
 
-    public void SenseAndPublish(TimerEvent ev)
+    public void SenseAndPublish(ZmqTimerEvent ev)
     {
         if (channelNames == null || channelNames.Length == 0) return;
 

@@ -25,6 +25,9 @@ namespace RealLifeEnvironment
         [Tooltip("How many in-game hours pass per real second. Set to 0 for static time.")]
         public float timeAdvanceRate = 1f;
 
+        [Tooltip("Allowed time range for automatic day cycling in hours (x = start, y = end). Cycling skips times outside this range.")]
+        public Vector2 timeRange = new Vector2(0f, 24f);
+
         [Header("References")]
         public Light directionalLight;
         [Tooltip("The skybox material to modify (works best with Procedural skybox).")]
@@ -99,6 +102,8 @@ namespace RealLifeEnvironment
             // Optionally pull variables from the JSON config if provided
             timeOfDay = WorldLoadingController.GetParamFloat("worldchanger/time_of_day", timeOfDay);
             timeAdvanceRate = WorldLoadingController.GetParamFloat("worldchanger/time_advance_rate", timeAdvanceRate);
+            timeRange.x = WorldLoadingController.GetParamFloat("worldchanger/time_range_min", timeRange.x);
+            timeRange.y = WorldLoadingController.GetParamFloat("worldchanger/time_range_max", timeRange.y);
             heavyFogMode = WorldLoadingController.GetParamInt("worldchanger/heavy_fog", heavyFogMode ? 1 : 0) != 0;
             fogDensityMultiplier = WorldLoadingController.GetParamFloat("worldchanger/fog_density_multiplier", fogDensityMultiplier);
             heavyFogDensity = WorldLoadingController.GetParamFloat("worldchanger/heavy_fog_density", heavyFogDensity);
@@ -129,6 +134,9 @@ namespace RealLifeEnvironment
                 {
                     timeOfDay += timeAdvanceRate * Time.deltaTime;
                     timeOfDay %= 24f;
+                    if (timeOfDay < 0f) timeOfDay += 24f;
+
+                    ApplyTimeRangeSkip();
                 }
             }
             else if (timeAdvanceRate > 0f)
@@ -138,6 +146,47 @@ namespace RealLifeEnvironment
             }
 
             UpdateLighting();
+        }
+
+        private void ApplyTimeRangeSkip()
+        {
+            float min = Mathf.Clamp(timeRange.x, 0f, 24f);
+            float max = Mathf.Clamp(timeRange.y, 0f, 24f);
+
+            // Default or full day range: no skipping
+            if ((min == 0f && max == 0f) || Mathf.Abs(max - min) >= 24f || (min == 0f && max == 24f))
+            {
+                return;
+            }
+
+            if (min < max)
+            {
+                if (timeOfDay >= max)
+                {
+                    float overshoot = timeOfDay - max;
+                    float maxOvershoot = Mathf.Max(0.5f, timeAdvanceRate * Time.deltaTime * 2f);
+                    timeOfDay = min + (overshoot < maxOvershoot ? overshoot : 0f);
+                }
+                else if (timeOfDay < min)
+                {
+                    timeOfDay = min;
+                }
+            }
+            else if (min > max)
+            {
+                // Overnight range: active during [min, 24) and [0, max], skips [max, min)
+                if (timeOfDay >= max && timeOfDay < min)
+                {
+                    float overshoot = timeOfDay - max;
+                    float maxOvershoot = Mathf.Max(0.5f, timeAdvanceRate * Time.deltaTime * 2f);
+                    timeOfDay = min + (overshoot < maxOvershoot ? overshoot : 0f);
+                    if (timeOfDay >= 24f) timeOfDay %= 24f;
+                }
+            }
+            else
+            {
+                timeOfDay = min;
+            }
         }
 
         private void OnValidate()

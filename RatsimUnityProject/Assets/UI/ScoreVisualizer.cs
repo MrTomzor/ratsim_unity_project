@@ -28,8 +28,8 @@ public class ScoreVisualizer : MonoBehaviour
 
     void Start()
     {
-        RoslikeTCPServer.GetInstance().Subscribe<Float32Message>(stepScoreTopic, OnStepScore);
-        RoslikeTCPServer.GetInstance().Subscribe<BoolMessage>("/sim_control/reset_episode", OnReset);
+        ZmqUnityServer.GetInstance().Subscribe<Float32Message>(stepScoreTopic, OnStepScore);
+        ZmqUnityServer.GetInstance().Subscribe<BoolMessage>("/sim_control/reset_episode", OnReset);
 
         UpdateDisplay();
 

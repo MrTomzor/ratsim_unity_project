@@ -73,6 +73,8 @@ namespace RealLifeEnvironment
         public bool castShadows = true;
         [Tooltip("If enabled, instances that are scaled to overlap into other biomes will be clipped pixel-perfectly at the boundary in the shader.")]
         public bool pixelAccurateBiomeClipping = false;
+        [Tooltip("If enabled, pixels rendered against the skybox will be clipped in the shader.")]
+        public bool excludeRenderingAgainstSkybox = false;
         public float spacing = 0.5f;//Spacing between instances
         public float drawDistance = 300;
         public float fullDensityDistance = 50;//After this distance, we start removing some instances in sake of performance
@@ -105,6 +107,8 @@ namespace RealLifeEnvironment
 
         [Header("Debug")]
         public bool previewVisibleInstanceCount = false;
+        [Tooltip("If true, this instancer will be rendered into the custom depth map for visualization. Disable to save performance.")]
+        public bool showInDepthMap = true;
 
         [Header("Stats")]
         [Tooltip("Shows how many total places are being considered by the compute shader.")]
@@ -170,6 +174,7 @@ namespace RealLifeEnvironment
 
             if (spacing == 0 || instanceMaterial == null) return;
             if (Camera.main == null) return;
+            GPUInstancerDepthPass.EnsureOnCamera(Camera.main);
             if (instanceMesh == null) return;
 
             Bounds cameraBounds = CalculateCameraBounds(Camera.main);
@@ -255,6 +260,12 @@ namespace RealLifeEnvironment
                 }
             }
 
+            propertyBlock.SetFloat("_ExcludeAgainstSkybox", excludeRenderingAgainstSkybox ? 1f : 0f);
+            if (excludeRenderingAgainstSkybox && Camera.main != null)
+            {
+                Camera.main.depthTextureMode |= DepthTextureMode.Depth;
+            }
+
             //Big Draw Call -------------------------------------------------------------
             Graphics.DrawMeshInstancedIndirect(instanceMesh, 0, instanceMaterial, cameraBounds, argsBuffer, 0, propertyBlock, ShadowCastingMode.Off, true);
 
@@ -286,6 +297,23 @@ namespace RealLifeEnvironment
                         shadowMaterial.SetTexture("_WindTexture", instanceMaterial.GetTexture("_WindTexture"));
                         shadowMaterial.SetVector("_WindTexture_ST", instanceMaterial.GetVector("_WindTexture_ST"));
                     }
+                    
+                    // Sync Dither Settings
+                    if (instanceMaterial.HasProperty("_DitherTransparency")) shadowMaterial.SetFloat("_DitherTransparency", instanceMaterial.GetFloat("_DitherTransparency"));
+                    if (instanceMaterial.HasProperty("_UseDitherTexture")) shadowMaterial.SetFloat("_UseDitherTexture", instanceMaterial.GetFloat("_UseDitherTexture"));
+                    if (instanceMaterial.HasProperty("_DitherTexture")) shadowMaterial.SetTexture("_DitherTexture", instanceMaterial.GetTexture("_DitherTexture"));
+                    if (instanceMaterial.HasProperty("_DitherTextureScale")) shadowMaterial.SetFloat("_DitherTextureScale", instanceMaterial.GetFloat("_DitherTextureScale"));
+                    if (instanceMaterial.HasProperty("_DitherMeshUVInfluence")) shadowMaterial.SetFloat("_DitherMeshUVInfluence", instanceMaterial.GetFloat("_DitherMeshUVInfluence"));
+                    if (instanceMaterial.HasProperty("_DitherInstanceInfluence")) shadowMaterial.SetFloat("_DitherInstanceInfluence", instanceMaterial.GetFloat("_DitherInstanceInfluence"));
+                    if (instanceMaterial.HasProperty("_DitherAnimationSpeed")) shadowMaterial.SetFloat("_DitherAnimationSpeed", instanceMaterial.GetFloat("_DitherAnimationSpeed"));
+                    if (instanceMaterial.HasProperty("_DitherSolidThreshold")) shadowMaterial.SetFloat("_DitherSolidThreshold", instanceMaterial.GetFloat("_DitherSolidThreshold"));
+                    if (instanceMaterial.HasProperty("_GlobalAlphaMultiplier")) shadowMaterial.SetFloat("_GlobalAlphaMultiplier", instanceMaterial.GetFloat("_GlobalAlphaMultiplier"));
+                    
+                    if (instanceMaterial.IsKeywordEnabled("_DITHERED_TRANSPARENCY")) shadowMaterial.EnableKeyword("_DITHERED_TRANSPARENCY");
+                    else shadowMaterial.DisableKeyword("_DITHERED_TRANSPARENCY");
+                    
+                    if (instanceMaterial.IsKeywordEnabled("_USE_DITHER_TEXTURE")) shadowMaterial.EnableKeyword("_USE_DITHER_TEXTURE");
+                    else shadowMaterial.DisableKeyword("_USE_DITHER_TEXTURE");
                     // Pass main camera position so distance-based scaling matches the visible pass
                     propertyBlock.SetVector("_MainCameraPosition", Camera.main.transform.position);
 
